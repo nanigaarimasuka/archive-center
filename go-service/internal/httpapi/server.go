@@ -260,6 +260,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	s.registerUpdateRoutes(sub)
 	sub.HandleFunc("GET /diagnostics/report", s.handleDiagnosticReport)
 	sub.HandleFunc("POST /diagnostics/logging", s.handleDiagnosticLogging)
+	registerDiagPprofRoutes(sub) // TEMPORARY: perf/lean-diag only
 	mux.Handle("/", s.diagnosticMiddleware(s.corsMiddleware(s.authMiddleware(s.reverseProxyBasePathMiddleware(sub)))))
 }
 
