@@ -231,12 +231,90 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	shadow["project_model"] = health.ProjectModel
 	shadow["model_ready"] = health.ModelReady
 	shadow["preflight_issues"] = health.PreflightIssues
+	// Search parameters do not depend on the query vectors; they are set here
+	// so searches for already known vectors can start before embedding ends.
+	candidateLimit := limit
+	filter := strings.TrimSpace(clientMetaString(req.ClientMeta, "chroma_filter"))
+	searchSessionIDs := prepareTurnVectorHistorySessionIDs(req.ChatSessionID, historyScopes)
+	// Vector reads are independent of each other. Every pass is launched before
+	// any is merged; merging still walks sessions and queries in their original
+	// order, so ranks, duplicate owners and the first reported error are unchanged.
+	const vectorSearchConcurrency = 4 // transport bound, not a recall limit
+	vectorSearchSlots := make(chan struct{}, vectorSearchConcurrency)
+	var queryCountsMu sync.Mutex
+	// Passes and queries return mostly the same documents; each stored
+	// embedding is transferred once for all of them.
+	sharedEmbeddingContext := vector.WithSharedEmbeddings(ctx)
+	passContexts := map[string]context.Context{}
+	for _, pass := range []string{"all", "memory", "precise"} {
+		passContexts[pass] = vector.WithQueryResponseObserver(sharedEmbeddingContext, func(size, status int) {
+			queryCountsMu.Lock()
+			defer queryCountsMu.Unlock()
+			queryCounts[pass+".http_responses"]++
+			queryCounts[pass+".response_bytes"] += size
+		})
+	}
+	memoryFilter := `tier == "memory"`
+	preciseMemoryFilter := `source_table == "precise_memory_units"`
+	preciseCandidateCount := 0
+	for _, count := range preciseCandidateLimits {
+		preciseCandidateCount += maxInt(count, 0)
+	}
+	type vectorPass struct {
+		name             string
+		searchFilter     func(string) string
+		perSessionLimits map[string]int
+	}
+	allPass := vectorPass{"all", func(searchSessionID string) string {
+		if filter != "" {
+			return filter
+		}
+		return fmt.Sprintf("chat_session_id == %q", searchSessionID)
+	}, nil}
+	memoryPass := vectorPass{"memory", func(string) string { return memoryFilter }, nil}
+	precisePass := vectorPass{"precise", func(string) string { return preciseMemoryFilter }, preciseCandidateLimits}
+	passes := []vectorPass{allPass, memoryPass}
+	if preciseCandidateCount > 0 {
+		passes = append(passes, precisePass)
+	}
+	// passSearches lists a pass's searches per session, as they are launched.
+	passSearches := func(pass vectorPass, each func(sessionID string, limit int, filter string)) {
+		for _, searchSessionID := range searchSessionIDs {
+			sessionLimit := candidateLimit
+			if pass.perSessionLimits != nil {
+				sessionLimit = pass.perSessionLimits[searchSessionID]
+				if sessionLimit <= 0 {
+					continue
+				}
+			}
+			each(searchSessionID, sessionLimit, pass.searchFilter(searchSessionID))
+		}
+	}
+	// A search started before embedding ended, for a recent-turn query whose
+	// embedding was kept. It is used only for a final search with the same
+	// pass, session, query, vector, limit and filter.
+	type speculativeKey struct {
+		pass, sessionID string
+		origin          int
+	}
+	type speculativeSearch struct {
+		vector   []float32
+		limit    int
+		filter   string
+		done     chan struct{}
+		results  []vector.VectorDocument
+		err      error
+		duration time.Duration
+	}
+	speculative := map[speculativeKey]*speculativeSearch{}
+	queryOrigins := []int{}
 	queryVector := clientMetaFloat32Vector(req.ClientMeta, "chroma_query_vector")
 	queryVectors := [][]float32{}
 	vectorQueries := []prepareTurnRetrievalQuery{}
 	queryKey := "chroma_query_vector"
 	if len(queryVector) > 0 {
 		queryVectors = append(queryVectors, queryVector)
+		queryOrigins = append(queryOrigins, 0)
 		if len(retrievalQueries) > 0 {
 			vectorQueries = append(vectorQueries, retrievalQueries[0])
 		} else {
@@ -265,17 +343,48 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 			model     string
 			err       error
 			attempted bool
+			cacheHit  bool
 		}
 		embeddings := make([]queryEmbeddingResult, len(retrievalQueries))
 		embed := func(index int) {
-			text, resolvedModel, err := callQueryEmbedding(ctx, embeddingCfg, retrievalQueries[index].Text)
-			embeddings[index] = queryEmbeddingResult{parseFloat32JSONList(text), resolvedModel, err, true}
+			text, resolvedModel, hit, err := queryEmbedding(ctx, embeddingCfg, retrievalQueries[index].Text)
+			embeddings[index] = queryEmbeddingResult{parseFloat32JSONList(text), resolvedModel, err, true, hit}
 		}
 		embeddingStarted := time.Now()
 		// Preserve the primary-query failure path: do not spend requests on
 		// history if the current input cannot be embedded. History requests
 		// are then sent together, so embedding takes two waits however many
 		// recent turns are configured; each keeps its per-call timeout.
+		if queryEmbeddingCacheAllowed(ctx) {
+			// Early searches report into the query counts, so the recall
+			// returns only after they end, whether or not they are used.
+			defer func() {
+				for _, search := range speculative {
+					<-search.done
+				}
+			}()
+			for index := 1; index < len(retrievalQueries); index++ {
+				text, kept := sharedQueryEmbeddingCache.peek(embeddingCfg, retrievalQueries[index].Text)
+				known := parseFloat32JSONList(text)
+				if !kept || len(known) == 0 {
+					continue
+				}
+				for _, pass := range passes {
+					passSearches(pass, func(sessionID string, limit int, filter string) {
+						search := &speculativeSearch{vector: known, limit: limit, filter: filter, done: make(chan struct{})}
+						speculative[speculativeKey{pass.name, sessionID, index}] = search
+						go func() {
+							defer close(search.done)
+							vectorSearchSlots <- struct{}{}
+							defer func() { <-vectorSearchSlots }()
+							started := time.Now()
+							search.results, search.err = s.Vector.Search(passContexts[pass.name], sessionID, search.vector, limit, filter)
+							search.duration = time.Since(started)
+						}()
+					})
+				}
+			}
+		}
 		embed(0)
 		if embeddings[0].err == nil && len(embeddings[0].vector) > 0 {
 			var workers sync.WaitGroup
@@ -290,6 +399,17 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		}
 		// This timing measures elapsed preparation, not summed concurrent calls.
 		searchTiming.addElapsed("embedding", embeddingStarted)
+		if queryEmbeddingCacheAllowed(ctx) {
+			hits := 0
+			for _, embedded := range embeddings {
+				if embedded.cacheHit {
+					hits++
+				}
+			}
+			slog.InfoContext(ctx, "query embedding cache", "queries", len(retrievalQueries), "hits", hits,
+				"current_input_hit", embeddings[0].cacheHit, "newest_history_hit", len(embeddings) > 1 && embeddings[1].cacheHit,
+				"elapsed_ms", time.Since(embeddingStarted).Milliseconds())
+		}
 		for _, embedded := range embeddings {
 			if embedded.attempted {
 				queryCounts["embedding_calls"]++
@@ -324,6 +444,7 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 				continue
 			}
 			queryVectors = append(queryVectors, vectorValue)
+			queryOrigins = append(queryOrigins, index)
 			vectorQueries = append(vectorQueries, query)
 			if strings.TrimSpace(embedded.model) != "" {
 				model = strings.TrimSpace(embedded.model)
@@ -351,15 +472,6 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	} else {
 		shadow["note"] = "R2 bounded recall read drill: ChromaDB vector search remains support-only until endpoint readiness is configured"
 	}
-	candidateLimit := limit
-	filter := strings.TrimSpace(clientMetaString(req.ClientMeta, "chroma_filter"))
-	searchSessionIDs := prepareTurnVectorHistorySessionIDs(req.ChatSessionID, historyScopes)
-	// Vector reads are independent of each other. Every pass is launched before
-	// any is merged; merging still walks sessions and queries in their original
-	// order, so ranks, duplicate owners and the first reported error are unchanged.
-	const vectorSearchConcurrency = 4 // transport bound, not a recall limit
-	vectorSearchSlots := make(chan struct{}, vectorSearchConcurrency)
-	var queryCountsMu sync.Mutex
 	type vectorSearchCall struct {
 		sessionID  string
 		queryIndex int
@@ -367,42 +479,34 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		err        error
 		duration   time.Duration
 	}
-	// Passes and queries return mostly the same documents; each stored
-	// embedding is transferred once for all of them.
-	sharedEmbeddingContext := vector.WithSharedEmbeddings(ctx)
-	launchSearch := func(pass string, searchFilter func(string) string, perSessionLimits map[string]int) func() ([]vector.VectorDocument, error) {
+	launchSearch := func(vectorPass vectorPass) func() ([]vector.VectorDocument, error) {
+		pass := vectorPass.name
 		passStarted := time.Now()
-		queryContext := vector.WithQueryResponseObserver(sharedEmbeddingContext, func(size, status int) {
-			queryCountsMu.Lock()
-			defer queryCountsMu.Unlock()
-			queryCounts[pass+".http_responses"]++
-			queryCounts[pass+".response_bytes"] += size
-		})
+		queryContext := passContexts[pass]
 		calls := []*vectorSearchCall{}
 		var searches sync.WaitGroup
-		for _, searchSessionID := range searchSessionIDs {
-			sessionLimit := candidateLimit
-			if perSessionLimits != nil {
-				sessionLimit = perSessionLimits[searchSessionID]
-				if sessionLimit <= 0 {
-					continue
-				}
-			}
-			sessionFilter := searchFilter(searchSessionID)
+		passSearches(vectorPass, func(searchSessionID string, sessionLimit int, sessionFilter string) {
 			for queryIndex := range queryVectors {
 				call := &vectorSearchCall{sessionID: searchSessionID, queryIndex: queryIndex}
 				calls = append(calls, call)
 				searches.Add(1)
 				go func(call *vectorSearchCall, limit int, filter string) {
 					defer searches.Done()
+					vector := queryVectors[call.queryIndex]
+					if early := speculative[speculativeKey{pass, call.sessionID, queryOrigins[call.queryIndex]}]; early != nil &&
+						early.limit == limit && early.filter == filter && prepareTurnSameFloat32s(early.vector, vector) {
+						<-early.done
+						call.results, call.err, call.duration = early.results, early.err, early.duration
+						return
+					}
 					vectorSearchSlots <- struct{}{}
 					defer func() { <-vectorSearchSlots }()
 					started := time.Now()
-					call.results, call.err = s.Vector.Search(queryContext, call.sessionID, queryVectors[call.queryIndex], limit, filter)
+					call.results, call.err = s.Vector.Search(queryContext, call.sessionID, vector, limit, filter)
 					call.duration = time.Since(started)
 				}(call, sessionLimit, sessionFilter)
 			}
-		}
+		})
 		return func() ([]vector.VectorDocument, error) {
 			searches.Wait()
 			defer func() { searchTiming.addElapsed("pass_"+pass, passStarted) }()
@@ -488,22 +592,11 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	shadow["candidate_policy"] = "ui_configured_vector_recall_limit_per_worldline_history_session"
 	shadow["filter"] = filter
 	shadow["history_session_ids"] = searchSessionIDs
-	memoryFilter := `tier == "memory"`
-	preciseCandidateCount := 0
-	for _, count := range preciseCandidateLimits {
-		preciseCandidateCount += maxInt(count, 0)
-	}
-	preciseMemoryFilter := `source_table == "precise_memory_units"`
-	waitAll := launchSearch("all", func(searchSessionID string) string {
-		if filter != "" {
-			return filter
-		}
-		return fmt.Sprintf("chat_session_id == %q", searchSessionID)
-	}, nil)
-	waitMemory := launchSearch("memory", func(string) string { return memoryFilter }, nil)
+	waitAll := launchSearch(allPass)
+	waitMemory := launchSearch(memoryPass)
 	var waitPrecise func() ([]vector.VectorDocument, error)
 	if preciseCandidateCount > 0 {
-		waitPrecise = launchSearch("precise", func(string) string { return preciseMemoryFilter }, preciseCandidateLimits)
+		waitPrecise = launchSearch(precisePass)
 	}
 	results, err := waitAll()
 	switch {
@@ -3526,4 +3619,18 @@ func relevantDegradedReason(query string, selected, candidates int) string {
 		return "no_keyword_overlap_candidates"
 	}
 	return "candidate_limit_zero"
+}
+
+// prepareTurnSameFloat32s reports whether two vectors hold the same values bit
+// for bit.
+func prepareTurnSameFloat32s(a, b []float32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if math.Float32bits(a[i]) != math.Float32bits(b[i]) {
+			return false
+		}
+	}
+	return true
 }

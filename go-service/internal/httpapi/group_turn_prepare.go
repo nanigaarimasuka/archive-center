@@ -274,6 +274,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 	diagnosticCtx, finishDiagnostic := diagnosticTurnRequest(r.Context(), "prepare_turn", diagnosticID)
 	defer finishDiagnostic()
 	r = r.WithContext(diagnosticCtx)
+	if !clientDebugRequested(r) {
+		r = r.WithContext(withQueryEmbeddingCache(r.Context()))
+	}
 	currentInputDecision, enforceCurrentInputContract := buildPrepareTurnCurrentInputDecision(request, sid)
 	sessionBootstrap := buildPrepareTurnSessionBootstrap(request, sid)
 	hostContextSnapshot := buildPrepareTurnRisuHostContextSnapshot(request, sid)
