@@ -2105,6 +2105,17 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		}
 		delete(compactEffectiveInputPreview, "payload_application_plan")
 		delete(compactEffectiveInputPreview, "memory_transport_plan")
+		responseMemoryDeliveryPlan := compactPrepareTurnMemoryQueryText(mapFromAny(injectionPack["memory_delivery_plan"]))
+		responseInputTransparencyModel := inputTransparencyModel
+		if !clientDebugRequested(r) {
+			// Normal mode: keep the LLM payload and decisions, drop diagnostic
+			// texts the plugin never reads (see prepare_turn_lean_response.go).
+			responseMemoryDeliveryPlan = leanPrepareTurnMemoryDeliveryPlan(responseMemoryDeliveryPlan)
+			languageTrace := []string{"counts", "language_aware_injection"}
+			compactEffectiveInputPreview = withoutNestedKey(compactEffectiveInputPreview, languageTrace, "memory_language_trace")
+			responseInputTransparencyModel = withoutNestedKey(responseInputTransparencyModel, languageTrace, "memory_language_trace")
+			responseInputTransparencyModel = withoutNestedKey(responseInputTransparencyModel, []string{"language_injection_trace"}, "memory_language_trace")
+		}
 		tracePreview["response_projection"] = map[string]any{
 			"contract_version": prepareTurnProductionProjectionV1,
 			"status":           "ready",
@@ -2117,7 +2128,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			},
 			"payload_application_plan":        payloadApplicationPlan,
 			"memory_recall_plan":              injectionPack["memory_recall_plan"],
-			"memory_delivery_plan":            compactPrepareTurnMemoryQueryText(mapFromAny(injectionPack["memory_delivery_plan"])),
+			"memory_delivery_plan":            responseMemoryDeliveryPlan,
 			"memory_delivery_lineage":         boundedMemoryDeliveryLineage,
 			"source_to_payload_lineage":       sourceToPayloadLineage,
 			"memory_injection_baseline":       memoryInjectionBaseline,
@@ -2154,7 +2165,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			"memory_transport_payload":        memoryTransportPayload,
 			"memory_budget_resolution":        memoryBudgetResolution,
 			"language_context":                languageContext,
-			"input_transparency_model":        inputTransparencyModel,
+			"input_transparency_model":        responseInputTransparencyModel,
 			"effective_input_preview":         compactEffectiveInputPreview,
 			"backend_timing":                  backendTiming,
 			"turn_workflow_hud":               turnWorkflowHUD,
