@@ -252,7 +252,7 @@ func prepareTurnPreprocessingSearchTrace(shadow map[string]any) map[string]any {
 }
 
 func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
-	defer releaseJSONMapCache()
+	defer releaseJSONMapCacheAfterRequest()
 	measurement := newPrepareTurnMeasurement()
 	timing := newBackendTimingTrace("prepare_turn.backend_timing.v1")
 	decodeStartedAt := time.Now()
@@ -1263,6 +1263,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				Perspective:                assemblyPerspectiveContext,
 			}
 			assemblyInput.Measurement = measurement
+			assemblyInput.ReuseReadingForms = queryEmbeddingCacheAllowed(r.Context())
 			assemblyInput.Common = prepareTurnCommonAssemblySources(assemblyInput)
 			assemblyTiming.addElapsed("source_preparation", assemblyStageStarted)
 			assemblyStageStarted = time.Now()

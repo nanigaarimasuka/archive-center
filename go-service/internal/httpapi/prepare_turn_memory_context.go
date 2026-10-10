@@ -140,6 +140,44 @@ type prepareTurnMemoryForm struct {
 	Parts                         []prepareTurnMemoryFormPart
 	Refs                          []string
 	Chars                         int
+	// kept is set on forms kept across requests: what later requests derive
+	// from them is then derived once.
+	kept *prepareTurnKeptForm
+}
+
+// prepareTurnKeptForm holds what is derived from a kept form: its delivery
+// parts, prepareTurnMemoryDeliveryParts(parts), and whether those are
+// distinct, for the parts it was made for (a copy of a form shares it; a
+// copy whose parts changed no longer matches them); and its meaning's
+// lexical analysis.
+type prepareTurnKeptForm struct {
+	once     sync.Once
+	source   []prepareTurnMemoryFormPart
+	parts    []prepareTurnMemoryFormPart
+	distinct bool
+	lexical  prepareTurnKeptLexical
+}
+
+// keptLexical is nil-safe; it is nil for forms that are not kept.
+func (f *prepareTurnMemoryForm) keptLexical() *prepareTurnKeptLexical {
+	if f == nil || f.kept == nil {
+		return nil
+	}
+	return &f.kept.lexical
+}
+
+// keptDelivery returns the form's delivery parts and whether they are
+// distinct when the form keeps them; ok is false otherwise.
+func (f *prepareTurnMemoryForm) keptDelivery() (parts []prepareTurnMemoryFormPart, distinct, ok bool) {
+	d := f.kept
+	if d == nil || len(d.source) != len(f.Parts) || (len(f.Parts) > 0 && &d.source[0] != &f.Parts[0]) {
+		return nil, false, false
+	}
+	d.once.Do(func() {
+		d.parts = prepareTurnMemoryDeliveryParts(d.source)
+		d.distinct = prepareTurnMemoryPartsDistinct(d.parts)
+	})
+	return d.parts, d.distinct, true
 }
 
 func prepareTurnMemoryPath(path []string) string {
@@ -368,7 +406,7 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 		if !ok {
 			index = len(created)
 			createdIndex[formKey] = index
-			created = append(created, newForm{key: formKey, source: i})
+			created = append(created, newForm{key: formKey, source: i, form: preparation.keptReadingForms().get(formKey)})
 		}
 		formOf[i] = index
 	}
@@ -417,7 +455,19 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 	storageOf := func(text string) prepareTurnTextStorage {
 		return prepareTurnTextStorage{unsafe.StringData(text), len(text)}
 	}
+	built := make([]bool, len(created))
 	prepareTurnParallelFor(len(created), func(index int) {
+		if created[index].form != nil {
+			// Kept from an earlier request; only its part values are needed.
+			parts := candidates[created[index].source].Reading.Parts
+			values := make([]string, len(parts))
+			for i, p := range parts {
+				values[i] = p.Value
+			}
+			created[index].values = values
+			return
+		}
+		built[index] = true
 		memo := memos.Get().(*partMemo)
 		defer memos.Put(memo)
 		c := &candidates[created[index].source]
@@ -554,6 +604,18 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 	for index, item := range created {
 		forms[item.key] = item.form
 		meanings[index] = prepareTurnJoinedLexicalText{joined: item.form.Meaning, parts: item.values}
+	}
+	if kept := preparation.keptReadingForms(); kept != nil {
+		keys, newForms := []prepareTurnMemoryFormKey{}, []*prepareTurnMemoryForm{}
+		for index, item := range created {
+			if built[index] {
+				keys, newForms = append(keys, item.key), append(newForms, item.form)
+			}
+		}
+		kept.put(keys, newForms)
+		for index, item := range created {
+			meanings[index].kept = item.form.keptLexical()
+		}
 	}
 	preparation.primeJoinedLexicalTexts(meanings)
 	if len(primeScores) > 0 {

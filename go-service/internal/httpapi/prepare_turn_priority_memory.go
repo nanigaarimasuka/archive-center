@@ -2701,9 +2701,13 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	deliveryParts := func(form *prepareTurnMemoryForm) []prepareTurnMemoryFormPart {
 		parts, ok := deliveryPartsByForm[form]
 		if !ok {
-			parts = prepareTurnMemoryDeliveryParts(form.Parts)
+			var distinct, kept bool
+			if parts, distinct, kept = form.keptDelivery(); !kept {
+				parts = prepareTurnMemoryDeliveryParts(form.Parts)
+				distinct = prepareTurnMemoryPartsDistinct(parts)
+			}
 			deliveryPartsByForm[form] = parts
-			distinctDeliveryParts[form] = prepareTurnMemoryPartsDistinct(parts)
+			distinctDeliveryParts[form] = distinct
 		}
 		return parts
 	}
