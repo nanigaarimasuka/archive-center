@@ -38,8 +38,20 @@ func buildPrepareTurnEntityIdentityAliases(ctx context.Context, candidateStore s
 		add(firstNonEmpty(memory.OwnerEntityName, memory.PersonaEntityName))
 		add(firstNonEmpty(memory.OwnerEntityKey, memory.PersonaEntityKey))
 	}
-	for _, surface := range surfaces {
-		resolved, err := resolver.ResolveUniqueActiveEntityIdentityBySurface(ctx, sid, comparableEntityKey(surface))
+	type surfaceIdentity struct {
+		resolved store.ResolvedEntityIdentity
+		err      error
+	}
+	keys := make([]string, len(surfaces))
+	for i, surface := range surfaces {
+		keys[i] = comparableEntityKey(surface)
+	}
+	identities := lookupConcurrently(keys, identityLookupConcurrency, func(key string) surfaceIdentity {
+		resolved, err := resolver.ResolveUniqueActiveEntityIdentityBySurface(ctx, sid, key)
+		return surfaceIdentity{resolved, err}
+	})
+	for i, surface := range surfaces {
+		resolved, err := identities[keys[i]].resolved, identities[keys[i]].err
 		if err != nil || strings.TrimSpace(resolved.StableEntityID) == "" || strings.TrimSpace(resolved.CanonicalLabel) == "" {
 			continue
 		}
@@ -1230,11 +1242,17 @@ func prepareTurnAnyOwnerTokenMatches(tokens []string, text string) bool {
 }
 
 func normalizePrepareTurnEntityNeedle(text string) string {
-	text = strings.ToLower(strings.TrimSpace(text))
+	return prepareTurnEntityNeedleChars(strings.TrimSpace(text))
+}
+
+// The needle characters of already trimmed text.
+func prepareTurnEntityNeedleChars(text string) string {
+	text = strings.ToLower(text)
 	if text == "" {
 		return ""
 	}
 	var b strings.Builder
+	b.Grow(len(text)) // Size hint only; kept runes rarely exceed the source bytes.
 	for _, r := range text {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r > 127 {
 			b.WriteRune(r)

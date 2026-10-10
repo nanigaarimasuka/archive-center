@@ -537,12 +537,7 @@ func (s *Server) canonicalCharacterReadProjection(ctx context.Context, sid strin
 		label    string
 		stableID string
 	}
-	resolvedByName := map[string]resolvedSurface{}
-	resolve := func(name string) resolvedSurface {
-		name = strings.TrimSpace(name)
-		if cached, exists := resolvedByName[name]; exists {
-			return cached
-		}
+	lookup := func(name string) resolvedSurface {
 		fallback := resolvedSurface{groupKey: "surface:" + name, label: name}
 		resolved, err := resolver.ResolveUniqueActiveEntityIdentityBySurface(ctx, sid, comparableEntityKey(name))
 		if err == nil && strings.TrimSpace(resolved.StableEntityID) != "" {
@@ -552,8 +547,27 @@ func (s *Server) canonicalCharacterReadProjection(ctx context.Context, sid strin
 				fallback.label = label
 			}
 		}
-		resolvedByName[name] = fallback
 		return fallback
+	}
+	// Every name resolved below, read concurrently up front.
+	names := []string{}
+	for _, state := range states {
+		if name := strings.TrimSpace(state.CharacterName); name != "" {
+			names = append(names, name)
+		}
+	}
+	for _, event := range events {
+		names = append(names, strings.TrimSpace(event.CharacterName))
+	}
+	resolvedByName := lookupConcurrently(names, identityLookupConcurrency, lookup)
+	resolve := func(name string) resolvedSurface {
+		name = strings.TrimSpace(name)
+		if cached, exists := resolvedByName[name]; exists {
+			return cached
+		}
+		resolved := lookup(name)
+		resolvedByName[name] = resolved
+		return resolved
 	}
 
 	sorted := append([]store.CharacterState(nil), states...)
@@ -633,8 +647,21 @@ func (s *Server) canonicalCharacterReadProjection(ctx context.Context, sid strin
 	}
 	if catalogReader, ok := s.Store.(store.EntityIdentityCatalogReader); ok {
 		if surfaces, err := catalogReader.ListActiveEntityIdentitySurfaces(ctx, sid); err == nil {
+			// Many surfaces name the same identity; resolve each identity once,
+			// concurrently up front.
+			ids := make([]string, len(surfaces))
+			for i, surface := range surfaces {
+				ids[i] = surface.StableEntityID
+			}
+			rootByID := lookupConcurrently(ids, identityLookupConcurrency, func(id string) string {
+				return s.characterIdentityRoot(ctx, sid, id)
+			})
 			for _, surface := range surfaces {
-				rootID := s.characterIdentityRoot(ctx, sid, surface.StableEntityID)
+				rootID, resolved := rootByID[surface.StableEntityID]
+				if !resolved {
+					rootID = s.characterIdentityRoot(ctx, sid, surface.StableEntityID)
+					rootByID[surface.StableEntityID] = rootID
+				}
 				for canonicalNameKey, stableID := range out.StableIDs {
 					if stableID != rootID {
 						continue
@@ -1233,6 +1260,13 @@ func parseSurfacePayload(raw string) any {
 	text := strings.TrimSpace(raw)
 	if text == "" {
 		return nil
+	}
+	if text[0] == '{' {
+		// Objects come from the shared parse cache, as a private copy.
+		if parsed := parseJSONMapCached(text); parsed != nil {
+			return copyJSONValue(parsed)
+		}
+		return text
 	}
 	var parsed any
 	if err := json.Unmarshal([]byte(text), &parsed); err == nil {
