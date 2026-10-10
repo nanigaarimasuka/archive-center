@@ -50,6 +50,8 @@ type Server struct {
 	PersistRuntimeConfig   bool
 	runtimeConfigSaved     map[string]any // the synced settings, by plugin key
 	runtimeConfigPersistMu sync.Mutex
+	pluginSettings         []byte // the plugin's whole settings object, as JSON
+	pluginSettingsMu       sync.Mutex
 	memoryWorkerWake       chan struct{}
 	memoryWorkerWakeOnce   sync.Once
 	memoryWorkerStartOnce  sync.Once

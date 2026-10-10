@@ -31,6 +31,8 @@ func (s *Server) registerConfigRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /config/memory-preprocessing", s.handleMultiAgentSettings)
 	mux.HandleFunc("PUT /config/memory-preprocessing", s.handleMultiAgentSettings)
 	mux.HandleFunc("POST /config/memory-preprocessing/jev-test", s.handleJevTest)
+	mux.HandleFunc("GET /config/plugin-settings", s.handlePluginSettings)
+	mux.HandleFunc("PUT /config/plugin-settings", s.handlePluginSettings)
 	mux.HandleFunc("GET /config/body-tracking/{chat_session_id}", s.handleBodyTrackingSettings)
 	mux.HandleFunc("PUT /config/body-tracking/{chat_session_id}", s.handleBodyTrackingSettings)
 	mux.HandleFunc("PUT /config/body-tracking/{chat_session_id}/state", s.handleBodyTrackingState)

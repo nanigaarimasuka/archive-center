@@ -68,10 +68,15 @@ func writeRuntimeConfigFile(b []byte) error {
 	if err != nil {
 		return err
 	}
+	return writeDataFileAtomic(path, b)
+}
+
+// writeDataFileAtomic replaces path with b so readers never see a partial file.
+func writeDataFileAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".runtime-config-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*")
 	if err != nil {
 		return err
 	}

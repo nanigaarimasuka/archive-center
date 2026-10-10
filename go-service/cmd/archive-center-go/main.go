@@ -72,6 +72,9 @@ func main() {
 	if err := server.LoadPersistedRuntimeConfig(); err != nil {
 		logger.Warn("saved runtime config was not loaded", "error", err)
 	}
+	if err := server.LoadPersistedPluginSettings(); err != nil {
+		logger.Warn("saved plugin settings were not loaded", "error", err)
+	}
 	var requestedExitCode atomic.Int32
 	if managedUpdateLauncherAuthorized(cfg) {
 		server.RequestShutdown = func(exitCode int) {

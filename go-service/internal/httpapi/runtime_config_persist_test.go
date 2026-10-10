@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/risulongmemory/archive-center-go/internal/config"
@@ -55,7 +56,8 @@ func TestRuntimeConfigSurvivesARestartWhenPersisted(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Fatalf("restored %+v, want %+v", got, want)
 	}
-	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0600 {
+	// Windows reports no Unix permission bits.
+	if info, err := os.Stat(path); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 		t.Fatalf("saved file %v %v", info, err)
 	}
 }

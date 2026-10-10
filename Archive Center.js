@@ -12415,10 +12415,72 @@
     }
   }
 
+  // Every setting except how this device reaches the backend is shared through
+  // the backend, so another browser or device opens with the same settings.
+  const DEVICE_LOCAL_SETTING_KEYS = Object.freeze(["bridgeUrl", "webDirectBridgeEnabled"]);
+
+  function backendSharedSettings(s) {
+    const shared = { ...s };
+    DEVICE_LOCAL_SETTING_KEYS.forEach(function(key) { delete shared[key]; });
+    return shared;
+  }
+
+  async function pushSettingsToBackend(s) {
+    const result = await safeCall(() => bridgeFetch("/config/plugin-settings", {
+      method: "PUT",
+      body: backendSharedSettings(s),
+      timeoutMs: getRequestTimeoutSettingMs(s.requestTimeoutMs),
+    }), null, "pushSettingsToBackend");
+    const shared = !!(result && result.status === "ok");
+    if (!shared) warnLog("Settings saved locally but not shared through the backend");
+    return shared;
+  }
+
+  /** The newer of this device's settings and the backend's copy wins; returns whether the backend's was applied. */
+  async function restoreSettingsFromBackend() {
+    const result = await safeCall(() => bridgeFetch("/config/plugin-settings", {
+      timeoutMs: getRequestTimeoutSettingMs(settings.requestTimeoutMs),
+    }), null, "restoreSettingsFromBackend");
+    if (!result || result.status !== "ok") return false;
+    const remote = result.settings && typeof result.settings === "object" && !Array.isArray(result.settings)
+      ? result.settings
+      : null;
+    const localSavedAt = Number(settings.settingsSavedAt) || 0;
+    const remoteSavedAt = remote ? (Number(remote.settingsSavedAt) || 0) : 0;
+    if (remote && remoteSavedAt > localSavedAt) {
+      const deviceLocal = {};
+      DEVICE_LOCAL_SETTING_KEYS.forEach(function(key) { deviceLocal[key] = settings[key]; });
+      settings = sanitizeSettings({ ...backendSharedSettings(remote), ...deviceLocal });
+      try {
+        await persistentSet(SETTINGS_KEY, JSON.stringify(settings));
+      } catch (err) {
+        warnLog("Settings from the backend were applied but not saved locally:", err && err.message);
+      }
+      debugLog("Settings restored from the backend");
+      return true;
+    }
+    if (remote && remoteSavedAt === localSavedAt) return false;
+    // Seed or refresh the backend copy, but never with defaults this device
+    // never saved: they would replace another device's settings.
+    if (!remote && _settingsStorageStatus.mode === "default") return false;
+    if (!localSavedAt) {
+      settings.settingsSavedAt = Date.now();
+      try {
+        await persistentSet(SETTINGS_KEY, JSON.stringify(settings));
+      } catch (err) {
+        warnLog("Settings save time was not stored locally:", err && err.message);
+      }
+    }
+    await pushSettingsToBackend(settings);
+    return false;
+  }
+
   async function saveSettings() {
     try {
+      settings.settingsSavedAt = Date.now();
       const json = JSON.stringify(settings);
       await persistentSet(SETTINGS_KEY, json);
+      await pushSettingsToBackend(settings);
       markBackendRuntimeConfigDirty("settings_changed");
       debugLog("Settings saved (persistent)");
       const syncAck = await syncConfigToBackend(settings);
@@ -55476,6 +55538,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       // ── 3단계: pluginStorage에서 영속 설정 로드 (비동기) ──
       //    재시작/새로고침 후에도 API Key 등이 복원된다.
       await loadSettings();
+      // Settings changed on another device arrive through the backend.
+      if (settings.enabled) await restoreSettingsFromBackend();
       debugLog("Settings after persistent load:", safeSettingsForLog(getSettings()));
 
       // The first request must see the persisted runtime configuration even
