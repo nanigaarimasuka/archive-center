@@ -688,7 +688,7 @@ func (s *Server) multiAgentProxyRequest(role string, settings multiAgentSettings
 			call.MissingConfigurationFields = append(call.MissingConfigurationFields, field.name)
 		}
 	}
-	if strings.TrimSpace(llm.APIKey) == "" && provider != "ollama" {
+	if strings.TrimSpace(llm.APIKey) == "" && llmProviderNeedsAPIKey(provider) {
 		call.MissingConfigurationFields = append(call.MissingConfigurationFields, "api_key")
 	}
 	if llm.Model == "" {

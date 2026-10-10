@@ -81,7 +81,7 @@
   const RECOMPOSER_BRIDGE_KEY = "__RISU_ARCHIVE_CENTER_RECOMPOSER_V1__";
   const RECOMPOSER_BRIDGE_CONTRACT = "archive_center.recomposer_bridge.v1";
   const RECOMPOSER_ENHANCEMENT_CONTRACT = "archive_center.recomposer_enhancement.v1";
-  const LLM_PROVIDER_OPTIONS = Object.freeze(["openai", "claude", "gemini", "openrouter", "llmgateway", "vercel", "neuralwatt", "vertex", "copilot", "ollama", "opencode", "opencode-go", "custom"]);
+  const LLM_PROVIDER_OPTIONS = Object.freeze(["openai", "claude", "gemini", "openrouter", "llmgateway", "vercel", "neuralwatt", "vertex", "copilot", "ollama", "opencode", "opencode-go", "custom", "risu"]);
   const EMBEDDING_PROVIDER_OPTIONS = Object.freeze(["openai", "gemini", "vertex", "voyageai", "ollama", "custom"]);
   const SOURCE_SEARCH_LLM_PROVIDER_OPTIONS = Object.freeze(["openai", "claude", "gemini", "ollama"]);
   const REASONING_PRESET_OPTIONS = Object.freeze(["auto", "gpt", "gemini", "claude", "glm", "custom"]);
@@ -5472,6 +5472,7 @@
       _activeFinalConfirmationRequestContext.state = "superseded";
     }
     _activeFinalConfirmationRequestContext = null;
+    stopRisuModelBridge();
     try {
       const registrationId = _memoryTransportBodyInterceptorRegistration && typeof _memoryTransportBodyInterceptorRegistration === "object"
         ? _memoryTransportBodyInterceptorRegistration.id
@@ -11750,9 +11751,170 @@
       ["openrouter", "OpenRouter"], ["opencode", "OpenCode Zen"], ["opencode-go", "OpenCode Go"],
       ["llmgateway", "LLM Gateway"], ["vercel", "Vercel AI Gateway"], ["neuralwatt", "NeuralWatt"],
       ["vertex", "Vertex"], ["copilot", "Copilot"], ["ollama", "Ollama"], ["custom", "Custom"],
+      ["risu", "RisuAI 플러그인 모델"],
     ];
     return providers.map(([value, label]) => '<option value="' + value + '"' +
       ((selected || "openai") === value ? " selected" : "") + '>' + label + '</option>').join("");
+  }
+
+  // ───────────────────────────────────────────────────────
+  // [RISU PLUGIN MODEL PROVIDER]
+  // The "risu" provider ("RisuAI 플러그인 모델") runs LLM calls in this tab
+  // through RisuAI's runLLMModel with a model another plugin added to RisuAI
+  // (e.g. PageFold). That plugin holds the model's endpoint and key.
+  // ───────────────────────────────────────────────────────
+  // The models other plugins provide to RisuAI (pluginmodel:::*), by id and
+  // name, from RisuAI's model list.
+  async function loadRisuPluginModels() {
+    if (!R || typeof R.getModelList !== "function") return [];
+    try {
+      const models = await R.getModelList();
+      return (Array.isArray(models) ? models : [])
+        .map((model) => ({ id: String(model && model.id || ""), name: String(model && model.name || "") }))
+        .filter((model) => model.id.startsWith("pluginmodel:::"));
+    } catch (err) {
+      warnLog("RisuAI model list unavailable:", err && err.message);
+      return [];
+    }
+  }
+
+  // With the risu provider, a dropdown of RisuAI's plugin models stands in for
+  // the model field, which keeps the value, and the endpoint and key fields
+  // are not used.
+  function syncRisuProviderFields(provider, fields) {
+    const risu = String(provider || "").trim().toLowerCase() === "risu";
+    for (const input of [fields.endpoint, fields.apiKey]) {
+      if (!input) continue;
+      input.disabled = risu;
+      const row = input.closest && input.closest(".mo-row");
+      if (row) row.hidden = risu;
+    }
+    const model = fields.model;
+    if (!model) return;
+    let picker = model.id ? document.getElementById(model.id + "-risu") : null;
+    if (!risu) {
+      model.hidden = false;
+      if (picker) picker.hidden = true;
+      return;
+    }
+    if (!picker) {
+      picker = document.createElement("select");
+      if (model.id) picker.id = model.id + "-risu";
+      model.insertAdjacentElement("afterend", picker);
+      picker.addEventListener("change", () => {
+        model.value = picker.value;
+        model.dispatchEvent(new Event("input", { bubbles: true }));
+        model.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
+    model.hidden = true;
+    picker.hidden = false;
+    loadRisuPluginModels().then((models) => {
+      const current = String(model.value || "").trim();
+      const options = models.map((item) => [item.id, item.name || item.id]);
+      if (current && !options.some(([id]) => id === current)) options.unshift([current, current]);
+      picker.innerHTML = options.length
+        ? options.map(([id, name]) => '<option value="' + escapeAttr(id) + '"' + (id === current ? " selected" : "") + ">" + escapeAttr(name) + "</option>").join("")
+        : '<option value="" disabled selected>RisuAI에 플러그인 모델이 없습니다</option>';
+      if (!current && options.length) {
+        picker.value = options[0][0];
+        picker.dispatchEvent(new Event("change"));
+      }
+    });
+  }
+
+  let _risuBridgeRunning = false;
+  // Samples of the messages of calls running now, to tell their request
+  // bodies from RisuAI's own in the body interceptor.
+  const _risuBridgeBodySamples = new Set();
+
+  function risuBridgeOwnsBody(body) {
+    if (_risuBridgeBodySamples.size === 0) return false;
+    let text = "";
+    try {
+      text = typeof body === "string" ? body : JSON.stringify(body);
+    } catch (_) {
+      return false;
+    }
+    for (const sample of _risuBridgeBodySamples) {
+      if (sample && text.includes(sample)) return true;
+    }
+    return false;
+  }
+
+  // runLLMModel returns { type, result }. A streamed result is read to its
+  // end; each chunk holds the text so far under "0".
+  async function risuBridgeResultText(result) {
+    if (typeof result === "string") return { ok: true, content: result };
+    if (result && result.type === "success" && typeof result.result === "string") return { ok: true, content: result.result };
+    if (result && result.type === "streaming" && result.result && typeof result.result.getReader === "function") {
+      const reader = result.result.getReader();
+      let text = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (typeof value === "string") text += value;
+        else if (value && typeof value["0"] === "string") text = value["0"];
+      }
+      return { ok: true, content: text };
+    }
+    if (result && typeof result.result === "string") return { ok: false, error: result.result };
+    return { ok: false, error: "RisuAI returned an unsupported response (type " + String(result && result.type || typeof result) + ")" };
+  }
+
+  async function runRisuBridgeCall(call) {
+    const messages = Array.isArray(call.messages) ? call.messages : [];
+    const last = messages.length ? String(messages[messages.length - 1].content || "") : "";
+    const sample = last.trim() ? JSON.stringify(last.trim().slice(0, 160)).slice(1, -1) : "";
+    if (sample) _risuBridgeBodySamples.add(sample);
+    let outcome;
+    try {
+      const options = {
+        mode: "otherAx",
+        messages,
+        staticModel: String(call.model || ""),
+        allowPlugins: true,
+      };
+      if (call.max_tokens != null) options.maxTokens = Number(call.max_tokens);
+      if (call.temperature != null) options.temperature = Number(call.temperature);
+      if (call.reasoning_effort != null) options.reasoningEffort = Number(call.reasoning_effort);
+      if (call.thinking_tokens != null) options.thinkingTokens = Number(call.thinking_tokens);
+      if (Array.isArray(call.additional_parameters) && call.additional_parameters.length) options.additionalParameters = call.additional_parameters;
+      if (call.timeout_ms) options.timeoutMs = Number(call.timeout_ms);
+      outcome = await risuBridgeResultText(await R.runLLMModel(options));
+    } catch (err) {
+      outcome = { ok: false, error: String(err && err.message || err || "RisuAI model call failed") };
+    } finally {
+      if (sample) _risuBridgeBodySamples.delete(sample);
+    }
+    await bridgeFetch("/risu-bridge/result", { method: "POST", body: { id: call.id, ...outcome }, timeoutMs: 30000 });
+  }
+
+  // Takes the backend's risu provider calls while this tab is open. Calls run
+  // concurrently; each is answered when it ends. The backend holds each poll
+  // until a call arrives; after repeated failures (the backend is down) the
+  // loop stops until the backend config is synchronized again.
+  function startRisuModelBridge() {
+    if (_risuBridgeRunning || !R || typeof R.runLLMModel !== "function") return;
+    _risuBridgeRunning = true;
+    (async () => {
+      let failures = 0;
+      while (_risuBridgeRunning && failures < 3) {
+        const data = await bridgeFetch("/risu-bridge/next", { method: "GET", timeoutMs: 30000 });
+        if (!_risuBridgeRunning) break;
+        failures = data ? 0 : failures + 1;
+        const call = data && data.call;
+        if (call && call.id) {
+          runRisuBridgeCall(call).catch((err) => warnLog("RisuAI model call relay failed:", err && err.message));
+        }
+      }
+      if (_risuBridgeRunning) warnLog("RisuAI model bridge stopped: the backend did not answer");
+      _risuBridgeRunning = false;
+    })();
+  }
+
+  function stopRisuModelBridge() {
+    _risuBridgeRunning = false;
   }
 
   function bindLlmSettingsView(prefix, fetchView, options = {}) {
@@ -12260,6 +12422,9 @@
       markBackendRuntimeConfigDirty("settings_changed");
       debugLog("Settings saved (persistent)");
       const syncAck = await syncConfigToBackend(settings);
+      // A changed backend address, or a bridge stopped while the backend was
+      // down, takes effect once the backend answers again.
+      if (syncAck.ok) startRisuModelBridge();
       if (!syncAck.ok) {
         warnLog("Settings saved locally but backend runtime sync failed:", syncAck.code);
         updateRuntimeState("lastConfigSync", "fail", {
@@ -20842,6 +21007,8 @@
   }
 
   async function onMemoryTransportBodyInterceptor(body, type) {
+    // Risu provider calls are Archive Center's own; their bodies stay as sent.
+    if (risuBridgeOwnsBody(body)) return body;
     const active = _activeFinalConfirmationRequestContext;
     const envelope = active && active.memoryTransportEnvelope;
     const requestType = String(type || "");
@@ -27106,7 +27273,7 @@
       settings.pluginMainProvider &&
       typeof settings.pluginMainProvider === "string" &&
       settings.pluginMainProvider.trim() &&
-      (settings.pluginMainProvider.trim().toLowerCase() === "ollama" || (
+      (["ollama", "risu"].includes(settings.pluginMainProvider.trim().toLowerCase()) || (
         typeof settings.pluginMainApiKey === "string" && settings.pluginMainApiKey.trim()
       )) &&
       settings.pluginMainModel &&
@@ -27420,7 +27587,7 @@
       settings.subLlmProvider &&
       typeof settings.subLlmProvider === "string" &&
       settings.subLlmProvider.trim() &&
-      (settings.subLlmProvider.trim().toLowerCase() === "ollama" || (
+      (["ollama", "risu"].includes(settings.subLlmProvider.trim().toLowerCase()) || (
         typeof settings.subLlmApiKey === "string" && settings.subLlmApiKey.trim()
       )) &&
       settings.subLlmModel &&
@@ -52441,7 +52608,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             + '<div class="mo-ma-editor"><section><h4>AI 연결</h4><p class="mo-ma-copy">이 담당이 사용할 제공자·주소·모델·키를 지정하세요. 출판사 연결 공유를 켜도 담당 프롬프트는 각각 적용됩니다.</p>'
             + '<div class="mo-ma-inherited" id="mo-ma-' + role + '-inherited" hidden></div>'
             + '<fieldset aria-label="AI 연결 설정" id="mo-ma-' + role + '-connection"' + (c.use_publisher || c.use_role ? ' disabled hidden' : '') + '>'
-            + select(role, 'provider', '제공자', [['', '제공자 선택'], ...LLM_PROVIDER_OPTIONS.map(provider => [provider, ({ openai: 'OpenAI', gemini: 'Gemini · AI Studio', claude: 'Claude', llmgateway: 'LLM Gateway', vertex: 'Vertex AI', openrouter: 'OpenRouter', opencode: 'OpenCode Zen', 'opencode-go': 'OpenCode Go', neuralwatt: 'NeuralWatt', vercel: 'Vercel AI Gateway', copilot: 'Copilot', ollama: 'Ollama', custom: 'Custom' })[provider] || provider])])
+            + select(role, 'provider', '제공자', [['', '제공자 선택'], ...LLM_PROVIDER_OPTIONS.map(provider => [provider, ({ openai: 'OpenAI', gemini: 'Gemini · AI Studio', claude: 'Claude', llmgateway: 'LLM Gateway', vertex: 'Vertex AI', openrouter: 'OpenRouter', opencode: 'OpenCode Zen', 'opencode-go': 'OpenCode Go', neuralwatt: 'NeuralWatt', vercel: 'Vercel AI Gateway', copilot: 'Copilot', ollama: 'Ollama', custom: 'Custom', risu: 'RisuAI 플러그인 모델' })[provider] || provider])])
             + field(role, 'endpoint', 'Endpoint') + field(role, 'model', '모델 ID')
             + field(role, 'api_key', 'API Key', 'password')
             + select(role, 'llm_gateway_service_tier', '처리 모드 · 지원 모델에서 사용', [['', '기본값'], ['standard', 'Standard'], ['flex', 'Flex'], ['priority', 'Priority']])
@@ -52490,6 +52657,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           const provider = root.querySelector('#mo-ma-' + role + '-provider').value.trim().toLowerCase();
           root.querySelector('#mo-ma-' + role + '-llm_gateway_service_tier-row').hidden = !['openai', 'llmgateway', 'vercel', 'neuralwatt', 'custom', 'gemini'].includes(provider);
           root.querySelector('#mo-ma-' + role + '-vertex_flex_mode-row').hidden = provider !== 'vertex';
+          syncRisuProviderFields(provider, {
+            endpoint: root.querySelector('#mo-ma-' + role + '-endpoint'),
+            apiKey: root.querySelector('#mo-ma-' + role + '-api_key'),
+            model: root.querySelector('#mo-ma-' + role + '-model'),
+          });
         };
         root.querySelector('#mo-ma-' + role + '-provider').addEventListener('change', syncFlexControls);
         syncFlexControls();
@@ -54638,8 +54810,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             : (isLlmGateway ? llmGatewayEndpointPlaceholder : (isVercel ? vercelEndpointPlaceholder : (isNeuralWatt ? neuralWattEndpointPlaceholder : (isOpenCode ? openCodeEndpointPlaceholder : (isOpenCodeGo ? "https://opencode.ai/zen/go/v1" : (isOpenRouter ? openRouterEndpointPlaceholder : (defaults.endpoint || "")))))));
           if (modelInput) modelInput.placeholder = isVertex ? (defaults.vertexModel || "예: gemini-2.5-flash") : (defaults.model || "");
           if (hint) {
-            hint.textContent = "비워두면 선택한 Provider의 공식 기본 Endpoint를 사용하며, 직접 입력하면 입력한 주소를 우선합니다.";
+            hint.textContent = provider === "risu"
+              ? "RisuAI에 다른 플러그인(예: PageFold)이 추가한 모델을 이 탭에서 실행합니다. 목록에는 플러그인을 통해 추가된 모델만 보이며, Endpoint와 API Key는 그 플러그인의 설정을 따릅니다."
+              : "비워두면 선택한 Provider의 공식 기본 Endpoint를 사용하며, 직접 입력하면 입력한 주소를 우선합니다.";
           }
+          syncRisuProviderFields(provider, { endpoint: endpointInput, apiKey: apiInput, model: modelInput });
         };
         providerEl.addEventListener("change", sync);
         sync();
@@ -54924,12 +55099,15 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         const testEndpoint = (($("mo-pluginMainEndpoint") || {}).value || "").trim();
         const testModel = (($("mo-pluginMainModel") || {}).value || "").trim();
         const testProvider = normalizeLlmProvider((($("mo-pluginMainProvider") || {}).value) || "openai", "openai");
-        if ((!testApiKey && testProvider !== "ollama") || !testModel) {
-          resultEl.innerHTML = '<div class="mo-status mo-status-fail">❌ 출판사 LLM API Key / Model이 비어 있습니다. Endpoint는 비워두면 자동 설정됩니다.</div>';
+        if ((!testApiKey && testProvider !== "ollama" && testProvider !== "risu") || !testModel) {
+          resultEl.innerHTML = testProvider === "risu"
+            ? '<div class="mo-status mo-status-fail">❌ 출판사 LLM으로 쓸 RisuAI 플러그인 모델을 선택해 주세요.</div>'
+            : '<div class="mo-status mo-status-fail">❌ 출판사 LLM API Key / Model이 비어 있습니다. Endpoint는 비워두면 자동 설정됩니다.</div>';
           return;
         }
 
-        resultEl.innerHTML = '<div class="mo-status mo-status-wait">⏳ 출판사 LLM 호출 테스트 중 (백엔드 프록시)...</div>';
+        resultEl.innerHTML = '<div class="mo-status mo-status-wait">⏳ 출판사 LLM 호출 테스트 중 ('
+          + (testProvider === "risu" ? 'RisuAI 플러그인 모델 · 이 탭의 RisuAI에서 실행' : '백엔드 프록시') + ')...</div>';
         try {
           const savedPublisherConfigMatches = testProvider === getPluginMainProviderSetting(settings.pluginMainProvider)
             && testApiKey === String(settings.pluginMainApiKey || "").trim()
@@ -54986,7 +55164,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           if (!data) {
             resultEl.innerHTML = '<div class="mo-status mo-status-fail">❌ 연결 실패: ' + escapeAttr(formatBridgeFailureForDisplay("/proxy/plugin-main", "백엔드가 오류를 반환했습니다.")) + '</div>';
           } else if (data.error) {
-            resultEl.innerHTML = '<div class="mo-status mo-status-fail">❌ 프록시 오류: ' + escapeAttr(data.error) + '</div>';
+            resultEl.innerHTML = '<div class="mo-status mo-status-fail">❌ ' + (testProvider === "risu" ? 'RisuAI 플러그인 모델 호출 오류' : '프록시 오류') + ': ' + escapeAttr(data.error) + '</div>';
           } else {
             const reply = String((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
             if (!reply) {
@@ -55009,12 +55187,15 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         const testEndpoint = (($("mo-subLlmEndpoint") || {}).value || "").trim();
         const testModel = (($("mo-subLlmModel") || {}).value || "").trim();
         const testProvider = normalizeLlmProvider((($("mo-subLlmProvider") || {}).value) || "openai", "openai");
-        if ((!testApiKey && testProvider !== "ollama") || !testModel) {
-          resultEl.innerHTML = '<div class="mo-status mo-status-fail">❌ 평론가 LLM API Key / Model이 비어 있습니다. Endpoint는 비워두면 자동 설정됩니다.</div>';
+        if ((!testApiKey && testProvider !== "ollama" && testProvider !== "risu") || !testModel) {
+          resultEl.innerHTML = testProvider === "risu"
+            ? '<div class="mo-status mo-status-fail">❌ 평론가 LLM으로 쓸 RisuAI 플러그인 모델을 선택해 주세요.</div>'
+            : '<div class="mo-status mo-status-fail">❌ 평론가 LLM API Key / Model이 비어 있습니다. Endpoint는 비워두면 자동 설정됩니다.</div>';
           return;
         }
 
-        resultEl.innerHTML = '<div class="mo-status mo-status-wait">⏳ 평론가 LLM 호출 테스트 중 (백엔드 프록시)...</div>';
+        resultEl.innerHTML = '<div class="mo-status mo-status-wait">⏳ 평론가 LLM 호출 테스트 중 ('
+          + (testProvider === "risu" ? 'RisuAI 플러그인 모델 · 이 탭의 RisuAI에서 실행' : '백엔드 프록시') + ')...</div>';
         try {
           const savedCriticConfig = resolveEffectiveCriticConfig(settings);
           const savedCriticConfigMatches = testProvider === getSubLlmProviderSetting(settings.subLlmProvider)
@@ -55306,6 +55487,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           reason_code: syncAck.code,
         });
         if (!syncAck.ok) warnLog("Initial backend config sync unavailable:", syncAck.code);
+        // The backend address is known only now, after the persisted settings.
+        if (syncAck.ok) startRisuModelBridge();
       }
 
       // ── 4단계: pluginStorage에서 턴 카운터 복원 ──

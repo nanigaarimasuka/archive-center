@@ -6456,7 +6456,7 @@ func TestAdapterLifecycleStateRuntimeContracts(t *testing.T) {
 		extractArchiveCenterJSFunction(t, src, "peekRawInputForSession"),
 		extractArchiveCenterJSFunction(t, src, "bindRawInputObservationToRequest"),
 		extractArchiveCenterJSFunction(t, src, "isRisuHistoryTrimCommandText"),
-		extractArchiveCenterJSAsyncFunction(t, src, "saveSettings"),
+		extractArchiveCenterJSAsyncFunction(t, src, "saveSettings") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 		extractArchiveCenterJSAsyncFunction(t, src, "refreshArchiveCenterUpdateStatus"),
 		extractArchiveCenterJSFunction(t, src, "stopTurnWorkflowHUDWatch"),
 		extractArchiveCenterJSFunction(t, src, "schedulePostOutputFinalReplacement"),

@@ -876,8 +876,8 @@ func TestRisuLifecycleRegistrationAndRemovalAreIndependent(t *testing.T) {
 		}
 	}
 	src := readArchiveCenterJS(t)
-	register := extractJSFunctionBlockForTest(t, src, "async function registerRisuLifecycleHooks()")
-	remove := extractJSFunctionBlockForTest(t, src, "async function removeRegisteredRisuHooksOnUnload()")
+	register := extractJSFunctionBlockForTest(t, src, "async function registerRisuLifecycleHooks()") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests."
+	remove := extractJSFunctionBlockForTest(t, src, "async function removeRegisteredRisuHooksOnUnload()") + "\nfunction stopRisuModelBridge() {} // The Risu model bridge has its own tests."
 	script := `
 const calls = [];
 const R = {
@@ -1669,7 +1669,7 @@ func TestRegisteredRequestCallbacksDetachExactBeforeRequestContext(t *testing.T)
 		extractArchiveCenterJSFunction(t, src, "acceptRisuAfterRequestFinal"),
 		extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
 		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
-		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks"),
+		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 		extractArchiveCenterJSFunction(t, src, "startTurnWorkflowHUDWatch"),
 	}, "\n")
 	script := functions + `
@@ -2230,7 +2230,7 @@ func TestRegisteredAfterRequestCarriesEachCapturedContextIntoCompleteTurn(t *tes
 		extractArchiveCenterJSAsyncFunction(t, src, "buildNextInputSourceAcceptanceFinality"),
 		extractArchiveCenterJSFunction(t, src, "acceptRisuAfterRequestFinal"),
 		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
-		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks"),
+		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 	}, "\n")
 	script := functions + `
 const settings={enabled:true,debug:false};

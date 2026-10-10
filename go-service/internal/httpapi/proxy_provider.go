@@ -102,7 +102,7 @@ func callProxyProviderWithPolicy(ctx context.Context, req dto.ProxyPluginMainReq
 		}
 	}()
 	endpoint := proxyProviderBaseURL(provider, stringPtrValue(req.Endpoint, ""))
-	if provider == "" || endpoint == "" || model == "" || (apiKey == "" && provider != "ollama") {
+	if provider == "" || endpoint == "" || model == "" || (apiKey == "" && llmProviderNeedsAPIKey(provider)) {
 		return nil, http.StatusBadRequest, &proxyLocalRequestError{
 			Stage: "configuration",
 			Cause: fmt.Errorf("provider / endpoint / api_key / model is required"),
@@ -129,6 +129,8 @@ func callProxyProviderWithPolicy(ctx context.Context, req dto.ProxyPluginMainReq
 	}
 
 	switch provider {
+	case risuProvider:
+		return proxyCallRisu(ctx, req, model)
 	case "opencode", "opencode-go":
 		// Zen/Go exposes native APIs per model. An explicit API endpoint takes
 		// precedence over the model's documented default transport.
@@ -2062,6 +2064,9 @@ func proxyAttachRequestOverrideTrace(resp map[string]any, trace map[string]any) 
 }
 
 func proxyProviderBaseURL(provider, endpoint string) string {
+	if strings.EqualFold(strings.TrimSpace(provider), risuProvider) {
+		return risuBridgeEndpoint
+	}
 	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
 	if endpoint != "" {
 		return endpoint

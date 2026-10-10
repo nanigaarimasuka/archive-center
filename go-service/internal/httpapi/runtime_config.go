@@ -399,10 +399,11 @@ func configMissingFieldsWithProvider(provider, apiKey, endpoint, model string) [
 	if provider == "" {
 		missing = append(missing, "provider")
 	}
-	if strings.TrimSpace(apiKey) == "" && !strings.EqualFold(provider, "ollama") {
+	if strings.TrimSpace(apiKey) == "" && llmProviderNeedsAPIKey(provider) {
 		missing = append(missing, "api_key")
 	}
-	if strings.TrimSpace(endpoint) == "" {
+	// Risu calls run in the RisuAI tab and have no endpoint.
+	if strings.TrimSpace(endpoint) == "" && !strings.EqualFold(provider, risuProvider) {
 		missing = append(missing, "endpoint")
 	}
 	if strings.TrimSpace(model) == "" {

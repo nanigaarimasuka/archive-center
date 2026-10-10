@@ -138,7 +138,7 @@ func TestArchiveCenterPDFMemoryTransportProviderBodiesAreIdempotent(t *testing.T
 		extractJSFunctionBlockForTest(t, src, "function replaceSelectedMemoryText(text, selectedMemoryText)"),
 		extractJSFunctionBlockForTest(t, src, "function applyGoogleMemoryPDFBody(body, plan, transient)"),
 		extractJSFunctionBlockForTest(t, src, "function applyLLMGatewayMemoryPDFBody(body, plan, transient)"),
-		extractJSFunctionBlockForTest(t, src, "async function onMemoryTransportBodyInterceptor(body, type)"),
+		extractJSFunctionBlockForTest(t, src, "async function onMemoryTransportBodyInterceptor(body, type)") + "\nfunction risuBridgeOwnsBody() { return false; } // Risu model bridge bodies are covered by its own tests.",
 	}
 	script := strings.Join(functions, "\n") + `
 function assert(condition, message) {
