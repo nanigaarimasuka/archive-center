@@ -375,27 +375,29 @@ func buildResponseExecutionSourceRulesWithMemory(currentInput dto.PrepareTurnCur
 			hostRefs = appendUniqueMemorySearchText(hostRefs, ref)
 		}
 	}
-	allRefs := append([]string{}, currentInputRefs...)
+	allRefSet := newMemorySearchTextSet(append([]string{}, currentInputRefs...))
 	for _, ref := range hostRefs {
-		allRefs = appendUniqueMemorySearchText(allRefs, ref)
+		allRefSet.add(ref)
 	}
-	memoryRefs := deliveredPrepareTurnMemorySourceRefs(sessionID, memoryDeliveryLineage)
+	memoryRefSet := newMemorySearchTextSet(deliveredPrepareTurnMemorySourceRefs(sessionID, memoryDeliveryLineage))
 	characterMemoryRefs := deliveredPrepareTurnCharacterMemorySourceRefs(characterMemorySupport)
 	for _, ref := range characterMemoryRefs {
-		memoryRefs = appendUniqueMemorySearchText(memoryRefs, ref)
+		memoryRefSet.add(ref)
 	}
+	memoryRefs := memoryRefSet.items
 	for _, ref := range memoryRefs {
-		allRefs = appendUniqueMemorySearchText(allRefs, ref)
+		allRefSet.add(ref)
 	}
 	deliveredContextRefs := supervisorDeliveredContextSourceRefs(memoryDeliveryPlan, memoryDeliveryLineage, characterMemorySupport)
 	for _, ref := range deliveredContextRefs {
-		allRefs = appendUniqueMemorySearchText(allRefs, ref)
+		allRefSet.add(ref)
 	}
 	continuityRefs := []string{}
 	if strings.TrimSpace(inputContextText) != "" {
 		continuityRefs = append(continuityRefs, supervisorAcceptedRecentContextSourceRef)
-		allRefs = appendUniqueMemorySearchText(allRefs, supervisorAcceptedRecentContextSourceRef)
+		allRefSet.add(supervisorAcceptedRecentContextSourceRef)
 	}
+	allRefs := allRefSet.items
 
 	mustPreserve := []map[string]any{}
 	if len(hostRefs) > 0 {
@@ -477,25 +479,20 @@ func buildPrepareTurnGuideEligibility(guideMode, guideStrength string, injection
 	mode := normalizeNarrativeGuideMode(guideMode)
 	strength := normalizeNarrativeGuideStrength(guideStrength)
 	sourceRefs := mapFromAny(responseExecutionContract["source_refs"])
-	currentInputRefs := []string{}
-	memoryRefs := []string{}
-	expressionRefs := []string{}
+	currentInputRefSet := newMemorySearchTextSet([]string{})
+	memoryRefSet := newMemorySearchTextSet([]string{})
+	expressionRefSet := newMemorySearchTextSet([]string{})
 	for _, ref := range stringSliceFromAny(sourceRefs["current_input"]) {
-		currentInputRefs = appendUniqueMemorySearchText(currentInputRefs, ref)
-		expressionRefs = appendUniqueMemorySearchText(expressionRefs, ref)
+		currentInputRefSet.add(ref)
+		expressionRefSet.add(ref)
 	}
-	for _, ref := range stringSliceFromAny(sourceRefs["memory"]) {
-		memoryRefs = appendUniqueMemorySearchText(memoryRefs, ref)
-		expressionRefs = appendUniqueMemorySearchText(expressionRefs, ref)
+	for _, key := range []string{"memory", "delivered_context", "lorebook_reference"} {
+		for _, ref := range stringSliceFromAny(sourceRefs[key]) {
+			memoryRefSet.add(ref)
+			expressionRefSet.add(ref)
+		}
 	}
-	for _, ref := range stringSliceFromAny(sourceRefs["delivered_context"]) {
-		memoryRefs = appendUniqueMemorySearchText(memoryRefs, ref)
-		expressionRefs = appendUniqueMemorySearchText(expressionRefs, ref)
-	}
-	for _, ref := range stringSliceFromAny(sourceRefs["lorebook_reference"]) {
-		memoryRefs = appendUniqueMemorySearchText(memoryRefs, ref)
-		expressionRefs = appendUniqueMemorySearchText(expressionRefs, ref)
-	}
+	currentInputRefs, memoryRefs, expressionRefs := currentInputRefSet.items, memoryRefSet.items, expressionRefSet.items
 	eligibleRefs := append([]string{}, expressionRefs...)
 
 	status := "eligible"

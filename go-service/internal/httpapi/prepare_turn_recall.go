@@ -273,20 +273,18 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		}
 		embeddingStarted := time.Now()
 		// Preserve the primary-query failure path: do not spend requests on
-		// history if the current input cannot be embedded. Independent history
-		// requests keep their configured per-call timeout and original ordering.
+		// history if the current input cannot be embedded. History requests
+		// are then sent together, so embedding takes two waits however many
+		// recent turns are configured; each keeps its per-call timeout.
 		embed(0)
 		if embeddings[0].err == nil && len(embeddings[0].vector) > 0 {
-			const historyEmbeddingConcurrency = 3 // transport bound, not a recall limit
 			var workers sync.WaitGroup
-			for worker := 0; worker < minInt(historyEmbeddingConcurrency, len(retrievalQueries)-1); worker++ {
+			for index := 1; index < len(retrievalQueries); index++ {
 				workers.Add(1)
-				go func(worker int) {
+				go func(index int) {
 					defer workers.Done()
-					for index := worker + 1; index < len(retrievalQueries); index += historyEmbeddingConcurrency {
-						embed(index)
-					}
-				}(worker)
+					embed(index)
+				}(index)
 			}
 			workers.Wait()
 		}
@@ -356,18 +354,32 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	candidateLimit := limit
 	filter := strings.TrimSpace(clientMetaString(req.ClientMeta, "chroma_filter"))
 	searchSessionIDs := prepareTurnVectorHistorySessionIDs(req.ChatSessionID, historyScopes)
-	searchAcrossSessions := func(pass string, searchFilter func(string) string, perSessionLimits map[string]int) ([]vector.VectorDocument, error) {
+	// Vector reads are independent of each other. Every pass is launched before
+	// any is merged; merging still walks sessions and queries in their original
+	// order, so ranks, duplicate owners and the first reported error are unchanged.
+	const vectorSearchConcurrency = 4 // transport bound, not a recall limit
+	vectorSearchSlots := make(chan struct{}, vectorSearchConcurrency)
+	var queryCountsMu sync.Mutex
+	type vectorSearchCall struct {
+		sessionID  string
+		queryIndex int
+		results    []vector.VectorDocument
+		err        error
+		duration   time.Duration
+	}
+	// Passes and queries return mostly the same documents; each stored
+	// embedding is transferred once for all of them.
+	sharedEmbeddingContext := vector.WithSharedEmbeddings(ctx)
+	launchSearch := func(pass string, searchFilter func(string) string, perSessionLimits map[string]int) func() ([]vector.VectorDocument, error) {
 		passStarted := time.Now()
-		defer func() { searchTiming.addElapsed("pass_"+pass, passStarted) }()
-		queryContext := vector.WithQueryResponseObserver(ctx, func(size, status int) {
+		queryContext := vector.WithQueryResponseObserver(sharedEmbeddingContext, func(size, status int) {
+			queryCountsMu.Lock()
+			defer queryCountsMu.Unlock()
 			queryCounts[pass+".http_responses"]++
 			queryCounts[pass+".response_bytes"] += size
 		})
-		queryCounts[pass+".sessions"] = len(searchSessionIDs)
-		queryCounts[pass+".queries"] = len(queryVectors)
-		resultsByID := map[string]vector.VectorDocument{}
-		resultOrder := []string{}
-		var firstErr error
+		calls := []*vectorSearchCall{}
+		var searches sync.WaitGroup
 		for _, searchSessionID := range searchSessionIDs {
 			sessionLimit := candidateLimit
 			if perSessionLimits != nil {
@@ -376,11 +388,38 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 					continue
 				}
 			}
-			for queryIndex, searchVector := range queryVectors {
-				vectorStarted := time.Now()
+			sessionFilter := searchFilter(searchSessionID)
+			for queryIndex := range queryVectors {
+				call := &vectorSearchCall{sessionID: searchSessionID, queryIndex: queryIndex}
+				calls = append(calls, call)
+				searches.Add(1)
+				go func(call *vectorSearchCall, limit int, filter string) {
+					defer searches.Done()
+					vectorSearchSlots <- struct{}{}
+					defer func() { <-vectorSearchSlots }()
+					started := time.Now()
+					call.results, call.err = s.Vector.Search(queryContext, call.sessionID, queryVectors[call.queryIndex], limit, filter)
+					call.duration = time.Since(started)
+				}(call, sessionLimit, sessionFilter)
+			}
+		}
+		return func() ([]vector.VectorDocument, error) {
+			searches.Wait()
+			defer func() { searchTiming.addElapsed("pass_"+pass, passStarted) }()
+			// Other passes may still be reporting responses into the same counts.
+			queryCountsMu.Lock()
+			defer queryCountsMu.Unlock()
+			queryCounts[pass+".sessions"] = len(searchSessionIDs)
+			queryCounts[pass+".queries"] = len(queryVectors)
+			resultsByID := map[string]vector.VectorDocument{}
+			resultOrder := []string{}
+			var firstErr error
+			for _, call := range calls {
+				searchSessionID, queryIndex := call.sessionID, call.queryIndex
+				sessionResults, searchErr := call.results, call.err
 				queryCounts[pass+".calls"]++
-				sessionResults, searchErr := s.Vector.Search(queryContext, searchSessionID, searchVector, sessionLimit, searchFilter(searchSessionID))
-				searchTiming.addElapsed("vector_search", vectorStarted)
+				// Summed per-call time, as before; the pass entry is elapsed time.
+				searchTiming.addMilliseconds("vector_search", durationMilliseconds(call.duration))
 				if searchErr != nil && !errors.Is(searchErr, vector.ErrNotFound) {
 					queryCounts[pass+".failures"]++
 				}
@@ -424,21 +463,21 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 					}
 				}
 			}
+			results := make([]vector.VectorDocument, 0, len(resultOrder))
+			for _, key := range resultOrder {
+				results = append(results, resultsByID[key])
+			}
+			if len(results) > 0 {
+				sort.SliceStable(results, func(i, j int) bool {
+					return prepareTurnVectorDocumentRanksBefore(results[i], results[j])
+				})
+				return results, nil
+			}
+			if firstErr != nil {
+				return nil, firstErr
+			}
+			return nil, vector.ErrNotFound
 		}
-		results := make([]vector.VectorDocument, 0, len(resultOrder))
-		for _, key := range resultOrder {
-			results = append(results, resultsByID[key])
-		}
-		if len(results) > 0 {
-			sort.SliceStable(results, func(i, j int) bool {
-				return prepareTurnVectorDocumentRanksBefore(results[i], results[j])
-			})
-			return results, nil
-		}
-		if firstErr != nil {
-			return nil, firstErr
-		}
-		return nil, vector.ErrNotFound
 	}
 	shadow["search_attempted"] = true
 	shadow["query_vector_key"] = queryKey
@@ -449,12 +488,24 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	shadow["candidate_policy"] = "ui_configured_vector_recall_limit_per_worldline_history_session"
 	shadow["filter"] = filter
 	shadow["history_session_ids"] = searchSessionIDs
-	results, err := searchAcrossSessions("all", func(searchSessionID string) string {
+	memoryFilter := `tier == "memory"`
+	preciseCandidateCount := 0
+	for _, count := range preciseCandidateLimits {
+		preciseCandidateCount += maxInt(count, 0)
+	}
+	preciseMemoryFilter := `source_table == "precise_memory_units"`
+	waitAll := launchSearch("all", func(searchSessionID string) string {
 		if filter != "" {
 			return filter
 		}
 		return fmt.Sprintf("chat_session_id == %q", searchSessionID)
 	}, nil)
+	waitMemory := launchSearch("memory", func(string) string { return memoryFilter }, nil)
+	var waitPrecise func() ([]vector.VectorDocument, error)
+	if preciseCandidateCount > 0 {
+		waitPrecise = launchSearch("precise", func(string) string { return preciseMemoryFilter }, preciseCandidateLimits)
+	}
+	results, err := waitAll()
 	switch {
 	case err == nil:
 		revisionStarted := time.Now()
@@ -482,10 +533,9 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		shadow["search_result"] = "error"
 		shadow["search_error"] = err.Error()
 	}
-	memoryFilter := `tier == "memory"`
 	shadow["memory_search_attempted"] = true
 	shadow["memory_search_filter"] = memoryFilter
-	memoryResults, memoryErr := searchAcrossSessions("memory", func(string) string { return memoryFilter }, nil)
+	memoryResults, memoryErr := waitMemory()
 	switch {
 	case memoryErr == nil:
 		revisionStarted := time.Now()
@@ -513,12 +563,7 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		shadow["memory_search_results"] = []map[string]any{}
 		shadow["memory_search_error"] = memoryErr.Error()
 	}
-	preciseCandidateCount := 0
-	for _, count := range preciseCandidateLimits {
-		preciseCandidateCount += maxInt(count, 0)
-	}
 	shadow["precise_memory_search_candidate_count"] = preciseCandidateCount
-	preciseMemoryFilter := `source_table == "precise_memory_units"`
 	shadow["precise_memory_search_filter"] = preciseMemoryFilter
 	if preciseCandidateCount <= 0 {
 		shadow["precise_memory_search_attempted"] = false
@@ -527,7 +572,7 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		return result
 	}
 	shadow["precise_memory_search_attempted"] = true
-	preciseResults, preciseErr := searchAcrossSessions("precise", func(string) string { return preciseMemoryFilter }, preciseCandidateLimits)
+	preciseResults, preciseErr := waitPrecise()
 	switch {
 	case preciseErr == nil:
 		shadow["precise_memory_search_result"] = "ok"
@@ -828,6 +873,28 @@ func (s *Server) filterPrepareTurnActiveSourceRevisionVectors(
 		active bool
 		err    error
 	}
+	// The revisions to check, read concurrently before the documents are
+	// filtered in order.
+	type revisionKey struct{ sessionID, revision string }
+	documentRevision := func(document vector.VectorDocument) (revisionKey, bool) {
+		metadata := document.Metadata
+		revision := strings.TrimSpace(extractionStringFromAny(metadata["source_revision"]))
+		sessionID := strings.TrimSpace(document.ChatSessionID)
+		if sessionID == "" {
+			sessionID = strings.TrimSpace(fallbackSessionID)
+		}
+		return revisionKey{sessionID, revision}, revision != "" && sessionID != ""
+	}
+	keys := []revisionKey{}
+	for _, document := range documents {
+		if key, ok := documentRevision(document); ok {
+			keys = append(keys, key)
+		}
+	}
+	prefetched := lookupConcurrently(keys, identityLookupConcurrency, func(key revisionKey) sourceRevisionCheck {
+		active, err := sourceRevisions.IsSourceRevisionActive(ctx, key.sessionID, key.revision)
+		return sourceRevisionCheck{active, err}
+	})
 	checks := map[string]sourceRevisionCheck{}
 	filtered := make([]vector.VectorDocument, 0, len(documents))
 	droppedMissingRevision := 0
@@ -863,7 +930,7 @@ func (s *Server) filterPrepareTurnActiveSourceRevisionVectors(
 		key := sessionID + "\x00" + revision
 		check, exists := checks[key]
 		if !exists {
-			check.active, check.err = sourceRevisions.IsSourceRevisionActive(ctx, sessionID, revision)
+			check = prefetched[revisionKey{sessionID, revision}]
 			checks[key] = check
 		}
 		if check.err != nil {
@@ -1189,25 +1256,38 @@ func prepareTurnPrepareRecallMemory(item store.Memory) prepareTurnRecallMemory {
 func prepareTurnMemoryRecallMatcher(query string) func(prepareTurnRecallMemory) prepareTurnRecallEvidence {
 	query = strings.TrimSpace(query)
 	phrases := prepareTurnRecallPhrasePairs(query)
-	termsByAnchors := map[string][]string{"": prepareTurnDistinctiveRecallTerms(query)}
+	distinctive := newPrepareTurnDistinctiveQuery(query)
+	termsByAnchors := map[string][]string{"": distinctive.terms()}
+	// The query is fixed for this matcher: normalize it once, and decide each
+	// distinct anchor once, exactly as prepareTurnRecallContainsAnchor does.
+	queryNeedle := normalizePrepareTurnEntityNeedle(query)
+	anchorMatches := map[string]bool{}
+	containsAnchor := func(anchor string) bool {
+		matched, ok := anchorMatches[anchor]
+		if !ok {
+			matched = strings.TrimSpace(anchor) != "" && strings.Contains(queryNeedle, normalizePrepareTurnEntityNeedle(anchor))
+			anchorMatches[anchor] = matched
+		}
+		return matched
+	}
 	return func(item prepareTurnRecallMemory) prepareTurnRecallEvidence {
 		if query == "" {
 			return prepareTurnRecallEvidence{}
 		}
 		evidence := prepareTurnRecallEvidence{}
 		for _, anchor := range item.anchors {
-			if prepareTurnRecallContainsAnchor(query, anchor) {
+			if containsAnchor(anchor) {
 				evidence.StructuredAnchors = append(evidence.StructuredAnchors, anchor)
 			}
 		}
-		encodedAnchors, _ := json.Marshal(evidence.StructuredAnchors)
-		key := string(encodedAnchors)
-		if len(evidence.StructuredAnchors) == 0 {
-			key = ""
+		key := ""
+		if len(evidence.StructuredAnchors) > 0 {
+			encodedAnchors, _ := json.Marshal(evidence.StructuredAnchors)
+			key = string(encodedAnchors)
 		}
 		queryTerms, ok := termsByAnchors[key]
 		if !ok {
-			queryTerms = prepareTurnDistinctiveRecallTerms(query, evidence.StructuredAnchors...)
+			queryTerms = distinctive.terms(evidence.StructuredAnchors...)
 			termsByAnchors[key] = queryTerms
 		}
 		for _, term := range queryTerms {
@@ -1215,8 +1295,13 @@ func prepareTurnMemoryRecallMatcher(query string) func(prepareTurnRecallMemory) 
 				evidence.OverlapTerms = append(evidence.OverlapTerms, term)
 			}
 		}
-		for pair := range item.phrases {
-			if phrases[pair] {
+		// Whether the two phrase sets meet; walk the smaller one.
+		small, large := item.phrases, phrases
+		if len(phrases) < len(item.phrases) {
+			small, large = phrases, item.phrases
+		}
+		for pair := range small {
+			if large[pair] {
 				evidence.ExactPhrase = true
 				break
 			}
@@ -1241,12 +1326,71 @@ func prepareTurnSupportRecallEligible(query, text string, anchors ...string) boo
 	if query == "" || text == "" {
 		return query == "" && text != ""
 	}
-	if prepareTurnSharedRecallPhrase(query, text) {
-		return true
+	prepared := prepareTurnSupportQueryFor(query, anchors)
+	for pair := range prepareTurnRecallPhrasePairs(text) {
+		if prepared.pairs[pair] {
+			return true
+		}
 	}
-	queryTerms := prepareTurnDistinctiveRecallTerms(query, anchors...)
+	queryTerms := prepared.terms
 	overlap := prepareTurnDistinctiveRecallOverlapCount(queryTerms, text)
 	return overlap >= prepareTurnRecallRequiredOverlap(queryTerms, text)
+}
+
+// prepareTurnSupportQuery is the query side of prepareTurnSupportRecallEligible:
+// its phrase pairs and its distinctive terms without the anchors. Both are
+// read only once built.
+type prepareTurnSupportQuery struct {
+	pairs map[string]bool
+	terms []string
+}
+
+type prepareTurnSupportQueryKey struct {
+	query, anchors string
+}
+
+// One request checks many texts against the same few queries; the most
+// recently prepared queries are kept, bounded in number.
+var prepareTurnSupportQueries = struct {
+	sync.Mutex
+	entries map[prepareTurnSupportQueryKey]*prepareTurnSupportQuery
+	order   []prepareTurnSupportQueryKey
+}{entries: map[prepareTurnSupportQueryKey]*prepareTurnSupportQuery{}}
+
+const prepareTurnSupportQueryCacheSize = 32
+
+func prepareTurnSupportQueryFor(query string, anchors []string) *prepareTurnSupportQuery {
+	key := prepareTurnSupportQueryKey{query: query}
+	if len(anchors) > 0 {
+		// Length-prefixed, so different anchor lists never share a key.
+		var b strings.Builder
+		for _, anchor := range anchors {
+			b.WriteString(strconv.Itoa(len(anchor)))
+			b.WriteByte(':')
+			b.WriteString(anchor)
+		}
+		key.anchors = b.String()
+	}
+	cache := &prepareTurnSupportQueries
+	cache.Lock()
+	prepared := cache.entries[key]
+	cache.Unlock()
+	if prepared != nil {
+		return prepared
+	}
+	prepared = &prepareTurnSupportQuery{pairs: prepareTurnRecallPhrasePairs(query), terms: prepareTurnDistinctiveRecallTerms(query, anchors...)}
+	cache.Lock()
+	defer cache.Unlock()
+	if existing := cache.entries[key]; existing != nil {
+		return existing
+	}
+	if len(cache.order) >= prepareTurnSupportQueryCacheSize {
+		delete(cache.entries, cache.order[0])
+		cache.order = cache.order[1:]
+	}
+	cache.entries[key] = prepared
+	cache.order = append(cache.order, key)
+	return prepared
 }
 
 // An exact adjacent term pair is request-local evidence without requiring a
@@ -1377,6 +1521,90 @@ func prepareTurnDistinctiveRecallTerms(text string, anchors ...string) []string 
 	return out
 }
 
+// prepareTurnDistinctiveQuery is the anchor-independent part of
+// prepareTurnDistinctiveRecallTerms for one text, so the terms for many
+// anchor lists come from one analysis. Anchors only exclude terms and forms:
+// a term passes the frequency rules whatever the anchors, and each term
+// value is excluded or not wherever it occurs.
+type prepareTurnDistinctiveQuery struct {
+	candidates []string   // first occurrences passing the frequency rules
+	forms      [][]string // each candidate's term forms
+	fallback   []string   // prepareTurnRecallTerms(text)
+}
+
+func newPrepareTurnDistinctiveQuery(text string) *prepareTurnDistinctiveQuery {
+	all := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !(r == '_' || r == '-' || unicode.IsLetter(r) || unicode.IsNumber(r))
+	})
+	counts := map[string]int{}
+	lengths := []int{}
+	for _, term := range all {
+		term = strings.TrimSpace(term)
+		if term != "" {
+			counts[term]++
+			lengths = append(lengths, len([]rune(term)))
+		}
+	}
+	sort.Ints(lengths)
+	medianLength := 0
+	minimumLength := 0
+	if len(lengths) > 0 {
+		medianLength = lengths[len(lengths)/2]
+		minimumLength = lengths[0]
+	}
+	query := &prepareTurnDistinctiveQuery{fallback: prepareTurnRecallTerms(text)}
+	seen := map[string]bool{}
+	for _, term := range all {
+		term = strings.TrimSpace(term)
+		termLength := len([]rune(term))
+		lowInformationRepeat := counts[term] > 1 && termLength < medianLength
+		shortestTier := len(lengths) > 1 && termLength == minimumLength
+		if term == "" || seen[term] || lowInformationRepeat || shortestTier {
+			continue
+		}
+		seen[term] = true
+		query.candidates = append(query.candidates, term)
+		query.forms = append(query.forms, prepareTurnRecallTermForms(term))
+	}
+	return query
+}
+
+// terms is prepareTurnDistinctiveRecallTerms(text, anchors...).
+func (query *prepareTurnDistinctiveQuery) terms(anchors ...string) []string {
+	excluded := map[string]bool{}
+	for _, anchor := range anchors {
+		for _, term := range prepareTurnRecallTerms(anchor) {
+			excluded[term] = true
+		}
+	}
+	kept := []int{}
+	for i, term := range query.candidates {
+		if !excluded[term] {
+			kept = append(kept, i)
+		}
+	}
+	if len(kept) > 0 {
+		forms := []string{}
+		formSeen := map[string]bool{}
+		for _, i := range kept {
+			for _, form := range query.forms[i] {
+				if !excluded[form] && !formSeen[form] {
+					formSeen[form] = true
+					forms = append(forms, form)
+				}
+			}
+		}
+		return forms
+	}
+	out := []string{}
+	for _, term := range query.fallback {
+		if !excluded[term] {
+			out = append(out, term)
+		}
+	}
+	return out
+}
+
 // The lexical proof grows with request complexity instead of using short/long
 // context bands. It is a relevance criterion, not an item-count or turn cap.
 func prepareTurnDynamicOverlapRequirement(distinctiveTermCount int) int {
@@ -1494,12 +1722,14 @@ func prepareTurnRecallTermForms(term string) []string {
 	return out
 }
 
+func prepareTurnRecallTermBreak(r rune) bool {
+	return !(r == '_' || r == '-' || unicode.IsLetter(r) || unicode.IsNumber(r))
+}
+
 func prepareTurnRecallTerms(text string) []string {
 	seen := map[string]bool{}
 	out := []string{}
-	for _, term := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !(r == '_' || r == '-' || unicode.IsLetter(r) || unicode.IsNumber(r))
-	}) {
+	for _, term := range strings.FieldsFunc(strings.ToLower(text), prepareTurnRecallTermBreak) {
 		term = strings.TrimSpace(term)
 		if term == "" || seen[term] {
 			continue
@@ -2094,7 +2324,7 @@ func prepareTurnProtectedAliasResolution(memories []store.Memory, registeredAlia
 		}
 	}
 	for _, item := range memories {
-		parsed := parseJSONMap(item.SummaryJSON)
+		parsed := parseJSONMapShared(item.SummaryJSON) // read only
 		for _, raw := range sliceFromAny(parsed["character_identity_accuracy"]) {
 			identity := mapFromAny(raw)
 			canonical := extractionFirstNonEmpty(
@@ -2137,7 +2367,7 @@ func prepareTurnProtectedAliasCanonicalMap(memories []store.Memory) map[string]s
 }
 
 func prepareTurnProtectedMemoryCoverageKeys(item store.Memory, aliasCanonical map[string]string, ambiguousAliases ...map[string]bool) []string {
-	parsed := parseJSONMap(item.SummaryJSON)
+	parsed := parseJSONMapShared(item.SummaryJSON) // read only
 	keys := []string{}
 	ambiguous := map[string]bool{}
 	if len(ambiguousAliases) > 0 && ambiguousAliases[0] != nil {
@@ -2864,7 +3094,7 @@ func prepareTurnHydrateVectorMemoryHits(memories []store.Memory, vectorShadow ma
 		incrementLanguageCount(hydratedRawLanguageCounts, languageMeta["raw_language"])
 		incrementLanguageCount(hydratedSummaryLanguageCounts, languageMeta["summary_language"])
 		incrementLanguageCount(hydratedSessionLanguageCounts, languageMeta["session_output_language"])
-		if memorySearchTextFromMemory(item).AliasCount > 0 {
+		if _, aliasCount := memorySearchTextOf(item); aliasCount > 0 {
 			out.Trace["hydrated_alias_ready_count"] = intFromAny(out.Trace["hydrated_alias_ready_count"], 0) + 1
 		}
 		key := prepareTurnMemoryLaneKey(item)

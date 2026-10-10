@@ -995,7 +995,8 @@ func TestSearchVectorFirstHydratesMemoryWithoutLexicalTopKFill(t *testing.T) {
 	if vectorFake.searchCalls != 2 {
 		t.Fatalf("vector search calls = %d, want support and aggregate-memory lane searches", vectorFake.searchCalls)
 	}
-	if len(vectorFake.searchFilters) != 2 || !strings.Contains(vectorFake.searchFilters[1], `tier == "memory"`) {
+	// The support and aggregate-memory searches run concurrently; issue order is not fixed.
+	if len(vectorFake.searchFilters) != 2 || strings.Contains(vectorFake.searchFilters[0], `tier == "memory"`) == strings.Contains(vectorFake.searchFilters[1], `tier == "memory"`) {
 		t.Fatalf("vector search filters = %#v, want a dedicated aggregate-memory tier query", vectorFake.searchFilters)
 	}
 	items, ok := resp["items"].([]any)

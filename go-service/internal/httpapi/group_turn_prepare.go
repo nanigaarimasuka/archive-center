@@ -252,6 +252,7 @@ func prepareTurnPreprocessingSearchTrace(shadow map[string]any) map[string]any {
 }
 
 func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
+	defer releaseJSONMapCache()
 	measurement := newPrepareTurnMeasurement()
 	timing := newBackendTimingTrace("prepare_turn.backend_timing.v1")
 	decodeStartedAt := time.Now()
@@ -523,6 +524,128 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			measurement.add("pre_vector.precise_units.text_bytes", prepareTurnMeasuredTextBytes(reflect.ValueOf(units)))
 		}
 	}
+	// Reads that do not depend on vector recall start now and run while it
+	// waits on the vector store and embeddings; their results and
+	// measurements are taken where they were read before.
+	characterMemoryPrefetch := startPrepareTurnPrefetch(func() (map[string]any, error) {
+		return buildPrepareTurnCharacterMemoryReadContext(r.Context(), s.Store, sid), nil
+	})
+	characterStatesPrefetchName := "db.ListCharacterStates"
+	var characterStatesPrefetch *prepareTurnPrefetch[[]store.CharacterState]
+	if s.Store != nil {
+		if rangeStore, ok := s.Store.(store.PrepareTurnRangeStore); ok {
+			characterStatesPrefetchName = "db.ListCharacterStatesCurrentBefore"
+			characterStatesPrefetch = startPrepareTurnPrefetch(func() ([]store.CharacterState, error) {
+				return rangeStore.ListCharacterStatesCurrentBefore(r.Context(), sid, currentTurnFence)
+			})
+		} else {
+			characterStatesPrefetch = startPrepareTurnPrefetch(func() ([]store.CharacterState, error) {
+				return s.Store.ListCharacterStates(r.Context(), sid)
+			})
+		}
+	}
+	// Store reads that need nothing from vector recall start here as well.
+	readsCtx := r.Context()
+	prefetchHistoryFromTurn, prefetchHistoryToTurn := 0, 0
+	if currentTurnFence > 0 {
+		prefetchHistoryToTurn = currentTurnFence - 1
+	}
+	var (
+		interactionPrefetch, perspectivePrefetch *prepareTurnPrefetch[[]store.PreciseMemoryUnit]
+		kgPrefetch                               *prepareTurnPrefetch[[]store.KGTriple]
+		chatLogsPrefetch                         *prepareTurnPrefetch[[]store.ChatLog]
+		resumePackPrefetch                       *prepareTurnPrefetch[*store.ResumePack]
+		storylinesPrefetch                       *prepareTurnPrefetch[[]store.Storyline]
+		worldRulesPrefetch                       *prepareTurnPrefetch[[]store.WorldRule]
+		characterEventsPrefetch                  *prepareTurnPrefetch[[]store.CharacterEvent]
+		pendingThreadsPrefetch                   *prepareTurnPrefetch[[]store.PendingThread]
+		activeStatesPrefetch                     *prepareTurnPrefetch[[]store.ActiveState]
+		canonicalLayersPrefetch                  *prepareTurnPrefetch[[]store.CanonicalStateLayer]
+		episodeSummariesPrefetch                 *prepareTurnPrefetch[[]store.EpisodeSummary]
+		personaEntriesPrefetch                   *prepareTurnPrefetch[[]store.PersonaMemoryEntry]
+		entityOwnersPrefetch                     *prepareTurnPrefetch[[]store.ProtagonistEntityMemoryOwner]
+		narrativeValuesPrefetch                  *prepareTurnPrefetch[[]store.StatusCurrentValue]
+		clockValuesPrefetch                      *prepareTurnPrefetch[[]store.StatusCurrentValue]
+		reversibleValuesPrefetch                 *prepareTurnPrefetch[[]store.StatusCurrentValue]
+	)
+	if s.Store != nil {
+		if interactionReader, ok := s.Store.(store.ActiveInteractionMemoryReader); ok {
+			interactionPrefetch = startPrepareTurnPrefetch(func() ([]store.PreciseMemoryUnit, error) {
+				return interactionReader.ListActiveInteractionMemoryUnits(readsCtx, sid)
+			})
+		}
+		if holderID := strings.TrimSpace(extractionStringFromAny(perspectiveContext["current_pov_entity_id"])); holderID != "" {
+			if perspectiveReader, ok := s.Store.(store.CharacterPerspectiveMemoryReader); ok {
+				perspectivePrefetch = startPrepareTurnPrefetch(func() ([]store.PreciseMemoryUnit, error) {
+					return perspectiveReader.ListCharacterPerspectiveMemoryUnits(readsCtx, sid, holderID)
+				})
+			}
+		}
+		if rangeStore, ok := s.Store.(store.PrepareTurnRangeStore); ok {
+			kgPrefetch = startPrepareTurnPrefetch(func() ([]store.KGTriple, error) {
+				return listPrepareTurnHistoryKGTriples(readsCtx, rangeStore, historyScope.Segments)
+			})
+			activeStatesPrefetch = startPrepareTurnPrefetch(func() ([]store.ActiveState, error) {
+				return rangeStore.ListActiveStatesRange(readsCtx, sid, prefetchHistoryFromTurn, prefetchHistoryToTurn)
+			})
+			canonicalLayersPrefetch = startPrepareTurnPrefetch(func() ([]store.CanonicalStateLayer, error) {
+				return rangeStore.ListCanonicalStateLayersRange(readsCtx, sid, prefetchHistoryFromTurn, prefetchHistoryToTurn)
+			})
+		} else {
+			kgPrefetch = startPrepareTurnPrefetch(func() ([]store.KGTriple, error) { return s.Store.ListKGTriples(readsCtx, sid) })
+			activeStatesPrefetch = startPrepareTurnPrefetch(func() ([]store.ActiveState, error) { return s.Store.ListActiveStates(readsCtx, sid, "") })
+			canonicalLayersPrefetch = startPrepareTurnPrefetch(func() ([]store.CanonicalStateLayer, error) {
+				return s.Store.ListCanonicalStateLayers(readsCtx, sid, "")
+			})
+		}
+		chatLogsPrefetch = startPrepareTurnPrefetch(func() ([]store.ChatLog, error) {
+			return listPrepareTurnHistoryChatLogs(readsCtx, s.Store, historyScope.Segments)
+		})
+		resumePackPrefetch = startPrepareTurnPrefetch(func() (*store.ResumePack, error) { return s.Store.GetResumePack(readsCtx, sid, "prepare_turn") })
+		storylinesPrefetch = startPrepareTurnPrefetch(func() ([]store.Storyline, error) { return s.Store.ListStorylines(readsCtx, sid) })
+		worldRulesPrefetch = startPrepareTurnPrefetch(func() ([]store.WorldRule, error) { return s.Store.ListWorldRules(readsCtx, sid) })
+		if responseProjection != prepareTurnProductionProjectionV1 {
+			characterEventsPrefetch = startPrepareTurnPrefetch(func() ([]store.CharacterEvent, error) { return s.Store.ListCharacterEvents(readsCtx, sid, "") })
+		}
+		pendingThreadsPrefetch = startPrepareTurnPrefetch(func() ([]store.PendingThread, error) { return s.Store.ListPendingThreads(readsCtx, sid, "") })
+		episodeLimit := supportRecallLimit
+		episodeSummariesPrefetch = startPrepareTurnPrefetch(func() ([]store.EpisodeSummary, error) {
+			return s.Store.ListEpisodeSummaries(readsCtx, sid, episodeLimit, 0, 0)
+		})
+		if personaStore, ok := s.Store.(store.PersonaCapsuleStore); ok {
+			personaEntriesPrefetch = startPrepareTurnPrefetch(func() ([]store.PersonaMemoryEntry, error) {
+				return personaStore.ListAttachedPersonaMemoryEntries(readsCtx, sid, 0)
+			})
+		}
+		if _, ok := s.Store.(store.ProtagonistEntityMemoryStore); ok {
+			if ownerStore, ok := s.Store.(store.ProtagonistEntityMemoryOwnerIndexStore); ok {
+				entityOwnersPrefetch = startPrepareTurnPrefetch(func() ([]store.ProtagonistEntityMemoryOwner, error) {
+					return ownerStore.ListProtagonistEntityMemoryOwners(readsCtx, store.ProtagonistEntityMemoryFilter{
+						OwnerEntityRole:     "npc",
+						OwnerVisibility:     "owner_private",
+						SourceChatSessionID: sid,
+					})
+				})
+			}
+		}
+		if valueStore, ok := s.Store.(store.StatusCurrentValueStore); ok {
+			narrativeValuesPrefetch = startPrepareTurnPrefetch(func() ([]store.StatusCurrentValue, error) {
+				return valueStore.ListStatusCurrentValues(readsCtx, sid, "", "", narrativeStateStatusKey, -1)
+			})
+			clockValuesPrefetch = startPrepareTurnPrefetch(func() ([]store.StatusCurrentValue, error) {
+				return valueStore.ListStatusCurrentValues(readsCtx, sid, storyClockOwnerScope, storyClockOwnerID, storyClockStatusKey, 0)
+			})
+		}
+		if reversibleStore, ok := s.Store.(store.ReversibleStatusTransitionStore); ok {
+			keys := reversibleStatusKeys()
+			if bodyConfig.CycleTrackingEnabled || bodyConfig.AutomaticPregnancyEnabled {
+				keys = append(keys, bodyTrackingStatusKey)
+			}
+			reversibleValuesPrefetch = startPrepareTurnPrefetch(func() ([]store.StatusCurrentValue, error) {
+				return reversibleStore.ListReversibleStatusCurrentValues(readsCtx, sid, reversibleStateOwnerScope, keys)
+			})
+		}
+	}
 	vectorStartedAt := time.Now()
 	vectorRecall := s.prepareTurnVectorShadowWithPreciseCandidateLimits(
 		r.Context(),
@@ -575,9 +698,8 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		"status":           "unavailable", "reason": "general_precise_memory_reader_unavailable",
 		"score_owner": "precise_memory_unit_vector_similarity",
 	}
-	dbcharacter_memory_contextSpan := measurement.start("db.character_memory_context")
-	characterMemoryReadContext := buildPrepareTurnCharacterMemoryReadContext(r.Context(), s.Store, sid)
-	dbcharacter_memory_contextSpan.end()
+	characterMemoryReadContext, _, characterMemoryElapsed := characterMemoryPrefetch.wait()
+	measurement.record("db.character_memory_context", 1, characterMemoryElapsed)
 
 	readErrs := []error{}
 	readsOK := 0
@@ -619,10 +741,8 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				sessionStateReads["precise_memory_vector_facts"] = true
 			}
 		}
-		if interactionReader, ok := s.Store.(store.ActiveInteractionMemoryReader); ok {
-			units, err := prepareTurnMeasureRead(measurement, "db.ListActiveInteractionMemoryUnits", func() ([]store.PreciseMemoryUnit, error) {
-				return interactionReader.ListActiveInteractionMemoryUnits(ctx, sid)
-			})
+		if _, ok := s.Store.(store.ActiveInteractionMemoryReader); ok {
+			units, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListActiveInteractionMemoryUnits", interactionPrefetch)
 			if err == nil {
 				activeInteractionUnits = units
 				readsOK++
@@ -632,10 +752,8 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if holderID := strings.TrimSpace(extractionStringFromAny(perspectiveContext["current_pov_entity_id"])); holderID != "" {
-			if perspectiveReader, ok := s.Store.(store.CharacterPerspectiveMemoryReader); ok {
-				units, err := prepareTurnMeasureRead(measurement, "db.ListCharacterPerspectiveMemoryUnits", func() ([]store.PreciseMemoryUnit, error) {
-					return perspectiveReader.ListCharacterPerspectiveMemoryUnits(ctx, sid, holderID)
-				})
+			if _, ok := s.Store.(store.CharacterPerspectiveMemoryReader); ok {
+				units, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListCharacterPerspectiveMemoryUnits", perspectivePrefetch)
 				if err == nil {
 					characterPerspectiveUnits = units
 					readsOK++
@@ -663,11 +781,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			readErrs = append(readErrs, memoryReadErr)
 		}
 		if fullSessionRangeRead {
-			kgTriples, kgReadErr = prepareTurnMeasureRead(measurement, "db.listPrepareTurnHistoryKGTriples", func() ([]store.KGTriple, error) {
-				return listPrepareTurnHistoryKGTriples(ctx, rangeStore, historyScope.Segments)
-			})
+			kgTriples, kgReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.listPrepareTurnHistoryKGTriples", kgPrefetch)
 		} else {
-			kgTriples, kgReadErr = prepareTurnMeasureRead(measurement, "db.ListKGTriples", func() ([]store.KGTriple, error) { return s.Store.ListKGTriples(ctx, sid) })
+			kgTriples, kgReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.ListKGTriples", kgPrefetch)
 		}
 		if kgReadErr == nil {
 			readsOK++
@@ -687,41 +803,33 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		} else if !errors.Is(evidenceReadErr, store.ErrNotEnabled) {
 			readErrs = append(readErrs, evidenceReadErr)
 		}
-		if c, err := prepareTurnMeasureRead(measurement, "db.listPrepareTurnHistoryChatLogs", func() ([]store.ChatLog, error) {
-			return listPrepareTurnHistoryChatLogs(ctx, s.Store, historyScope.Segments)
-		}); err == nil {
+		if c, err := prepareTurnRecordPrefetchedRead(measurement, "db.listPrepareTurnHistoryChatLogs", chatLogsPrefetch); err == nil {
 			chatLogs = c
 			readsOK++
 			sessionStateReads["chat_logs"] = true
 		} else if !errors.Is(err, store.ErrNotEnabled) {
 			readErrs = append(readErrs, err)
 		}
-		if rp, err := prepareTurnMeasureRead(measurement, "db.GetResumePack", func() (*store.ResumePack, error) { return s.Store.GetResumePack(ctx, sid, "prepare_turn") }); err == nil {
+		if rp, err := prepareTurnRecordPrefetchedRead(measurement, "db.GetResumePack", resumePackPrefetch); err == nil {
 			resumePack = rp
 			readsOK++
 		} else if !errors.Is(err, store.ErrNotEnabled) && !errors.Is(err, store.ErrNotFound) {
 			readErrs = append(readErrs, err)
 		}
-		if sl, err := prepareTurnMeasureRead(measurement, "db.ListStorylines", func() ([]store.Storyline, error) { return s.Store.ListStorylines(ctx, sid) }); err == nil {
+		if sl, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListStorylines", storylinesPrefetch); err == nil {
 			storylines = sl
 			readsOK++
 			sessionStateReads["storylines"] = true
 		} else if !errors.Is(err, store.ErrNotEnabled) {
 			readErrs = append(readErrs, err)
 		}
-		if wr, err := prepareTurnMeasureRead(measurement, "db.ListWorldRules", func() ([]store.WorldRule, error) { return s.Store.ListWorldRules(ctx, sid) }); err == nil {
+		if wr, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListWorldRules", worldRulesPrefetch); err == nil {
 			worldRules = wr
 			readsOK++
 		} else if !errors.Is(err, store.ErrNotEnabled) {
 			readErrs = append(readErrs, err)
 		}
-		if fullSessionRangeRead {
-			charStates, characterStateReadErr = prepareTurnMeasureRead(measurement, "db.ListCharacterStatesCurrentBefore", func() ([]store.CharacterState, error) {
-				return rangeStore.ListCharacterStatesCurrentBefore(ctx, sid, currentTurnFence)
-			})
-		} else {
-			charStates, characterStateReadErr = prepareTurnMeasureRead(measurement, "db.ListCharacterStates", func() ([]store.CharacterState, error) { return s.Store.ListCharacterStates(ctx, sid) })
-		}
+		charStates, characterStateReadErr = prepareTurnRecordPrefetchedRead(measurement, characterStatesPrefetchName, characterStatesPrefetch)
 		if characterStateReadErr == nil {
 			readsOK++
 			sessionStateReads["character_states"] = true
@@ -729,14 +837,14 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			readErrs = append(readErrs, characterStateReadErr)
 		}
 		if responseProjection != prepareTurnProductionProjectionV1 {
-			if ce, err := prepareTurnMeasureRead(measurement, "db.ListCharacterEvents", func() ([]store.CharacterEvent, error) { return s.Store.ListCharacterEvents(ctx, sid, "") }); err == nil {
+			if ce, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListCharacterEvents", characterEventsPrefetch); err == nil {
 				charEvents = ce
 				sessionStateReads["character_events"] = true
 			} else if !errors.Is(err, store.ErrNotEnabled) {
 				readErrs = append(readErrs, err)
 			}
 		}
-		if pt, err := prepareTurnMeasureRead(measurement, "db.ListPendingThreads", func() ([]store.PendingThread, error) { return s.Store.ListPendingThreads(ctx, sid, "") }); err == nil {
+		if pt, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListPendingThreads", pendingThreadsPrefetch); err == nil {
 			pendingThreads = pt
 			readsOK++
 			sessionStateReads["pending_threads"] = true
@@ -748,11 +856,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		}
 		var activeStateReadErr error
 		if fullSessionRangeRead {
-			activeStates, activeStateReadErr = prepareTurnMeasureRead(measurement, "db.ListActiveStatesRange", func() ([]store.ActiveState, error) {
-				return rangeStore.ListActiveStatesRange(ctx, sid, historyFromTurn, historyToTurn)
-			})
+			activeStates, activeStateReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.ListActiveStatesRange", activeStatesPrefetch)
 		} else {
-			activeStates, activeStateReadErr = prepareTurnMeasureRead(measurement, "db.ListActiveStates", func() ([]store.ActiveState, error) { return s.Store.ListActiveStates(ctx, sid, "") })
+			activeStates, activeStateReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.ListActiveStates", activeStatesPrefetch)
 		}
 		if activeStateReadErr == nil {
 			readsOK++
@@ -761,29 +867,23 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			readErrs = append(readErrs, activeStateReadErr)
 		}
 		if fullSessionRangeRead {
-			canonicalLayers, canonicalStateReadErr = prepareTurnMeasureRead(measurement, "db.ListCanonicalStateLayersRange", func() ([]store.CanonicalStateLayer, error) {
-				return rangeStore.ListCanonicalStateLayersRange(ctx, sid, historyFromTurn, historyToTurn)
-			})
+			canonicalLayers, canonicalStateReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.ListCanonicalStateLayersRange", canonicalLayersPrefetch)
 		} else {
-			canonicalLayers, canonicalStateReadErr = prepareTurnMeasureRead(measurement, "db.ListCanonicalStateLayers", func() ([]store.CanonicalStateLayer, error) { return s.Store.ListCanonicalStateLayers(ctx, sid, "") })
+			canonicalLayers, canonicalStateReadErr = prepareTurnRecordPrefetchedRead(measurement, "db.ListCanonicalStateLayers", canonicalLayersPrefetch)
 		}
 		if canonicalStateReadErr == nil {
 			readsOK++
 		} else if !errors.Is(canonicalStateReadErr, store.ErrNotEnabled) {
 			readErrs = append(readErrs, canonicalStateReadErr)
 		}
-		if es, err := prepareTurnMeasureRead(measurement, "db.ListEpisodeSummaries", func() ([]store.EpisodeSummary, error) {
-			return s.Store.ListEpisodeSummaries(ctx, sid, supportRecallLimit, 0, 0)
-		}); err == nil {
+		if es, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListEpisodeSummaries", episodeSummariesPrefetch); err == nil {
 			episodeSums = es
 			readsOK++
 		} else if !errors.Is(err, store.ErrNotEnabled) {
 			readErrs = append(readErrs, err)
 		}
-		if personaStore, ok := s.Store.(store.PersonaCapsuleStore); ok {
-			if entries, err := prepareTurnMeasureRead(measurement, "db.ListAttachedPersonaMemoryEntries", func() ([]store.PersonaMemoryEntry, error) {
-				return personaStore.ListAttachedPersonaMemoryEntries(ctx, sid, 0)
-			}); err == nil {
+		if _, ok := s.Store.(store.PersonaCapsuleStore); ok {
+			if entries, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListAttachedPersonaMemoryEntries", personaEntriesPrefetch); err == nil {
 				for _, entry := range entries {
 					if personaMemoryEntryIsCharacterPrivate(entry) {
 						characterPrivateMemories = append(characterPrivateMemories, personaMemoryEntryAsCharacterPrivateMemory(entry, sid))
@@ -803,14 +903,8 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				OwnerVisibility:     "owner_private",
 				SourceChatSessionID: sid,
 			}
-			if ownerStore, ownerOK := s.Store.(store.ProtagonistEntityMemoryOwnerIndexStore); ownerOK {
-				owners, ownerErr := prepareTurnMeasureRead(measurement, "db.ListProtagonistEntityMemoryOwners", func() ([]store.ProtagonistEntityMemoryOwner, error) {
-					return ownerStore.ListProtagonistEntityMemoryOwners(ctx, store.ProtagonistEntityMemoryFilter{
-						OwnerEntityRole:     "npc",
-						OwnerVisibility:     "owner_private",
-						SourceChatSessionID: sid,
-					})
-				})
+			if _, ownerOK := s.Store.(store.ProtagonistEntityMemoryOwnerIndexStore); ownerOK {
+				owners, ownerErr := prepareTurnRecordPrefetchedRead(measurement, "db.ListProtagonistEntityMemoryOwners", entityOwnersPrefetch)
 				if ownerErr == nil {
 					entityOwnerIndexCount = len(owners)
 					ownerIdentityMemories := make([]store.ProtagonistEntityMemory, 0, len(owners))
@@ -867,18 +961,14 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				readErrs = append(readErrs, err)
 			}
 		}
-		if valueStore, ok := s.Store.(store.StatusCurrentValueStore); ok {
-			if values, err := prepareTurnMeasureRead(measurement, "db.ListStatusCurrentValues.narrative", func() ([]store.StatusCurrentValue, error) {
-				return valueStore.ListStatusCurrentValues(ctx, sid, "", "", narrativeStateStatusKey, -1)
-			}); err == nil {
+		if _, ok := s.Store.(store.StatusCurrentValueStore); ok {
+			if values, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListStatusCurrentValues.narrative", narrativeValuesPrefetch); err == nil {
 				narrativeCurrentValues = values
 				readsOK++
 			} else if !errors.Is(err, store.ErrNotEnabled) {
 				readErrs = append(readErrs, err)
 			}
-			if values, err := prepareTurnMeasureRead(measurement, "db.ListStatusCurrentValues.clock", func() ([]store.StatusCurrentValue, error) {
-				return valueStore.ListStatusCurrentValues(ctx, sid, storyClockOwnerScope, storyClockOwnerID, storyClockStatusKey, 0)
-			}); err == nil {
+			if values, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListStatusCurrentValues.clock", clockValuesPrefetch); err == nil {
 				storyClockCurrentValues = values
 				if len(values) > 0 {
 					readsOK++
@@ -887,14 +977,8 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				readErrs = append(readErrs, err)
 			}
 		}
-		if reversibleStore, ok := s.Store.(store.ReversibleStatusTransitionStore); ok {
-			keys := reversibleStatusKeys()
-			if bodyConfig.CycleTrackingEnabled || bodyConfig.AutomaticPregnancyEnabled {
-				keys = append(keys, bodyTrackingStatusKey)
-			}
-			if values, err := prepareTurnMeasureRead(measurement, "db.ListReversibleStatusCurrentValues", func() ([]store.StatusCurrentValue, error) {
-				return reversibleStore.ListReversibleStatusCurrentValues(ctx, sid, reversibleStateOwnerScope, keys)
-			}); err == nil {
+		if _, ok := s.Store.(store.ReversibleStatusTransitionStore); ok {
+			if values, err := prepareTurnRecordPrefetchedRead(measurement, "db.ListReversibleStatusCurrentValues", reversibleValuesPrefetch); err == nil {
 				for _, value := range values {
 					if value.StatusKey == bodyTrackingStatusKey {
 						bodyTrackingCurrentValues = append(bodyTrackingCurrentValues, value)
@@ -997,10 +1081,36 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 	recollectionStartedAt := time.Now()
 	var personaRoleTrace map[string]any
 	characterPrivateMemories, personaRoleTrace = excludeRisuPersonaFromStoredNPCMemories(characterPrivateMemories, req.ClientMeta)
-	entityIdentityAliases := buildPrepareTurnEntityIdentityAliases(r.Context(), s.Store, sid, charStates, characterPrivateMemories)
-	characterPrivateMemories = s.canonicalizeSubjectiveEntityMemoriesForRead(r.Context(), sid, characterPrivateMemories)
-	kgTriples = s.canonicalizeCharacterKGTriplesForRead(r.Context(), sid, kgTriples)
-	characterProjection := s.canonicalCharacterReadProjection(r.Context(), sid, charStates, charEvents)
+	// These four read identities from the store one surface at a time. Each
+	// reads only the values above and none uses another's result, so they
+	// run concurrently and are assigned in the original order afterwards.
+	var (
+		entityIdentityAliases      map[string]any
+		canonicalCharacterMemories []store.ProtagonistEntityMemory
+		canonicalKGTriples         []store.KGTriple
+		characterProjection        characterReadProjection
+		recollectionReads          sync.WaitGroup
+	)
+	recollectionReads.Add(4)
+	go func() {
+		defer recollectionReads.Done()
+		entityIdentityAliases = buildPrepareTurnEntityIdentityAliases(r.Context(), s.Store, sid, charStates, characterPrivateMemories)
+	}()
+	go func() {
+		defer recollectionReads.Done()
+		canonicalCharacterMemories = s.canonicalizeSubjectiveEntityMemoriesForRead(r.Context(), sid, characterPrivateMemories)
+	}()
+	go func() {
+		defer recollectionReads.Done()
+		canonicalKGTriples = s.canonicalizeCharacterKGTriplesForRead(r.Context(), sid, kgTriples)
+	}()
+	go func() {
+		defer recollectionReads.Done()
+		characterProjection = s.canonicalCharacterReadProjection(r.Context(), sid, charStates, charEvents)
+	}()
+	recollectionReads.Wait()
+	characterPrivateMemories = canonicalCharacterMemories
+	kgTriples = canonicalKGTriples
 	charStates = characterProjection.States
 	charEvents = characterProjection.Events
 	var personaRelevanceTrace map[string]any
@@ -1215,6 +1325,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 					"recent_conversation_reading": multiAgentRecentReading(priorityMemoryRequest, chatLogs, assemblyInput.Common.GeneralMemories),
 					"story_time_note":             storyTimePromptNote(assemblyInput.Perspective.StoryClock),
 					"go_baseline_plan":            injectionAssembly.MemoryDeliveryPlan,
+					"lexical_text":                prepareTurnPreparationLexicalText(injectionAssembly.preparation),
 				})
 				if len(selection.Searches) > 0 {
 					timing.addMilliseconds("preprocessing_search", selection.SearchDurationMS)

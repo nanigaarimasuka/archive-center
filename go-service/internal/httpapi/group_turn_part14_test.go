@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/risulongmemory/archive-center-go/internal/config"
@@ -175,6 +177,7 @@ func TestPrepareTurnReadsOnlyConfirmedWorldlineOwnedHistory(t *testing.T) {
 
 type prepareTurnWorldlineVectorStore struct {
 	vector.VectorStore
+	mu               sync.Mutex
 	searchSessionIDs []string
 }
 
@@ -183,6 +186,8 @@ func (s *prepareTurnWorldlineVectorStore) Health(context.Context) (vector.Health
 }
 
 func (s *prepareTurnWorldlineVectorStore) Search(_ context.Context, sessionID string, _ []float32, _ int, _ string) ([]vector.VectorDocument, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.searchSessionIDs = append(s.searchSessionIDs, sessionID)
 	return nil, vector.ErrNotFound
 }
@@ -206,7 +211,9 @@ func TestPrepareTurnVectorRecallSearchesEachConfirmedWorldlineHistorySession(t *
 		RawUserInput:  &rawInput,
 		ClientMeta:    map[string]any{"chroma_query_vector": []any{0.1, 0.2, 0.3}},
 	}, 4, scope)
-	want := []string{"root", "branch-1", "branch-2", "root", "branch-1", "branch-2"}
+	// Searches run concurrently, so compare which sessions were searched, not issue order.
+	want := []string{"branch-1", "branch-1", "branch-2", "branch-2", "root", "root"}
+	sort.Strings(vectorStore.searchSessionIDs)
 	if len(vectorStore.searchSessionIDs) != len(want) {
 		t.Fatalf("search sessions=%v, want %v", vectorStore.searchSessionIDs, want)
 	}
