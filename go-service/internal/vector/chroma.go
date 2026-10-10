@@ -92,14 +92,8 @@ func (s *chromaStore) Search(ctx context.Context, sessionID string, vector []flo
 	if where := chromaWhere(sessionID, filter); len(where) > 0 {
 		body["where"] = where
 	}
-	var out struct {
-		IDs        [][]string         `json:"ids"`
-		Documents  [][]string         `json:"documents"`
-		Metadatas  [][]map[string]any `json:"metadatas"`
-		Distances  [][]float64        `json:"distances"`
-		Embeddings [][][]float32      `json:"embeddings"`
-	}
-	if _, err := s.doJSON(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, &out, http.StatusOK); err != nil {
+	out, err := s.searchQuery(ctx, ref, body)
+	if err != nil {
 		return nil, err
 	}
 	if len(out.IDs) == 0 || len(out.IDs[0]) == 0 {
@@ -149,6 +143,51 @@ func (s *chromaStore) Search(ctx context.Context, sessionID string, vector []flo
 	return docs, nil
 }
 
+// searchQuery runs a Search query. Searches sharing embeddings query without
+// them and fetch each stored embedding once; Chroma returns the same values
+// either way. Anything missing falls back to the full query.
+func (s *chromaStore) searchQuery(ctx context.Context, ref string, body map[string]any) (chromaQueryResponse, error) {
+	var out chromaQueryResponse
+	decode := func(data []byte) error { return decodeChromaQueryResponse(data, &out) }
+	path := s.collectionOperationPath(ref, "query")
+	if shared, generation, ok := sharedEmbeddingsFrom(ctx); ok {
+		light := make(map[string]any, len(body))
+		for key, value := range body {
+			light[key] = value
+		}
+		light["include"] = []string{"metadatas", "documents", "distances"}
+		// The light query is reported only if its result is used, so a
+		// fallback still reports one query response.
+		observed, observedBytes, observedStatus := false, 0, 0
+		lightCtx := WithQueryResponseObserver(ctx, func(bytes, status int) {
+			observed, observedBytes, observedStatus = true, bytes, status
+		})
+		report := func() {
+			if observed {
+				observeQueryResponse(ctx, path, observedBytes, observedStatus)
+			}
+		}
+		if _, err := s.doJSONDecode(lightCtx, http.MethodPost, path, light, decode, http.StatusOK); err != nil {
+			report()
+			return chromaQueryResponse{}, err
+		}
+		if len(out.IDs) != 1 {
+			report()
+			return out, nil
+		}
+		if embeddings, ok := s.sharedSearchEmbeddings(ctx, ref, shared, generation, out.IDs[0]); ok {
+			report()
+			out.Embeddings = [][][]float32{embeddings}
+			return out, nil
+		}
+		out = chromaQueryResponse{}
+	}
+	if _, err := s.doJSONDecode(ctx, http.MethodPost, path, body, decode, http.StatusOK); err != nil {
+		return chromaQueryResponse{}, err
+	}
+	return out, nil
+}
+
 // QueryExact preserves ChromaDB's response order and raw distance. Unlike the
 // session-memory Search method it does not overfetch, normalize distance, or
 // rerank candidates. Cosine is reported only when Chroma returns the stored
@@ -173,14 +212,9 @@ func (s *chromaStore) QueryExact(ctx context.Context, query ExactQuery) ([]Exact
 	if len(query.Where) > 0 {
 		body["where"] = query.Where
 	}
-	var out struct {
-		IDs        [][]string         `json:"ids"`
-		Documents  [][]string         `json:"documents"`
-		Metadatas  [][]map[string]any `json:"metadatas"`
-		Distances  [][]float64        `json:"distances"`
-		Embeddings [][][]float32      `json:"embeddings"`
-	}
-	if _, err := s.doJSON(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, &out, http.StatusOK); err != nil {
+	var out chromaQueryResponse
+	decode := func(data []byte) error { return decodeChromaQueryResponse(data, &out) }
+	if _, err := s.doJSONDecode(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, decode, http.StatusOK); err != nil {
 		return nil, err
 	}
 	if len(out.IDs) == 0 || len(out.IDs[0]) == 0 {
@@ -626,6 +660,15 @@ func (s *chromaStore) collectionOperationPath(collectionRef string, operation st
 }
 
 func (s *chromaStore) doJSON(ctx context.Context, method string, path string, body any, out any, okStatuses ...int) (int, error) {
+	var decode func([]byte) error
+	if out != nil {
+		decode = func(data []byte) error { return json.Unmarshal(data, out) }
+	}
+	return s.doJSONDecode(ctx, method, path, body, decode, okStatuses...)
+}
+
+// doJSONDecode is doJSON with a caller-supplied decoder for a successful body.
+func (s *chromaStore) doJSONDecode(ctx context.Context, method string, path string, body any, decode func([]byte) error, okStatuses ...int) (int, error) {
 	var reader io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
@@ -661,8 +704,8 @@ func (s *chromaStore) doJSON(ctx context.Context, method string, path string, bo
 	if readErr != nil {
 		return resp.StatusCode, fmt.Errorf("chroma store: read %s %s returned %d: %w", method, path, resp.StatusCode, readErr)
 	}
-	if out != nil && len(bytes.TrimSpace(data)) > 0 {
-		if err := json.Unmarshal(data, out); err != nil {
+	if decode != nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := decode(data); err != nil {
 			return resp.StatusCode, fmt.Errorf("chroma store: decode %s %s: %w", method, path, err)
 		}
 	}

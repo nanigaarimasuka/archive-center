@@ -1,10 +1,14 @@
 package vector
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 // fakeVectorStore is an R0/R1 no-op implementation.
 // It records every call so tests can assert the boundary without real persistence.
 type fakeVectorStore struct {
+	mu              sync.Mutex // calls may arrive concurrently
 	searchCalled    bool
 	searchSessionID string
 	searchVectorLen int
@@ -36,6 +40,8 @@ type fakeVectorStore struct {
 func NewFakeVectorStore() VectorStore { return &fakeVectorStore{} }
 
 func (f *fakeVectorStore) Search(ctx context.Context, sessionID string, vector []float32, limit int, filter string) ([]VectorDocument, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.searchCalled = true
 	f.searchSessionID = sessionID
 	f.searchVectorLen = len(vector)
@@ -45,10 +51,14 @@ func (f *fakeVectorStore) Search(ctx context.Context, sessionID string, vector [
 }
 
 func (f *fakeVectorStore) QueryExact(ctx context.Context, query ExactQuery) ([]ExactQueryResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return nil, ErrNotEnabled
 }
 
 func (f *fakeVectorStore) Upsert(ctx context.Context, sessionID string, docs []VectorDocument) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.upsertCalled = true
 	f.upsertSessionID = sessionID
 	f.upsertDocCount = len(docs)
@@ -63,6 +73,8 @@ func (f *fakeVectorStore) Upsert(ctx context.Context, sessionID string, docs []V
 }
 
 func (f *fakeVectorStore) DeleteSession(ctx context.Context, sessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleteCalled = true
 	f.deleteSessionID = sessionID
 	out := f.docs[:0]
@@ -76,6 +88,8 @@ func (f *fakeVectorStore) DeleteSession(ctx context.Context, sessionID string) e
 }
 
 func (f *fakeVectorStore) DeleteDocuments(ctx context.Context, ids []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleteDocumentIDs = append(f.deleteDocumentIDs, ids...)
 	remove := map[string]bool{}
 	for _, id := range ids {
@@ -92,17 +106,23 @@ func (f *fakeVectorStore) DeleteDocuments(ctx context.Context, ids []string) err
 }
 
 func (f *fakeVectorStore) ResetAll(ctx context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.resetAllCalled = true
 	return nil
 }
 
 func (f *fakeVectorStore) Rebuild(ctx context.Context, sessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.rebuildCalled = true
 	f.rebuildSessionID = sessionID
 	return nil
 }
 
 func (f *fakeVectorStore) Health(ctx context.Context) (HealthSnapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.healthCalled = true
 	return HealthSnapshot{
 		Status:          "shadow",
@@ -115,6 +135,8 @@ func (f *fakeVectorStore) Health(ctx context.Context) (HealthSnapshot, error) {
 }
 
 func (f *fakeVectorStore) Count(ctx context.Context, sessionID string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.countCalled = true
 	f.countSessionID = sessionID
 	if sessionID == "" {
@@ -130,6 +152,8 @@ func (f *fakeVectorStore) Count(ctx context.Context, sessionID string) (int, err
 }
 
 func (f *fakeVectorStore) ListDocuments(ctx context.Context, sessionID string) ([]VectorDocument, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	out := []VectorDocument{}
 	for _, doc := range f.docs {
 		if sessionID == "" || doc.ChatSessionID == sessionID {

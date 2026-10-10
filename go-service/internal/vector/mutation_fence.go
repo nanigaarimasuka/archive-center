@@ -16,6 +16,11 @@ type MutationFencer interface {
 type mutationFencedStore struct {
 	mu       sync.RWMutex
 	delegate VectorStore
+	// generation changes with every exclusive section, so data shared
+	// between searches is never reused across a possible mutation.
+	generation uint64
+	// Stored embeddings kept across searches; writes forget what they change.
+	stored *storedEmbeddings
 }
 
 // NewMutationFencedStore wraps the process-owned vector store. Archive Center's
@@ -28,7 +33,7 @@ func NewMutationFencedStore(delegate VectorStore) VectorStore {
 	if _, alreadyFenced := delegate.(*mutationFencedStore); alreadyFenced {
 		return delegate
 	}
-	return &mutationFencedStore{delegate: delegate}
+	return &mutationFencedStore{delegate: delegate, stored: newStoredEmbeddings()}
 }
 
 func (s *mutationFencedStore) WithExclusiveMutationFence(
@@ -38,7 +43,7 @@ func (s *mutationFencedStore) WithExclusiveMutationFence(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
@@ -49,29 +54,29 @@ func (s *mutationFencedStore) WithExclusiveMutationFence(
 func (s *mutationFencedStore) Search(ctx context.Context, sessionID string, embedding []float32, limit int, filter string) ([]VectorDocument, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.delegate.Search(ctx, sessionID, embedding, limit, filter)
+	return s.delegate.Search(withStoredEmbeddings(withSearchGeneration(ctx, s.generation), s.stored), sessionID, embedding, limit, filter)
 }
 
 func (s *mutationFencedStore) Upsert(ctx context.Context, sessionID string, docs []VectorDocument) error {
-	s.mu.Lock()
+	s.lockMutationOf(docs)
 	defer s.mu.Unlock()
 	return s.delegate.Upsert(ctx, sessionID, docs)
 }
 
 func (s *mutationFencedStore) DeleteSession(ctx context.Context, sessionID string) error {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	return s.delegate.DeleteSession(ctx, sessionID)
 }
 
 func (s *mutationFencedStore) Rebuild(ctx context.Context, sessionID string) error {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	return s.delegate.Rebuild(ctx, sessionID)
 }
 
 func (s *mutationFencedStore) RecoverIndex(ctx context.Context, path string, rebuild func(VectorStore) error) (string, error) {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	if recovery, ok := s.delegate.(IndexRecovery); ok {
 		return recovery.RecoverIndex(ctx, path, rebuild)
@@ -80,7 +85,7 @@ func (s *mutationFencedStore) RecoverIndex(ctx context.Context, path string, reb
 }
 
 func (s *mutationFencedStore) ResumeIndexRecovery(ctx context.Context, path string) error {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	if recovery, ok := s.delegate.(IndexRecovery); ok {
 		return recovery.ResumeIndexRecovery(ctx, path)
@@ -89,7 +94,7 @@ func (s *mutationFencedStore) ResumeIndexRecovery(ctx context.Context, path stri
 }
 
 func (s *mutationFencedStore) RecoverySnapshot(ctx context.Context, path string) ([]VectorDocument, int, error) {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	if recovery, ok := s.delegate.(IndexRecovery); ok {
 		return recovery.RecoverySnapshot(ctx, path)
@@ -110,7 +115,7 @@ func (s *mutationFencedStore) Count(ctx context.Context, sessionID string) (int,
 }
 
 func (s *mutationFencedStore) Close(ctx context.Context) error {
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	return s.delegate.Close(ctx)
 }
@@ -120,7 +125,11 @@ func (s *mutationFencedStore) DeleteDocuments(ctx context.Context, ids []string)
 	if !ok {
 		return ErrNotEnabled
 	}
-	s.mu.Lock()
+	docs := make([]VectorDocument, len(ids))
+	for i, id := range ids {
+		docs[i].ID = id
+	}
+	s.lockMutationOf(docs)
 	defer s.mu.Unlock()
 	return deleter.DeleteDocuments(ctx, ids)
 }
@@ -160,7 +169,21 @@ func (s *mutationFencedStore) ResetAll(ctx context.Context) error {
 	if !ok {
 		return ErrNotEnabled
 	}
-	s.mu.Lock()
+	s.lockMutation()
 	defer s.mu.Unlock()
 	return resetter.ResetAll(ctx)
+}
+
+// lockMutation starts a write that may change any document.
+func (s *mutationFencedStore) lockMutation() {
+	s.mu.Lock()
+	s.generation++
+	s.stored.clear()
+}
+
+// lockMutationOf starts a write of these documents only.
+func (s *mutationFencedStore) lockMutationOf(docs []VectorDocument) {
+	s.mu.Lock()
+	s.generation++
+	s.stored.forget(docs)
 }
