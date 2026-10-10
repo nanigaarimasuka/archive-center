@@ -45,18 +45,23 @@ type Server struct {
 	ReferenceVectorOpenError error
 	RuntimeConfig            RuntimeConfig
 	RuntimeConfigMu          sync.RWMutex
-	memoryWorkerWake         chan struct{}
-	memoryWorkerWakeOnce     sync.Once
-	memoryWorkerStartOnce    sync.Once
-	AdminJobs                *adminJobManager
-	CompleteTurns            *completeTurnRequestLedger
-	TurnWorkflows            *turnWorkflowHUDLedger
-	SourceAcceptances        *completeTurnSourceAcceptanceLedger
-	RollbackDecisions        *rollbackDecisionLedger
-	RequestShutdown          func(exitCode int)
-	DiagnosticWriter         *diagnostics.Writer
-	indexRecoveryState       atomic.Int32 // 0: ready, 1: settings needed, 2: rebuilding, 3: failed
-	indexRecoveryContext     context.Context
+	// PersistRuntimeConfig saves synced settings to the data directory and
+	// LoadPersistedRuntimeConfig restores them at startup.
+	PersistRuntimeConfig   bool
+	runtimeConfigSaved     map[string]any // the synced settings, by plugin key
+	runtimeConfigPersistMu sync.Mutex
+	memoryWorkerWake       chan struct{}
+	memoryWorkerWakeOnce   sync.Once
+	memoryWorkerStartOnce  sync.Once
+	AdminJobs              *adminJobManager
+	CompleteTurns          *completeTurnRequestLedger
+	TurnWorkflows          *turnWorkflowHUDLedger
+	SourceAcceptances      *completeTurnSourceAcceptanceLedger
+	RollbackDecisions      *rollbackDecisionLedger
+	RequestShutdown        func(exitCode int)
+	DiagnosticWriter       *diagnostics.Writer
+	indexRecoveryState     atomic.Int32 // 0: ready, 1: settings needed, 2: rebuilding, 3: failed
+	indexRecoveryContext   context.Context
 }
 
 // ValidateRuntimeDependencies verifies live dependencies before the HTTP

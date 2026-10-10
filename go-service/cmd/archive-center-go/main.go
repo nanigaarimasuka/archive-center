@@ -68,6 +68,10 @@ func main() {
 	mux := http.NewServeMux()
 	server := httpapi.NewServer(cfg)
 	server.DiagnosticWriter = logWriter
+	server.PersistRuntimeConfig = true
+	if err := server.LoadPersistedRuntimeConfig(); err != nil {
+		logger.Warn("saved runtime config was not loaded", "error", err)
+	}
 	var requestedExitCode atomic.Int32
 	if managedUpdateLauncherAuthorized(cfg) {
 		server.RequestShutdown = func(exitCode int) {

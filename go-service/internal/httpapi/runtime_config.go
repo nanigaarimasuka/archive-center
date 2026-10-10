@@ -287,6 +287,12 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setClampedInt("criticReprocessingIntervalSec", &s.RuntimeConfig.CriticReprocessingIntervalSec, 1, 3600)
 	setInt("topK", &s.RuntimeConfig.TopK)
 
+	if s.runtimeConfigSaved == nil {
+		s.runtimeConfigSaved = map[string]any{}
+	}
+	for _, key := range updated {
+		s.runtimeConfigSaved[key] = body[key]
+	}
 	return updated
 }
 
