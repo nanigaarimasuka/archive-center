@@ -984,7 +984,7 @@ SOURCE:
 	temp := cfg.Temperature
 	req := dto.ProxyPluginMainRequest{APIKey: &cfg.APIKey, Endpoint: &cfg.Endpoint, Model: &cfg.Model, Provider: &cfg.Provider, Messages: []any{map[string]any{"role": "system", "content": systemPrompt}, map[string]any{"role": "user", "content": userPrompt}}, MaxTokens: &maxTokens, MaxCompletionTokens: &maxCompletion, Temperature: &temp, TimeoutMs: &cfg.TimeoutMs}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{ExpectJSON: true, Backup: cfg.Backup})
 	if err != nil {
 		return nil, err
 	}
@@ -1022,7 +1022,7 @@ func (s *Server) runReferenceExtractionJob(ctx context.Context, ref store.Refere
 	succeeded := 0
 	for i, chunk := range chunks {
 		progress(map[string]any{"stage": "critic_extract", "processed": i, "candidate_count": len(chunks), "progress_percent": adminJobProgressPercent(i, len(chunks)), "chunk": i + 1})
-		parsed, err := callReferenceExtractor(ctx, extractionCfg.Critic, doc, chunk, i, len(chunks))
+		parsed, err := callReferenceExtractor(ctx, s.llmConfigWithBackup(extractionCfg.Critic, backupRoleReferenceLibrary), doc, chunk, i, len(chunks))
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("chunk %d: %v", i+1, err))
 			continue
@@ -1210,7 +1210,7 @@ EXISTING_APPROVED_REFERENCE (context only; never return decisions for these IDs)
 	temp := cfg.Temperature
 	req := dto.ProxyPluginMainRequest{APIKey: &cfg.APIKey, Endpoint: &cfg.Endpoint, Model: &cfg.Model, Provider: &cfg.Provider, Messages: []any{map[string]any{"role": "system", "content": systemPrompt}, map[string]any{"role": "user", "content": userPrompt}}, MaxTokens: &maxTokens, MaxCompletionTokens: &maxCompletion, Temperature: &temp, TimeoutMs: &cfg.TimeoutMs}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{ExpectJSON: true, Backup: cfg.Backup})
 	if err != nil {
 		return nil, err
 	}
@@ -1243,7 +1243,7 @@ TIMELINE ITEMS:
 	temp := cfg.Temperature
 	req := dto.ProxyPluginMainRequest{APIKey: &cfg.APIKey, Endpoint: &cfg.Endpoint, Model: &cfg.Model, Provider: &cfg.Provider, Messages: []any{map[string]any{"role": "system", "content": systemPrompt}, map[string]any{"role": "user", "content": userPrompt}}, MaxTokens: &maxTokens, MaxCompletionTokens: &maxCompletion, Temperature: &temp, TimeoutMs: &cfg.TimeoutMs}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{ExpectJSON: true, Backup: cfg.Backup})
 	if err != nil {
 		return nil, err
 	}
@@ -1266,7 +1266,7 @@ func (s *Server) runReferenceTimelineChronologyJob(ctx context.Context, ref stor
 		return map[string]any{"status": "completed", "updated": len(items), "ordered_ids": referenceTimelineItemIDs(items), "unresolved_ids": []string{}}, nil
 	}
 	progress(map[string]any{"stage": "critic_timeline_chronology", "processed": 0, "candidate_count": len(items), "progress_percent": 10})
-	parsed, err := callReferenceTimelineChronology(ctx, cfg, items)
+	parsed, err := callReferenceTimelineChronology(ctx, s.llmConfigWithBackup(cfg, backupRoleReferenceLibrary), items)
 	if err != nil {
 		return nil, err
 	}
@@ -1344,7 +1344,7 @@ func (s *Server) runReferenceAutoReviewJob(ctx context.Context, ref store.Refere
 			allowed[item.Kind+"\x00"+item.ID] = item
 		}
 		progress(map[string]any{"stage": "critic_auto_review", "processed": processed, "candidate_count": len(candidates), "progress_percent": adminJobProgressPercent(processed, len(candidates))})
-		parsed, reviewErr := callReferenceAutoReviewer(ctx, cfg, batch, approvedBaseline)
+		parsed, reviewErr := callReferenceAutoReviewer(ctx, s.llmConfigWithBackup(cfg, backupRoleReferenceLibrary), batch, approvedBaseline)
 		if reviewErr != nil {
 			return map[string]any{"mode": "recommendation_only", "approved": 0, "rejected": 0, "recommended_approved": counts["recommended_approved"], "recommended_rejected": counts["recommended_rejected"], "recommended_pending": counts["recommended_pending"], "remaining_pending": len(candidates), "vector_index": map[string]any{"status": "skipped", "reason": "manual_approval_required"}}, reviewErr
 		}

@@ -124,7 +124,7 @@ func (s *Server) handleCompleteTurn(w http.ResponseWriter, r *http.Request) {
 	workflowRequestID := completeTurnWorkflowRequestID(req)
 	diagnosticCtx, finishDiagnostic := diagnosticTurnRequest(r.Context(), "complete_turn", workflowRequestID)
 	defer finishDiagnostic()
-	r = r.WithContext(diagnosticCtx)
+	r = r.WithContext(s.withBackupLLMWorkflowNotice(diagnosticCtx, workflowRequestID))
 
 	s.executeCompleteTurnIdempotent(
 		r.Context(),
