@@ -2302,7 +2302,7 @@ func normalizeLLMJSONText(content string) string {
 func repairJSONCandidate(candidate string) string {
 	// Shared syntax recovery for model responses. Quoted source text stays intact;
 	// role-specific field types and acceptance remain with their existing owners.
-	repaired := replaceJSONLiteralsOutsideStrings(repairStructuralJSONQuotes(candidate))
+	repaired := replaceJSONLiteralsOutsideStrings(repairStructuralJSONQuotes(escapeJSONControlCharactersInStrings(candidate)))
 	repaired = repairJSONMissingArrayClosers(repaired)
 	repaired = removeJSONTrailingCommasOutsideStrings(repaired)
 	return strings.TrimSpace(repaired)

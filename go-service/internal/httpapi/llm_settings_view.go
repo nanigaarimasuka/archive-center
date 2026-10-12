@@ -68,7 +68,7 @@ type llmSettingsView struct {
 	NextBudget        string               `json:"nextBudget"`
 }
 
-var llmSettingsProviders = []string{"openai", "claude", "gemini", "llmgateway", "vertex", "openrouter", "opencode", "opencode-go", "neuralwatt", "vercel", "copilot", "ollama", "custom"}
+var llmSettingsProviders = []string{"openai", "claude", "gemini", "llmgateway", "vertex", "openrouter", "opencode", "opencode-go", "neuralwatt", "vercel", "copilot", "ollama", "custom", "risu"}
 var llmSettingsPresets = []string{"auto", "gpt", "gemini", "claude", "glm", "custom"}
 
 func llmSettingsEnum(value, fallback string, allowed []string) string {
@@ -92,13 +92,17 @@ func resolveLLMSettingsControls(provider, preset, model, endpoint string) llmRea
 	if family == "glm" && !regexp.MustCompile(`(^|/)glm[-_]`).MatchString(model) {
 		family = proxyReasoningFamily(provider, preset, "", "")
 	}
-	transport, err := proxyReasoningTransport(provider, endpoint)
 	makeControls := func(key string, options []string) llmReasoningControls {
 		c := llmSettingsControlTemplates[key]
 		c.Family = family
 		c.EffortOptions = append([]string{}, options...)
 		return c
 	}
+	if provider == risuProvider {
+		// Risu maps the effort and budget to the model it runs.
+		return makeControls("risu", []string{"none", "low", "medium", "high", "xhigh"})
+	}
+	transport, err := proxyReasoningTransport(provider, endpoint)
 	if err != nil {
 		return makeControls("conflict", nil)
 	}
@@ -390,7 +394,7 @@ func applyHostReasoningInput(req *dto.ProxyPluginMainRequest, input *llmReasonin
 	case "deepseek_v4_reasoning_effort", "kimi_reasoning_effort", "kimi_toggle":
 		req.ReasoningEffort = &effort
 	default:
-		if c.ShowEffort && effort != "" && (effort != "none" || slices.Contains([]string{"reasoning_effort", "ollama_reasoning_effort", "gateway_reasoning_effort"}, c.Mode)) {
+		if c.ShowEffort && effort != "" && (effort != "none" || slices.Contains([]string{"reasoning_effort", "ollama_reasoning_effort", "gateway_reasoning_effort", "risu_reasoning"}, c.Mode)) {
 			req.ReasoningEffort = &effort
 		}
 	}

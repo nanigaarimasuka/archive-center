@@ -2,6 +2,13 @@ package httpapi
 
 // Presentation copy and defaults preserved from the settings UI; model policy lives in Go.
 var llmSettingsControlTemplates = map[string]llmReasoningControls{
+	"risu": {
+		Mode: "risu_reasoning", ShowEffort: true, EffortLabel: "추론 강도",
+		EffortHint: "선택한 플러그인 모델에 추론 강도를 전달합니다. 그 플러그인이 받지 않으면 반영되지 않습니다.",
+		ShowBudget: true, BudgetLabel: "추론 토큰 예산",
+		BudgetHint:    "선택한 플러그인 모델에 추론 토큰 예산을 전달합니다.",
+		GuideModeText: "RisuAI 플러그인 모델 · reasoningEffort / thinkingTokens",
+	},
 	"glm_required": {
 		Mode: "glm_reasoning_effort", ShowEffort: true, EffortLabel: "추론 강도",
 		EffortHint:    "GLM 5.3 · 항상 추론하며 low / high / max를 지원합니다.",

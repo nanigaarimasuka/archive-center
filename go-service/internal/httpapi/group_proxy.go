@@ -49,6 +49,7 @@ func (s *Server) registerProxyRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /supervisor", s.handleSupervisor)
 	mux.HandleFunc("POST /proxy/plugin-main", s.handleProxyPluginMain)
 	mux.HandleFunc("POST /critic/test", s.handleCriticTest)
+	s.registerRisuBridgeRoutes(mux)
 }
 
 func (s *Server) handleSupervisor(w http.ResponseWriter, r *http.Request) {
