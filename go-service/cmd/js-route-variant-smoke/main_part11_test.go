@@ -6473,6 +6473,8 @@ let syncAck = {ok:false,code:"backend_down"};
 let runtimeStates = [];
 async function persistentSet(key, value) { persisted.push({key,value}); }
 async function syncConfigToBackend() { return syncAck; }
+let sharedSettings = [];
+async function pushSettingsToBackend(s) { sharedSettings.push(s.settingsSavedAt); return syncAck.ok; }
 function markBackendRuntimeConfigDirty() {}
 function updateRuntimeState(key, status, state) { runtimeStates.push({key,status,state}); }
 function debugLog() {}
@@ -6514,6 +6516,7 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
   const failedSave = await saveSettings();
   assert(failedSave === true, "verified local save was reported as failed only because the backend was unreachable");
   assert(persisted.length === 1, "local settings were not retained on backend sync failure");
+  assert(sharedSettings.length === 1 && sharedSettings[0] > 0, "saved settings were not stamped and shared through the backend");
   assert(runtimeStates.some(function(item) {
     return item.key === "lastConfigSync" && item.status === "fail" &&
       item.state && item.state.detail === "settings_saved_locally_backend_unsynced";

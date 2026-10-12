@@ -59,6 +59,7 @@ type RuntimeConfig struct {
 	EmbeddingEndpoint                  string
 	EmbeddingModel                     string
 	EmbeddingTimeoutSec                int64
+	EmbeddingRetryCount                int
 	SourceSearchPlannerProvider        string
 	SourceSearchPlannerAPIKey          string
 	SourceSearchPlannerEndpoint        string
@@ -272,6 +273,7 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setString("embeddingEndpoint", &s.RuntimeConfig.EmbeddingEndpoint)
 	setString("embeddingModel", &s.RuntimeConfig.EmbeddingModel)
 	setInt("embeddingTimeout", &s.RuntimeConfig.EmbeddingTimeoutSec)
+	setClampedInt("embeddingRetryCount", &s.RuntimeConfig.EmbeddingRetryCount, 0, 10)
 	setString("sourceSearchPlannerProvider", &s.RuntimeConfig.SourceSearchPlannerProvider)
 	setString("sourceSearchPlannerApiKey", &s.RuntimeConfig.SourceSearchPlannerAPIKey)
 	setString("sourceSearchPlannerEndpoint", &s.RuntimeConfig.SourceSearchPlannerEndpoint)
@@ -287,6 +289,12 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setClampedInt("criticReprocessingIntervalSec", &s.RuntimeConfig.CriticReprocessingIntervalSec, 1, 3600)
 	setInt("topK", &s.RuntimeConfig.TopK)
 
+	if s.runtimeConfigSaved == nil {
+		s.runtimeConfigSaved = map[string]any{}
+	}
+	for _, key := range updated {
+		s.runtimeConfigSaved[key] = body[key]
+	}
 	return updated
 }
 
