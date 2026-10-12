@@ -189,6 +189,7 @@
     llmRetryCount: 3,
     // ── 백엔드 임베딩 타임아웃 (초) ──
     embeddingTimeout: 30,
+    embeddingRetryCount: 0,
     // ── Phase 3-2: Episode auto-generation ──
     episodeIntervalTurns: 5,         // N턴마다 에피소드 요약 자동 생성
     episodeIntervalPolicyVersion: "closed5.v1",
@@ -1126,6 +1127,8 @@
       "settings.label.debug": "디버그 모드",
       "settings.label.debugContinuityTest": "Continuity 디버그 테스트",
       "settings.label.embeddingTimeout": "임베딩 Timeout (초)",
+      "settings.label.embeddingRetryCount": "임베딩 재시도 횟수",
+      "settings.label.embeddingRetryCount.hint": "0 = 재시도 없음(1회만 시도), 3 = 시간 초과·연결 오류·서버 오류 시 3회 추가 시도. 매 시도마다 위 Timeout이 적용됩니다.",
       "settings.label.injectionBudgetExtraChars": "추가 기억 예산 상한 (chars)",
       "settings.label.protectedSecretBudgetChars": "비밀 예산 (문자)",
       "settings.hint.protectedSecretBudgetChars": "일반 기억·신체 추적과 별도인 비밀 전달 상한입니다. 0 또는 빈값은 기본 4,000자를 사용하며 비밀을 끄지 않습니다. 관련 비밀만 선택하고 남은 공간을 채우지 않으며 자동 확장하지 않습니다.",
@@ -1642,6 +1645,8 @@
       "settings.label.supervisorTimeout": "Publisher LLM Timeout (sec)",
       "settings.label.criticTimeout": "Critic/Reviewer Timeout (sec)",
       "settings.label.embeddingTimeout": "Embedding Timeout (sec)",
+      "settings.label.embeddingRetryCount": "Embedding Retry Count",
+      "settings.label.embeddingRetryCount.hint": "0 = no retry (1 attempt only), 3 = up to 3 more attempts after a timeout, connection error or server error. Each attempt gets the timeout above.",
       "settings.label.publisherTemp": "Publisher Temperature",
       "settings.label.publisherMaxCompletionTokens": "Publisher Max Completion Tokens",
       "settings.label.publisherProvider": "Publisher Provider",
@@ -2994,6 +2999,8 @@
       "settings.label.supervisorTimeout": "Publisher LLM タイムアウト（秒）",
       "settings.label.criticTimeout": "評論家タイムアウト（秒）",
       "settings.label.embeddingTimeout": "Embeddingタイムアウト（秒）",
+      "settings.label.embeddingRetryCount": "Embeddingリトライ回数",
+      "settings.label.embeddingRetryCount.hint": "0 = リトライなし（1回のみ）、3 = タイムアウト・接続エラー・サーバーエラー時に最大3回追加試行。各試行に上のタイムアウトが適用されます。",
       "settings.label.publisherTemp": "出版社 Temperature",
       "settings.label.publisherMaxCompletionTokens": "出版社 Max Completion Tokens",
       "settings.label.publisherProvider": "出版社 Provider",
@@ -12269,6 +12276,7 @@
     merged.subLlmExtraBodyJson = sanitizeProviderOverrideJsonSetting(merged.subLlmExtraBodyJson);
     merged.embeddingProvider = normalizeEmbeddingProvider(merged.embeddingProvider, DEFAULT_SETTINGS.embeddingProvider);
     merged.embeddingTimeout = sanitizeNumber(merged.embeddingTimeout, DEFAULT_SETTINGS.embeddingTimeout, 5, 3000);
+    merged.embeddingRetryCount = Math.trunc(sanitizeNumber(merged.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10));
     merged.sourceSearchPlannerProvider = normalizeSourceSearchLlmProvider(merged.sourceSearchPlannerProvider);
     merged.sourceSearchPlannerTimeoutMs = sanitizeNumber(merged.sourceSearchPlannerTimeoutMs, DEFAULT_SETTINGS.sourceSearchPlannerTimeoutMs, 5000, 300000);
     merged.sourceSearchPlannerTemperature = sanitizeNumber(merged.sourceSearchPlannerTemperature, DEFAULT_SETTINGS.sourceSearchPlannerTemperature, 0, 2);
@@ -12415,10 +12423,72 @@
     }
   }
 
+  // Every setting except how this device reaches the backend is shared through
+  // the backend, so another browser or device opens with the same settings.
+  const DEVICE_LOCAL_SETTING_KEYS = Object.freeze(["bridgeUrl", "webDirectBridgeEnabled"]);
+
+  function backendSharedSettings(s) {
+    const shared = { ...s };
+    DEVICE_LOCAL_SETTING_KEYS.forEach(function(key) { delete shared[key]; });
+    return shared;
+  }
+
+  async function pushSettingsToBackend(s) {
+    const result = await safeCall(() => bridgeFetch("/config/plugin-settings", {
+      method: "PUT",
+      body: backendSharedSettings(s),
+      timeoutMs: getRequestTimeoutSettingMs(s.requestTimeoutMs),
+    }), null, "pushSettingsToBackend");
+    const shared = !!(result && result.status === "ok");
+    if (!shared) warnLog("Settings saved locally but not shared through the backend");
+    return shared;
+  }
+
+  /** The newer of this device's settings and the backend's copy wins; returns whether the backend's was applied. */
+  async function restoreSettingsFromBackend() {
+    const result = await safeCall(() => bridgeFetch("/config/plugin-settings", {
+      timeoutMs: getRequestTimeoutSettingMs(settings.requestTimeoutMs),
+    }), null, "restoreSettingsFromBackend");
+    if (!result || result.status !== "ok") return false;
+    const remote = result.settings && typeof result.settings === "object" && !Array.isArray(result.settings)
+      ? result.settings
+      : null;
+    const localSavedAt = Number(settings.settingsSavedAt) || 0;
+    const remoteSavedAt = remote ? (Number(remote.settingsSavedAt) || 0) : 0;
+    if (remote && remoteSavedAt > localSavedAt) {
+      const deviceLocal = {};
+      DEVICE_LOCAL_SETTING_KEYS.forEach(function(key) { deviceLocal[key] = settings[key]; });
+      settings = sanitizeSettings({ ...backendSharedSettings(remote), ...deviceLocal });
+      try {
+        await persistentSet(SETTINGS_KEY, JSON.stringify(settings));
+      } catch (err) {
+        warnLog("Settings from the backend were applied but not saved locally:", err && err.message);
+      }
+      debugLog("Settings restored from the backend");
+      return true;
+    }
+    if (remote && remoteSavedAt === localSavedAt) return false;
+    // Seed or refresh the backend copy, but never with defaults this device
+    // never saved: they would replace another device's settings.
+    if (!remote && _settingsStorageStatus.mode === "default") return false;
+    if (!localSavedAt) {
+      settings.settingsSavedAt = Date.now();
+      try {
+        await persistentSet(SETTINGS_KEY, JSON.stringify(settings));
+      } catch (err) {
+        warnLog("Settings save time was not stored locally:", err && err.message);
+      }
+    }
+    await pushSettingsToBackend(settings);
+    return false;
+  }
+
   async function saveSettings() {
     try {
+      settings.settingsSavedAt = Date.now();
       const json = JSON.stringify(settings);
       await persistentSet(SETTINGS_KEY, json);
+      await pushSettingsToBackend(settings);
       markBackendRuntimeConfigDirty("settings_changed");
       debugLog("Settings saved (persistent)");
       const syncAck = await syncConfigToBackend(settings);
@@ -12520,6 +12590,7 @@
       supervisorTimeout: Math.ceil(getPluginMainTimeoutSettingMs(s.pluginMainTimeoutMs) / 1000),
       criticTimeout: Math.ceil(getSubLlmTimeoutSettingMs(s.subLlmTimeoutMs) / 1000),
       embeddingTimeout: s.embeddingTimeout,
+      embeddingRetryCount: Math.trunc(sanitizeNumber(s.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10)),
       failedQueueMaxAttempts: failedQueueMaxAttempts(),
       criticReprocessingIntervalSec: sanitizeNumber(s.criticReprocessingIntervalSec, DEFAULT_SETTINGS.criticReprocessingIntervalSec, 1, 3600),
     };
@@ -12671,6 +12742,7 @@
         model: String(settings.embeddingModel || "").trim(),
         provider: normalizeEmbeddingProvider(settings.embeddingProvider, DEFAULT_SETTINGS.embeddingProvider),
         timeout_ms: getEmbeddingTimeoutMs(settings.embeddingTimeout),
+        retry_count: Math.trunc(sanitizeNumber(settings.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10)),
       },
       episode_interval_turns: settings.episodeIntervalTurns || DEFAULT_SETTINGS.episodeIntervalTurns,
       chapter_interval_episodes: settings.chapterIntervalEpisodes || DEFAULT_SETTINGS.chapterIntervalEpisodes,
@@ -53752,6 +53824,12 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           <input type="number" id="mo-embeddingTimeout" value="${s.embeddingTimeout ?? DEFAULT_SETTINGS.embeddingTimeout}" min="5" max="3000" step="5">
           <input class="mo-range" type="range" id="mo-embeddingTimeoutRange" data-sync-input="mo-embeddingTimeout" value="${s.embeddingTimeout ?? DEFAULT_SETTINGS.embeddingTimeout}" min="5" max="3000" step="5">
         </div>
+        <div class="mo-row mo-range-row">
+          <label>${t('settings.label.embeddingRetryCount')}</label>
+          <input type="number" id="mo-embeddingRetryCount" value="${s.embeddingRetryCount ?? DEFAULT_SETTINGS.embeddingRetryCount}" min="0" max="10" step="1">
+          <input class="mo-range" type="range" id="mo-embeddingRetryCountRange" data-sync-input="mo-embeddingRetryCount" value="${s.embeddingRetryCount ?? DEFAULT_SETTINGS.embeddingRetryCount}" min="0" max="10" step="1">
+          <small>${t('settings.label.embeddingRetryCount.hint')}</small>
+        </div>
         <div class="mo-row">
           <label>${t('settings.label.memoryTransportMode')}</label>
           <select id="mo-memoryTransportMode">
@@ -54868,6 +54946,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             webDirectBridgeEnabled: readChecked("mo-webDirectBridgeEnabled", false),
             requestTimeoutMs: $("mo-requestTimeoutMs").value,
             embeddingTimeout: $("mo-embeddingTimeout").value,
+            embeddingRetryCount: $("mo-embeddingRetryCount").value,
             coreObjectiveMemoryMaxItems: $("mo-coreObjectiveMemoryMaxItems").value,
             recentConversationReferenceCount: $("mo-recentConversationReferenceCount").value,
             llmRetryCount: $("mo-llmRetryCount").value,
@@ -54973,6 +55052,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           $("mo-webDirectBridgeEnabled").checked = settings.webDirectBridgeEnabled === true;
           $("mo-requestTimeoutMs").value = settings.requestTimeoutMs;
           $("mo-embeddingTimeout").value = settings.embeddingTimeout;
+          $("mo-embeddingRetryCount").value = settings.embeddingRetryCount;
           $("mo-embeddingProvider").value = settings.embeddingProvider || "openai";
           $("mo-pluginMainTimeoutMs").value = settings.pluginMainTimeoutMs;
           $("mo-pluginMainTemperature").value = settings.pluginMainTemperature;
@@ -55476,6 +55556,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       // ── 3단계: pluginStorage에서 영속 설정 로드 (비동기) ──
       //    재시작/새로고침 후에도 API Key 등이 복원된다.
       await loadSettings();
+      // Settings changed on another device arrive through the backend.
+      if (settings.enabled) await restoreSettingsFromBackend();
       debugLog("Settings after persistent load:", safeSettingsForLog(getSettings()));
 
       // The first request must see the persisted runtime configuration even
