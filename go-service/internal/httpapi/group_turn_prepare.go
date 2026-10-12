@@ -272,7 +272,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 	diagnosticID := prepareTurnWorkflowRequestID(prepareSourceContract, request)
 	diagnosticCtx, finishDiagnostic := diagnosticTurnRequest(r.Context(), "prepare_turn", diagnosticID)
 	defer finishDiagnostic()
-	r = r.WithContext(diagnosticCtx)
+	r = r.WithContext(s.withBackupLLMWorkflowNotice(diagnosticCtx, diagnosticID))
 	currentInputDecision, enforceCurrentInputContract := buildPrepareTurnCurrentInputDecision(request, sid)
 	sessionBootstrap := buildPrepareTurnSessionBootstrap(request, sid)
 	hostContextSnapshot := buildPrepareTurnRisuHostContextSnapshot(request, sid)

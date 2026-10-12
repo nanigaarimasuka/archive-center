@@ -13,6 +13,8 @@ import (
 )
 
 type completeTurnLLMConfig struct {
+	// Backup answers once when this model refuses the content.
+	Backup                *backupLLMTarget
 	APIKey                string
 	Endpoint              string
 	Model                 string

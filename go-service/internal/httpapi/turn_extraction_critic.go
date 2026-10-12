@@ -693,7 +693,7 @@ func (s *Server) runCompleteTurnCriticWithInputPolicy(ctx context.Context, sid s
 	}
 	applyProxyReasoningFromLLMConfig(&req, cfg)
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	jsonPolicy := proxyRequestPolicy{JSONResponse: true, Purpose: "complete_turn_critic", SessionID: sid}
+	jsonPolicy := proxyRequestPolicy{JSONResponse: true, Purpose: "complete_turn_critic", SessionID: sid, Backup: s.backupLLMFor(backupRoleCritic)}
 
 	upstream, upstreamStatus, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, jsonPolicy)
 	providerResponse = mapFromAny(upstream[proxyResponseMetadataKey])
@@ -962,7 +962,7 @@ func (s *Server) runCompleteTurnWorldRuleAudit(ctx context.Context, sid string, 
 	applyProxyReasoningFromLLMConfig(&req, cfg)
 	applyProxyOverridesFromLLMConfig(&req, cfg)
 	trace["llm_call_attempt"] = true
-	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{JSONResponse: true, Purpose: "complete_turn_world_rule_audit", SessionID: sid})
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{JSONResponse: true, Purpose: "complete_turn_world_rule_audit", SessionID: sid, Backup: s.backupLLMFor(backupRoleWorldRuleAudit)})
 	if err != nil {
 		trace["status"] = "error"
 		trace["error"] = err.Error()

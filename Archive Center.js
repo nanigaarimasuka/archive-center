@@ -185,6 +185,21 @@
     sourceSearchPlannerReasoningEffort: "none",
     sourceSearchPlannerReasoningBudgetTokens: 0,
     sourceSearchPlannerMaxCompletionTokens: 512,
+    // Backup model: answers once when a role's model refuses the content.
+    backupLlmEnabled: false,
+    backupProvider: "openai",
+    backupApiKey: "",
+    backupEndpoint: "",
+    backupModel: "",
+    backupTimeoutMs: 120000,
+    backupTimeoutFromRole: true,
+    backupTemperature: 0.7,
+    backupTemperatureFromRole: true,
+    backupMaxCompletionTokens: 0,
+    backupReasoningPreset: "auto",
+    backupReasoningEffort: "none",
+    backupReasoningBudgetTokens: 0,
+    backupLlmRoles: [],
     // ── LLM 호출 재시도 횟수 (0 = 재시도 없이 1회만) ──
     llmRetryCount: 3,
     // ── 백엔드 임베딩 타임아웃 (초) ──
@@ -1488,6 +1503,29 @@
       "turn_hud.warning.maintenance_handoff_failed": "후속 정리 작업 연결 실패",
       "turn_hud.warning.episode_blocked_missing_memory": "기억이 없는 턴이 있어 에피소드 요약을 보류함 (세션 정상화로 복구)",
       "turn_hud.warning.hierarchy_summary_failed": "챕터·아크·사가 요약 생성 실패 (세션 정상화로 재시도)",
+      "turn_hud.warning.backup_llm_used": "내용 거부로 예비 모델이 대신 답함",
+      "turn_hud.compact.backup_used": "예비 모델 호출됨",
+      "turn_hud.backup_reason.refusal_text": "거부 문구",
+      "turn_hud.backup_reason.missing_json": "JSON 형식 아님",
+      "turn_hud.backup_reason.empty_response": "빈 응답",
+      "turn_hud.backup_reason.provider_content_policy": "제공자 안전 차단",
+      "settings.section.backupLlm": "예비 모델 (내용 거부 시 대체)",
+      "settings.section.backupLlm.desc": "선택한 역할의 모델이 안전 필터나 거부 문구로 답하지 않을 때만 예비 모델이 한 번 대신 답합니다. 연결 오류, 시간 초과, 키 오류일 때는 쓰지 않습니다.",
+      "settings.label.backupEnabled": "예비 모델 사용",
+      "settings.backupEnabled.on": "켜기",
+      "settings.backupFromRole": "역할 설정 그대로 사용",
+      "settings.label.backupRoles": "사용할 역할",
+      "settings.hint.backupMaxTokens": "0이면 각 역할의 설정을 그대로 씁니다.",
+      "backupRole.publisher": "출판사 (입력 편집)",
+      "backupRole.critic": "평론가 (기억 생성·검토)",
+      "backupRole.world_rule_audit": "세계 규칙 점검",
+      "backupRole.preprocessing": "전처리",
+      "backupRole.chapter": "챕터 요약",
+      "backupRole.arc": "아크 요약",
+      "backupRole.saga": "사가 요약",
+      "backupRole.source_search": "출처 탐색",
+      "backupRole.reference_library": "참고 자료 정리",
+      "backupRole.memory_import": "기억 가져오기 평가",
       "summaryFailures.title": "요약 실패 구간",
       "summaryFailures.none": "실패한 요약 구간이 없습니다.",
       "summaryFailures.memories": "기억 없는 턴",
@@ -2874,6 +2912,29 @@
       "turn_hud.warning.maintenance_handoff_failed": "Follow-up maintenance handoff failed",
       "turn_hud.warning.episode_blocked_missing_memory": "Episode summary held: a turn has no memory (run Session Normalize)",
       "turn_hud.warning.hierarchy_summary_failed": "Chapter/arc/saga summary failed (run Session Normalize to retry)",
+      "turn_hud.warning.backup_llm_used": "Content was refused; the backup model answered",
+      "turn_hud.compact.backup_used": "Backup model used",
+      "turn_hud.backup_reason.refusal_text": "refusal",
+      "turn_hud.backup_reason.missing_json": "not JSON",
+      "turn_hud.backup_reason.empty_response": "empty answer",
+      "turn_hud.backup_reason.provider_content_policy": "provider safety stop",
+      "settings.section.backupLlm": "Backup model (when content is refused)",
+      "settings.section.backupLlm.desc": "When a selected role's model refuses through a safety filter or a refusal message, the backup model answers once instead. It is not used for connection errors, timeouts, or key errors.",
+      "settings.label.backupEnabled": "Use backup model",
+      "settings.backupEnabled.on": "On",
+      "settings.backupFromRole": "Use each role's setting",
+      "settings.label.backupRoles": "Roles",
+      "settings.hint.backupMaxTokens": "0 keeps each role's own setting.",
+      "backupRole.publisher": "Publisher (input editing)",
+      "backupRole.critic": "Critic (memory and review)",
+      "backupRole.world_rule_audit": "World rule audit",
+      "backupRole.preprocessing": "Preprocessing",
+      "backupRole.chapter": "Chapter summary",
+      "backupRole.arc": "Arc summary",
+      "backupRole.saga": "Saga summary",
+      "backupRole.source_search": "Source discovery",
+      "backupRole.reference_library": "Reference library",
+      "backupRole.memory_import": "Memory import scoring",
       "summaryFailures.title": "Failed summaries",
       "summaryFailures.none": "No failed summary ranges.",
       "summaryFailures.memories": "Turns without memory",
@@ -4258,6 +4319,29 @@
       "turn_hud.warning.maintenance_handoff_failed": "後続整理処理への接続に失敗",
       "turn_hud.warning.episode_blocked_missing_memory": "記憶のないターンがあるためエピソード要約を保留 (セッション正常化で復旧)",
       "turn_hud.warning.hierarchy_summary_failed": "章・アーク・サーガ要約の生成に失敗 (セッション正常化で再試行)",
+      "turn_hud.warning.backup_llm_used": "内容拒否のため予備モデルが代わりに回答",
+      "turn_hud.compact.backup_used": "予備モデル使用",
+      "turn_hud.backup_reason.refusal_text": "拒否文",
+      "turn_hud.backup_reason.missing_json": "JSON形式でない",
+      "turn_hud.backup_reason.empty_response": "空の応答",
+      "turn_hud.backup_reason.provider_content_policy": "プロバイダーの安全停止",
+      "settings.section.backupLlm": "予備モデル（内容拒否時の代替）",
+      "settings.section.backupLlm.desc": "選択した役割のモデルが安全フィルターや拒否文で応答しない場合のみ、予備モデルが一度だけ代わりに応答します。接続エラー、タイムアウト、キーエラーでは使いません。",
+      "settings.label.backupEnabled": "予備モデルを使う",
+      "settings.backupEnabled.on": "オン",
+      "settings.backupFromRole": "各役割の設定をそのまま使う",
+      "settings.label.backupRoles": "使う役割",
+      "settings.hint.backupMaxTokens": "0の場合は各役割の設定をそのまま使います。",
+      "backupRole.publisher": "出版社（入力編集）",
+      "backupRole.critic": "評論家（記憶生成・レビュー）",
+      "backupRole.world_rule_audit": "世界ルール点検",
+      "backupRole.preprocessing": "前処理",
+      "backupRole.chapter": "章要約",
+      "backupRole.arc": "アーク要約",
+      "backupRole.saga": "サーガ要約",
+      "backupRole.source_search": "出典探索",
+      "backupRole.reference_library": "参考資料整理",
+      "backupRole.memory_import": "記憶インポート評価",
       "summaryFailures.title": "要約失敗区間",
       "summaryFailures.none": "失敗した要約区間はありません。",
       "summaryFailures.memories": "記憶のないターン",
@@ -11848,6 +11932,38 @@
     return payload;
   }
 
+  // Roles the backup model can stand in for, in the order the settings list them.
+  const BACKUP_LLM_ROLES = [
+    "publisher", "critic", "world_rule_audit",
+    "preprocessing.event_recent", "preprocessing.character_objective", "preprocessing.subjective_relationship",
+    "preprocessing.world_state", "preprocessing.unresolved_goal",
+    "chapter", "arc", "saga",
+    "source_search", "reference_library", "memory_import",
+  ];
+
+  function backupLlmRoleLabel(role) {
+    const key = String(role || "");
+    if (key.indexOf("preprocessing.") === 0) {
+      return t("backupRole.preprocessing") + " · " + t("turn_hud.preprocessing." + key.slice("preprocessing.".length));
+    }
+    return t("backupRole." + key);
+  }
+
+  function renderBackupLlmRoleChecks(s) {
+    const enabled = new Set(Array.isArray(s.backupLlmRoles) ? s.backupLlmRoles : []);
+    return BACKUP_LLM_ROLES.map(function(role) {
+      const id = "mo-backupRole-" + role.split(".").join("-");
+      return '<div class="mo-chk"><input type="checkbox" id="' + id + '" data-backup-role="' + escapeAttr(role) + '"' + (enabled.has(role) ? " checked" : "") + '>'
+        + '<label for="' + id + '">' + escapeAttr(backupLlmRoleLabel(role)) + '</label></div>';
+    }).join("");
+  }
+
+  function readBackupLlmRoleChecks(fallback) {
+    const boxes = Array.from(document.querySelectorAll("[data-backup-role]"));
+    if (boxes.length === 0) return Array.isArray(fallback) ? fallback.slice() : [];
+    return boxes.filter(function(box) { return box.checked; }).map(function(box) { return box.getAttribute("data-backup-role"); });
+  }
+
   function renderLlmProviderOptions(selected) {
     const providers = [
       ["openai", "OpenAI"], ["claude", "Claude"], ["gemini", "Gemini"],
@@ -12380,6 +12496,19 @@
     merged.sourceSearchPlannerReasoningPreset = normalizeReasoningPreset(merged.sourceSearchPlannerReasoningPreset, DEFAULT_SETTINGS.sourceSearchPlannerReasoningPreset);
     merged.sourceSearchPlannerReasoningEffort = normalizeReasoningEffort(merged.sourceSearchPlannerReasoningEffort, DEFAULT_SETTINGS.sourceSearchPlannerReasoningEffort);
     merged.sourceSearchPlannerReasoningBudgetTokens = normalizeReasoningBudgetTokens(merged.sourceSearchPlannerReasoningBudgetTokens, DEFAULT_SETTINGS.sourceSearchPlannerReasoningBudgetTokens);
+    merged.backupLlmEnabled = merged.backupLlmEnabled === true;
+    merged.backupProvider = getSubLlmProviderSetting(merged.backupProvider || DEFAULT_SETTINGS.backupProvider);
+    merged.backupTimeoutMs = sanitizeNumber(merged.backupTimeoutMs, DEFAULT_SETTINGS.backupTimeoutMs, 5000, 300000);
+    merged.backupTimeoutFromRole = merged.backupTimeoutFromRole !== false;
+    merged.backupTemperatureFromRole = merged.backupTemperatureFromRole !== false;
+    merged.backupTemperature = sanitizeNumber(merged.backupTemperature, DEFAULT_SETTINGS.backupTemperature, 0, 2);
+    merged.backupMaxCompletionTokens = sanitizeNumber(merged.backupMaxCompletionTokens, DEFAULT_SETTINGS.backupMaxCompletionTokens, 0, 128000);
+    merged.backupReasoningPreset = normalizeReasoningPreset(merged.backupReasoningPreset, DEFAULT_SETTINGS.backupReasoningPreset);
+    merged.backupReasoningEffort = normalizeReasoningEffort(merged.backupReasoningEffort, DEFAULT_SETTINGS.backupReasoningEffort);
+    merged.backupReasoningBudgetTokens = normalizeReasoningBudgetTokens(merged.backupReasoningBudgetTokens, DEFAULT_SETTINGS.backupReasoningBudgetTokens);
+    merged.backupLlmRoles = (Array.isArray(merged.backupLlmRoles) ? merged.backupLlmRoles : [])
+      .map(function(role) { return String(role || "").trim(); })
+      .filter(function(role, index, list) { return BACKUP_LLM_ROLES.includes(role) && list.indexOf(role) === index; });
     // Phase 4-D-2: 하드코딩 상수 설정화
     merged.episodeIntervalTurns = Math.max(1, Math.floor(Number(merged.episodeIntervalTurns) || DEFAULT_SETTINGS.episodeIntervalTurns));
     merged.episodeIntervalPolicyVersion = "ui_configured.v1";
@@ -12689,6 +12818,20 @@
       embeddingRetryCount: Math.trunc(sanitizeNumber(s.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10)),
       failedQueueMaxAttempts: failedQueueMaxAttempts(),
       criticReprocessingIntervalSec: sanitizeNumber(s.criticReprocessingIntervalSec, DEFAULT_SETTINGS.criticReprocessingIntervalSec, 1, 3600),
+      backupLlmEnabled: s.backupLlmEnabled === true,
+      backupProvider: getSubLlmProviderSetting(s.backupProvider || DEFAULT_SETTINGS.backupProvider),
+      backupApiKey: typeof s.backupApiKey === "string" ? s.backupApiKey : "",
+      backupEndpoint: typeof s.backupEndpoint === "string" ? s.backupEndpoint : "",
+      backupModel: typeof s.backupModel === "string" ? s.backupModel : "",
+      backupTimeout: Math.ceil(sanitizeNumber(s.backupTimeoutMs, DEFAULT_SETTINGS.backupTimeoutMs, 5000, 300000) / 1000),
+      backupTemperature: sanitizeNumber(s.backupTemperature, DEFAULT_SETTINGS.backupTemperature, 0, 2),
+      backupTemperatureFromRole: s.backupTemperatureFromRole !== false,
+      backupTimeoutFromRole: s.backupTimeoutFromRole !== false,
+      backupMaxCompletionTokens: sanitizeNumber(s.backupMaxCompletionTokens, DEFAULT_SETTINGS.backupMaxCompletionTokens, 0, 128000),
+      backupReasoningPreset: normalizeReasoningPreset(s.backupReasoningPreset, DEFAULT_SETTINGS.backupReasoningPreset),
+      backupReasoningEffort: normalizeReasoningEffort(s.backupReasoningEffort, DEFAULT_SETTINGS.backupReasoningEffort),
+      backupReasoningBudgetTokens: normalizeReasoningBudgetTokens(s.backupReasoningBudgetTokens, DEFAULT_SETTINGS.backupReasoningBudgetTokens),
+      backupLlmRoles: Array.isArray(s.backupLlmRoles) ? s.backupLlmRoles.slice() : [],
     };
 
     const result = await safeCall(() => bridgeFetch("/config/update", {
@@ -15597,6 +15740,41 @@
       : view;
   }
 
+  // Where the backup model answered: the stage, the roles of the call and why
+  // the primary model's answer was not taken. Unknown parts are left out.
+  function turnWorkflowHUDBackupDetails(view, warning) {
+    const label = function(key, fallback) {
+      const text = t(key);
+      return text && text !== key ? text : fallback;
+    };
+    const details = [];
+    const stageKey = String(warning && warning.stage_key || "");
+    if (stageKey) {
+      const stage = (Array.isArray(view && view.stages) ? view.stages : []).find(function(item) { return item && item.key === stageKey; });
+      details.push(label(stage && stage.label_key || ("turn_hud.stage." + stageKey), stageKey));
+    }
+    const roles = (Array.isArray(warning && warning.backup_roles) ? warning.backup_roles : []).map(function(role) {
+      const text = String(role || "");
+      if (text.startsWith("preprocessing.")) {
+        const name = text.slice("preprocessing.".length);
+        return label("backupRole.preprocessing", "preprocessing") + "(" + label("turn_hud.preprocessing." + name, name) + ")";
+      }
+      return label("backupRole." + text, text);
+    }).filter(Boolean);
+    if (roles.length) details.push(roles.join(", "));
+    const reason = String(warning && warning.backup_reason || "");
+    if (reason) details.push(label("turn_hud.backup_reason." + reason, reason));
+    return details;
+  }
+
+  // The stage shown in the compact HUD has a backup answer.
+  function turnWorkflowHUDStageUsedBackup(view, stageKey) {
+    const key = String(stageKey || "");
+    return !!key && (Array.isArray(view && view.warnings) ? view.warnings : []).some(function(warning) {
+      return warning && warning.code === "BACKUP_LLM_USED" && String(warning.stage_key || "") === key;
+    });
+  }
+
   function turnWorkflowHUDWarningListHTML(view) {
     const requestId = String(view && view.request_id || "").trim();
     const hostWarnings = requestId
@@ -15609,7 +15787,8 @@
       const item = warning && typeof warning === "object" ? warning : {};
       if (item.code === "HOST_GENERATION_ENDED") return ""; // Full observation is on the dashboard.
       const label = item.message_key ? t(item.message_key) : "";
-      const message = label && label !== item.message_key ? label : t("turn_hud.warning.generic");
+      let message = label && label !== item.message_key ? label : t("turn_hud.warning.generic");
+      if (item.code === "BACKUP_LLM_USED") message = [message].concat(turnWorkflowHUDBackupDetails(view, item)).join(" · ");
       if (seen.has(message)) return "";
       seen.add(message);
       return `<div style="${TURN_WORKFLOW_HUD_WARNING_ITEM_STYLE}">${escapeTurnWorkflowHUDHTML(message)}</div>`;
@@ -16050,6 +16229,10 @@
         const badgeStatus = preprocessingMode === "enabled" && running ? "running" : preprocessingMode;
         preprocessingBadge = `<span data-turn-workflow-preprocessing="${escapeTurnWorkflowHUDHTML(badgeStatus)}" style="flex:none;font-size:9px;color:#9EABD6">${escapeTurnWorkflowHUDHTML(t("turn_hud.preprocessing.compact_" + badgeStatus))}</span>`;
       }
+      // Only for the stage on show, so it goes when the stage changes.
+      const backupBadge = !view.host_generation_finished && turnWorkflowHUDStageUsedBackup(view, stage.key)
+        ? `<span data-turn-workflow-backup="used" style="min-width:0;font-size:9px;color:#F5C451;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeTurnWorkflowHUDHTML(t("turn_hud.compact.backup_used"))}</span>`
+        : "";
       const dismissible = terminal || hostIdle || turnWorkflowHUDCloseButtonOnly(view);
       const style = TURN_WORKFLOW_HUD_CARD_STYLE + turnWorkflowHUDSeverityStyle(failed ? "error" : "normal")
         + ";width:min(112px,100%);margin-left:auto;min-height:42px;padding:6px 8px;border-radius:7px;display:flex;flex-direction:column;align-items:stretch;gap:2px;overflow:hidden"
@@ -16062,6 +16245,7 @@
           + (failed ? `<span style="flex:none;font-size:10px;color:#E158A6">${escapeTurnWorkflowHUDHTML(t(view.host_generation_end?.kind === "stopped" ? "turn_hud.stopped" : "turn_hud.stage_status.failed"))}</span>` : "")
           + `<time style="${TURN_WORKFLOW_HUD_ELAPSED_STYLE};white-space:nowrap">${escapeTurnWorkflowHUDHTML(elapsedStartedAt ? "" : " · " + duration)}</time>`
           + preprocessingBadge + `</div>`
+          + backupBadge
           + (dismissible ? turnWorkflowHUDDismissButtonHTML() : "") + `</div>`,
       };
     }
@@ -27538,9 +27722,9 @@
     applyProviderRequestOverrideFields(proxyBody, "main");
 
     // bridgeFetch는 성공 시 파싱된 data 객체, 실패 시 null 반환
-    const proxyPath = provider === "opencode-go"
-      ? "/proxy/plugin-main?chat_session_id=" + encodeURIComponent(opts.chatSessionId || await getCurrentChatSessionId())
-      : "/proxy/plugin-main";
+    const proxyPath = (provider === "opencode-go"
+      ? "/proxy/plugin-main?chat_session_id=" + encodeURIComponent(opts.chatSessionId || await getCurrentChatSessionId()) + "&"
+      : "/proxy/plugin-main?") + "backup_role=publisher";
     const data = await bridgeFetch(proxyPath, {
       method:  "POST",
       body:    proxyBody,
@@ -27974,9 +28158,9 @@
     applyReasoningFieldsToPayload(payload, reasoningPreset, requestedReasoningEffort, reasoningBudgetTokens);
     applyProviderRequestOverrideFields(payload, "sub");
 
-    const proxyPath = provider === "opencode-go"
-      ? "/proxy/plugin-main?chat_session_id=" + encodeURIComponent(opts.chatSessionId || await getCurrentChatSessionId())
-      : "/proxy/plugin-main";
+    const proxyPath = (provider === "opencode-go"
+      ? "/proxy/plugin-main?chat_session_id=" + encodeURIComponent(opts.chatSessionId || await getCurrentChatSessionId()) + "&"
+      : "/proxy/plugin-main?") + "backup_role=critic";
     const data = await bridgeFetch(proxyPath, {
       method: "POST",
       body: payload,
@@ -54064,6 +54248,99 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       </div>
     </div>
 
+    <!-- ▸ Backup model (content refusals) -->
+    <div class="mo-section">${t('settings.section.backupLlm')}</div>
+    <div class="mo-llm-split mo-llm-split-single">
+      <div class="mo-llm-panel">
+      <div class="mo-section-desc">${t('settings.section.backupLlm.desc')}</div>
+      <div class="mo-llm-section">
+      <div class="mo-row">
+        <label>${t('settings.label.backupEnabled')}</label>
+        <div class="mo-chk">
+          <input type="checkbox" id="mo-backupLlmEnabled"${s.backupLlmEnabled === true ? " checked" : ""}>
+          <label for="mo-backupLlmEnabled">${t('settings.backupEnabled.on')}</label>
+        </div>
+      </div>
+      <div class="mo-row">
+        <label id="mo-backupApiKeyLabel">API Key</label>
+        <input type="password" id="mo-backupApiKey" value="${escapeAttr(s.backupApiKey)}" placeholder="sk-..." autocomplete="off">
+        <button type="button" class="mo-btn-toggle" data-target="mo-backupApiKey">👁</button>
+      </div>
+      <div class="mo-row">
+        <label>Provider</label>
+        <select id="mo-backupProvider">
+          ${renderLlmProviderOptions(s.backupProvider)}
+        </select>
+      </div>
+      <div class="mo-row">
+        <label id="mo-backupEndpointLabel">Endpoint (비워두면 자동)</label>
+        <input type="text" id="mo-backupEndpoint" value="${escapeAttr(s.backupEndpoint)}" placeholder="https://api.openai.com/v1">
+        <small id="mo-backupVertexHint" style="color:#9aa8c7;font-size:11px;"></small>
+      </div>
+      <div class="mo-row">
+        <label>Model</label>
+        <input type="text" id="mo-backupModel" value="${escapeAttr(s.backupModel)}" placeholder="예: gpt-4o">
+      </div>
+      <div class="mo-row mo-range-row">
+        <label>Timeout (ms)</label>
+        <input type="number" id="mo-backupTimeoutMs" value="${s.backupTimeoutMs ?? DEFAULT_SETTINGS.backupTimeoutMs}" min="5000" max="300000" step="5000">
+        <input class="mo-range" type="range" id="mo-backupTimeoutMsRange" data-sync-input="mo-backupTimeoutMs" value="${s.backupTimeoutMs ?? DEFAULT_SETTINGS.backupTimeoutMs}" min="5000" max="300000" step="5000">
+        <div class="mo-chk">
+          <input type="checkbox" id="mo-backupTimeoutFromRole" data-backup-from-role="mo-backupTimeoutMs,mo-backupTimeoutMsRange"${s.backupTimeoutFromRole !== false ? " checked" : ""}>
+          <label for="mo-backupTimeoutFromRole">${t('settings.backupFromRole')}</label>
+        </div>
+      </div>
+      <div class="mo-row mo-range-row">
+        <label>Temperature</label>
+        <input type="number" id="mo-backupTemperature" value="${s.backupTemperature ?? DEFAULT_SETTINGS.backupTemperature}" min="0" max="2" step="0.1">
+        <input class="mo-range" type="range" id="mo-backupTemperatureRange" data-sync-input="mo-backupTemperature" value="${s.backupTemperature ?? DEFAULT_SETTINGS.backupTemperature}" min="0" max="2" step="0.1">
+        <div class="mo-chk">
+          <input type="checkbox" id="mo-backupTemperatureFromRole" data-backup-from-role="mo-backupTemperature,mo-backupTemperatureRange"${s.backupTemperatureFromRole !== false ? " checked" : ""}>
+          <label for="mo-backupTemperatureFromRole">${t('settings.backupFromRole')}</label>
+        </div>
+      </div>
+      <div class="mo-row">
+        <label>Reasoning Preset</label>
+        <select id="mo-backupReasoningPreset">
+          <option value="auto"${(s.backupReasoningPreset || "auto") === "auto" ? " selected" : ""}>auto</option>
+          <option value="gpt"${s.backupReasoningPreset === "gpt" ? " selected" : ""}>gpt</option>
+          <option value="gemini"${s.backupReasoningPreset === "gemini" ? " selected" : ""}>gemini</option>
+          <option value="claude"${s.backupReasoningPreset === "claude" ? " selected" : ""}>claude</option>
+          <option value="glm"${s.backupReasoningPreset === "glm" ? " selected" : ""}>glm</option>
+          <option value="custom"${s.backupReasoningPreset === "custom" ? " selected" : ""}>custom</option>
+        </select>
+      </div>
+      <div class="mo-row">
+        <label>Reasoning Effort</label>
+        <select id="mo-backupReasoningEffort">
+          <option value="none"${(s.backupReasoningEffort || "none") === "none" ? " selected" : ""}>none</option>
+          <option value="minimal"${s.backupReasoningEffort === "minimal" ? " selected" : ""}>minimal</option>
+          <option value="low"${s.backupReasoningEffort === "low" ? " selected" : ""}>low</option>
+          <option value="medium"${s.backupReasoningEffort === "medium" ? " selected" : ""}>medium</option>
+          <option value="high"${s.backupReasoningEffort === "high" ? " selected" : ""}>high</option>
+          <option value="xhigh"${s.backupReasoningEffort === "xhigh" ? " selected" : ""}>xhigh</option>
+          <option value="max"${s.backupReasoningEffort === "max" ? " selected" : ""}>max</option>
+          <option value="enable"${s.backupReasoningEffort === "enable" ? " selected" : ""}>enable</option>
+          <option value="disable"${s.backupReasoningEffort === "disable" ? " selected" : ""}>disable</option>
+        </select>
+      </div>
+      <div class="mo-row">
+        <label>Reasoning Budget Tokens</label>
+        <input type="number" id="mo-backupReasoningBudgetTokens" value="${s.backupReasoningBudgetTokens ?? 0}" min="0" max="131072" step="1">
+      </div>
+      <div class="mo-row">
+        <label>Max Completion Tokens</label>
+        <input type="number" id="mo-backupMaxCompletionTokens" value="${s.backupMaxCompletionTokens ?? 0}" min="0" max="128000" step="1">
+        <small style="color:#888;font-size:11px;">${t('settings.hint.backupMaxTokens')}</small>
+      </div>
+      <div class="mo-row">
+        <label>${t('settings.label.backupRoles')}</label>
+        <div class="mo-backup-roles">${renderBackupLlmRoleChecks(s)}</div>
+      </div>
+      </div>
+      </div>
+    </div>
+
     <!-- ▸ Script Reading + Retrieval LLM Split -->
     <div class="mo-section">${t('settings.section.embeddingLlm')}</div>
     <div class="mo-llm-split mo-llm-split-single">
@@ -55271,6 +55548,21 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         endpoint: t('settings.placeholder.sameAsMain'),
         model: "예: gpt-4o-mini",
       });
+      document.querySelectorAll("[data-backup-from-role]").forEach(function(box) {
+        const sync = function() {
+          String(box.getAttribute("data-backup-from-role") || "").split(",").forEach(function(id) {
+            const input = $(id);
+            if (input) input.disabled = box.checked;
+          });
+        };
+        box.addEventListener("change", sync);
+        sync();
+      });
+      bindVertexProviderHints("mo-backupProvider", "mo-backupApiKeyLabel", "mo-backupApiKey", "mo-backupEndpointLabel", "mo-backupEndpoint", "mo-backupModel", "mo-backupVertexHint", {
+        api: "sk-...",
+        endpoint: "https://api.openai.com/v1",
+        model: "예: gpt-4o",
+      });
       bindVertexProviderHints("mo-embeddingProvider", "mo-embeddingApiKeyLabel", "mo-embeddingApiKey", "mo-embeddingEndpointLabel", "mo-embeddingEndpoint", "mo-embeddingModel", "mo-embeddingVertexHint", {
         api: t('settings.placeholder.sameAsMain'),
         endpoint: t('settings.placeholder.sameAsMain'),
@@ -55364,6 +55656,20 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             embeddingApiKey: $("mo-embeddingApiKey").value,
             embeddingEndpoint: $("mo-embeddingEndpoint").value.trim(),
             embeddingModel: $("mo-embeddingModel").value.trim(),
+            backupLlmEnabled: $("mo-backupLlmEnabled") ? $("mo-backupLlmEnabled").checked : settings.backupLlmEnabled,
+            backupProvider: readValue("mo-backupProvider", settings.backupProvider, true),
+            backupApiKey: readValue("mo-backupApiKey", settings.backupApiKey),
+            backupEndpoint: readValue("mo-backupEndpoint", settings.backupEndpoint, true),
+            backupModel: readValue("mo-backupModel", settings.backupModel, true),
+            backupTimeoutMs: readValue("mo-backupTimeoutMs", settings.backupTimeoutMs),
+            backupTimeoutFromRole: $("mo-backupTimeoutFromRole") ? $("mo-backupTimeoutFromRole").checked : settings.backupTimeoutFromRole,
+            backupTemperature: readValue("mo-backupTemperature", settings.backupTemperature),
+            backupTemperatureFromRole: $("mo-backupTemperatureFromRole") ? $("mo-backupTemperatureFromRole").checked : settings.backupTemperatureFromRole,
+            backupReasoningPreset: readValue("mo-backupReasoningPreset", settings.backupReasoningPreset, true),
+            backupReasoningEffort: readValue("mo-backupReasoningEffort", settings.backupReasoningEffort, true),
+            backupReasoningBudgetTokens: readValue("mo-backupReasoningBudgetTokens", settings.backupReasoningBudgetTokens),
+            backupMaxCompletionTokens: readValue("mo-backupMaxCompletionTokens", settings.backupMaxCompletionTokens),
+            backupLlmRoles: readBackupLlmRoleChecks(settings.backupLlmRoles),
             sourceSearchPlannerProvider: readValue("mo-sourceSearchPlannerProvider", settings.sourceSearchPlannerProvider, true),
             sourceSearchPlannerApiKey: readValue("mo-sourceSearchPlannerApiKey", settings.sourceSearchPlannerApiKey),
             sourceSearchPlannerEndpoint: readValue("mo-sourceSearchPlannerEndpoint", settings.sourceSearchPlannerEndpoint, true),
