@@ -38,6 +38,10 @@ func ValidateProxyEndpoint(endpoint string) error {
 // local-network guard for every other provider.
 func ValidateProxyEndpointForProvider(endpoint, provider string) error {
 	endpoint = strings.TrimSpace(endpoint)
+	// Risu calls run in the RisuAI tab, not at an endpoint.
+	if strings.EqualFold(strings.TrimSpace(provider), risuProvider) && endpoint == risuBridgeEndpoint {
+		return nil
+	}
 	if endpoint == "" {
 		return fmt.Errorf("endpoint is required")
 	}

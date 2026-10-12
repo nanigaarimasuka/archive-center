@@ -2302,10 +2302,51 @@ func normalizeLLMJSONText(content string) string {
 func repairJSONCandidate(candidate string) string {
 	// Shared syntax recovery for model responses. Quoted source text stays intact;
 	// role-specific field types and acceptance remain with their existing owners.
-	repaired := replaceJSONLiteralsOutsideStrings(repairStructuralJSONQuotes(candidate))
+	repaired := replaceJSONLiteralsOutsideStrings(repairStructuralJSONQuotes(escapeJSONControlCharactersInStrings(candidate)))
 	repaired = repairJSONMissingArrayClosers(repaired)
 	repaired = removeJSONTrailingCommasOutsideStrings(repaired)
 	return strings.TrimSpace(repaired)
+}
+
+// escapeJSONControlCharactersInStrings escapes raw control characters, such
+// as a line break copied from a multi-line quotation, inside string literals.
+// JSON never allows them there, so only otherwise invalid text changes.
+func escapeJSONControlCharactersInStrings(input string) string {
+	var b strings.Builder
+	b.Grow(len(input))
+	inString, escaped := false, false
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+		if !inString {
+			if ch == '"' {
+				inString = true
+			}
+			b.WriteByte(ch)
+			continue
+		}
+		switch {
+		case escaped:
+			escaped = false
+		case ch == '\\':
+			escaped = true
+		case ch == '"':
+			inString = false
+		case ch < 0x20:
+			switch ch {
+			case '\n':
+				b.WriteString(`\n`)
+			case '\r':
+				b.WriteString(`\r`)
+			case '\t':
+				b.WriteString(`\t`)
+			default:
+				fmt.Fprintf(&b, `\u%04x`, ch)
+			}
+			continue
+		}
+		b.WriteByte(ch)
+	}
+	return b.String()
 }
 
 // Recover an omitted ] when a complete array is followed by an explicit object
