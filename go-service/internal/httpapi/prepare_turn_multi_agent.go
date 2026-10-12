@@ -1270,10 +1270,12 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 	var lore []map[string]any
 	var refs map[string]string
 	var searchEvidenceRanks map[string]float64
+	var knownCurrentRelevance map[string]float64
 	loreBudget := 0
 	if len(context) > 0 {
 		refs, _ = context[0]["candidate_refs"].(map[string]string)
 		searchEvidenceRanks, _ = context[0]["search_evidence_ranks"].(map[string]float64)
+		knownCurrentRelevance, _ = context[0]["current_relevance_by_text"].(map[string]float64)
 		if role == "world_state" {
 			lore, _ = context[0]["lorebook_candidates"].([]map[string]any)
 			loreBudget = intFromAny(context[0]["lorebook_budget_chars"], 0)
@@ -1294,7 +1296,13 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 	// recalled context, without weakening a precise semantic match.
 	facts = append([]prepareTurnPriorityMemoryCandidate(nil), facts...)
 	if currentInput := strings.TrimSpace(stringPtrValue(req.RawUserInput, "")); currentInput != "" && searchEvidenceRanks == nil {
-		currentRelevance := prepareTurnPriorityRelevanceScorer(nil, currentInput)
+		scoreCurrent := prepareTurnPriorityRelevanceScorer(nil, currentInput)
+		currentRelevance := func(text string) float64 {
+			if value, ok := knownCurrentRelevance[text]; ok {
+				return value
+			}
+			return scoreCurrent(text)
+		}
 		readingScore := map[string]float64{}
 		for _, c := range facts {
 			current := currentRelevance(c.CompleteText)
@@ -1545,10 +1553,16 @@ func (s *Server) runMultiAgent(ctx context.Context, cfg multiAgentSettings, req 
 	}()
 	inputContext := map[string]any{}
 	scope := map[string]any{}
+	var lexicalText func(string) prepareTurnPriorityLexicalText
 	if len(scopedContext) > 0 {
 		for key, value := range scopedContext[0] {
 			if key == "go_baseline_plan" {
 				result.captureBaseline(mapFromAny(value))
+				continue
+			}
+			if key == "lexical_text" {
+				// Request-local text analysis cache; never part of a role input.
+				lexicalText, _ = value.(func(string) prepareTurnPriorityLexicalText)
 				continue
 			}
 			if key == "lorebook_candidates" || key == "lorebook_budget_chars" || key == "recent_conversation_reading" || key == "story_time_note" {
@@ -1561,20 +1575,33 @@ func (s *Server) runMultiAgent(ctx context.Context, cfg multiAgentSettings, req 
 	lore, _ := inputContext["lorebook_candidates"].([]map[string]any)
 	refs := multiAgentReferences(facts, summaries, lore, nil)
 	inputContext["candidate_refs"] = refs
+	// Every role reads the same current-input relevance for the same text.
+	// Score each text once here, before role goroutines; roles only read it.
+	if currentInput := strings.TrimSpace(stringPtrValue(req.RawUserInput, "")); currentInput != "" {
+		inputContext["current_relevance_by_text"] = multiAgentCurrentRelevanceByText(currentInput, facts, lexicalText)
+	}
 	for _, role := range multiAgentRoles {
 		if cfg.Roles[role].Enabled || (!cfg.Enabled && cfg.Jev.Enabled) {
 			result.Roles = append(result.Roles, multiAgentRoleResult{Role: role, Source: "go_default", Reason: "no_recommendation"})
 		}
 	}
 	var wg sync.WaitGroup
+	// Role inputs only read the shared candidates and context, as in round two;
+	// each role writes its own indexed slot.
 	firstInputs := make([]map[string]any, len(result.Roles))
+	var firstInputWG sync.WaitGroup
 	for i := range result.Roles {
-		input := multiAgentInput(result.Roles[i].Role, facts, summaries, req, cfg, capChars, maxItems, laneCaps, inputContext)
-		if len(scopedContext) > 0 {
-			input["scope"] = scope
-		}
-		firstInputs[i] = input
+		firstInputWG.Add(1)
+		go func(i int) {
+			defer firstInputWG.Done()
+			input := multiAgentInput(result.Roles[i].Role, facts, summaries, req, cfg, capChars, maxItems, laneCaps, inputContext)
+			if len(scopedContext) > 0 {
+				input["scope"] = scope
+			}
+			firstInputs[i] = input
+		}(i)
 	}
+	firstInputWG.Wait()
 	measurement.addElapsed("first_input_preparation", stageStarted)
 	stageStarted = time.Now()
 	firstCalls := s.callMultiAgentRound(ctx, cfg, 1, result.Roles, firstInputs, req.ChatSessionID)

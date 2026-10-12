@@ -127,7 +127,14 @@ func TestPrepareTurnHistoryEmbeddingConcurrency(t *testing.T) {
 				}
 				return
 			}
-			if calls.Load() != 6 || peak.Load() != 3 || active.Load() != 0 {
+			// After the current input, every history query is sent at once.
+			// A cancel lands once three have started, so later ones may begin
+			// after earlier ones end.
+			wantPeak := peak.Load() == int32(len(queries)-1)
+			if mode == "cancel" {
+				wantPeak = peak.Load() >= 3
+			}
+			if calls.Load() != 6 || !wantPeak || active.Load() != 0 {
 				t.Fatalf("calls=%d peak=%d active=%d", calls.Load(), peak.Load(), active.Load())
 			}
 			for i := range queries {

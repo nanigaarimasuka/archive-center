@@ -92,14 +92,8 @@ func (s *chromaStore) Search(ctx context.Context, sessionID string, vector []flo
 	if where := chromaWhere(sessionID, filter); len(where) > 0 {
 		body["where"] = where
 	}
-	var out struct {
-		IDs        [][]string         `json:"ids"`
-		Documents  [][]string         `json:"documents"`
-		Metadatas  [][]map[string]any `json:"metadatas"`
-		Distances  [][]float64        `json:"distances"`
-		Embeddings [][][]float32      `json:"embeddings"`
-	}
-	if _, err := s.doJSON(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, &out, http.StatusOK); err != nil {
+	out, err := s.searchQuery(ctx, ref, body)
+	if err != nil {
 		return nil, err
 	}
 	if len(out.IDs) == 0 || len(out.IDs[0]) == 0 {
@@ -173,14 +167,9 @@ func (s *chromaStore) QueryExact(ctx context.Context, query ExactQuery) ([]Exact
 	if len(query.Where) > 0 {
 		body["where"] = query.Where
 	}
-	var out struct {
-		IDs        [][]string         `json:"ids"`
-		Documents  [][]string         `json:"documents"`
-		Metadatas  [][]map[string]any `json:"metadatas"`
-		Distances  [][]float64        `json:"distances"`
-		Embeddings [][][]float32      `json:"embeddings"`
-	}
-	if _, err := s.doJSON(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, &out, http.StatusOK); err != nil {
+	var out chromaQueryResponse
+	decode := func(data []byte) error { return decodeChromaQueryResponse(data, &out) }
+	if _, err := s.doJSONDecode(ctx, http.MethodPost, s.collectionOperationPath(ref, "query"), body, decode, http.StatusOK); err != nil {
 		return nil, err
 	}
 	if len(out.IDs) == 0 || len(out.IDs[0]) == 0 {
@@ -626,6 +615,15 @@ func (s *chromaStore) collectionOperationPath(collectionRef string, operation st
 }
 
 func (s *chromaStore) doJSON(ctx context.Context, method string, path string, body any, out any, okStatuses ...int) (int, error) {
+	var decode func([]byte) error
+	if out != nil {
+		decode = func(data []byte) error { return json.Unmarshal(data, out) }
+	}
+	return s.doJSONDecode(ctx, method, path, body, decode, okStatuses...)
+}
+
+// doJSONDecode is doJSON with a caller-supplied decoder for a successful body.
+func (s *chromaStore) doJSONDecode(ctx context.Context, method string, path string, body any, decode func([]byte) error, okStatuses ...int) (int, error) {
 	var reader io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
@@ -661,8 +659,8 @@ func (s *chromaStore) doJSON(ctx context.Context, method string, path string, bo
 	if readErr != nil {
 		return resp.StatusCode, fmt.Errorf("chroma store: read %s %s returned %d: %w", method, path, resp.StatusCode, readErr)
 	}
-	if out != nil && len(bytes.TrimSpace(data)) > 0 {
-		if err := json.Unmarshal(data, out); err != nil {
+	if decode != nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := decode(data); err != nil {
 			return resp.StatusCode, fmt.Errorf("chroma store: decode %s %s: %w", method, path, err)
 		}
 	}

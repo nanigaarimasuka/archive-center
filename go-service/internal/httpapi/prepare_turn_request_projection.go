@@ -15,7 +15,7 @@ import (
 type prepareTurnRequestPreparation struct {
 	metrics       *prepareTurnMeasurement
 	baseQueries   []string
-	baseLexical   func(string) float64
+	baseLexical   *prepareTurnRelevanceMemo
 	seedTemplates map[prepareTurnSourceTemplateKey]prepareTurnSourceTemplate
 	payloads      map[string]any
 	surfaces      map[string]string
@@ -24,12 +24,25 @@ type prepareTurnRequestPreparation struct {
 	summaries     map[store.Memory]string
 	memorySeeds   map[store.Memory][]prepareTurnPriorityFactSeed
 	guards        map[prepareTurnGuardKey]prepareTurnProtectedMemoryGuardResult
-	lexical       map[string]func(string) float64
+	lexical       map[string]*prepareTurnRelevanceMemo
 	lexicalTexts  map[string]prepareTurnPriorityLexicalText
-	readingForms  map[prepareTurnMemoryFormKey]*prepareTurnMemoryForm
-	readingGroups map[prepareTurnMemoryGroupKey]string
-	matches       map[string]func(store.Memory) prepareTurnRecallEvidence
-	similarities  map[string]map[store.Memory]float64
+	lexParts      map[string]*prepareTurnLexicalPart
+	lexFields     map[string]*prepareTurnLexicalField
+	lexIDs        map[string]int32
+	partNeedles   map[string]prepareTurnNeedleSegment
+	// The same caches by the storage of the part string: parts are mostly
+	// shared strings, found without hashing their (long) contents.
+	lexPartsByStorage    map[prepareTurnTextStorage]*prepareTurnLexicalPart
+	partNeedlesByStorage map[prepareTurnTextStorage]prepareTurnNeedleSegment
+	partDigests          map[prepareTurnPartDigestKey][32]byte
+	// Digests by the storage of a part's strings, confirmed by content.
+	partDigestsByStorage map[uint64][]prepareTurnStoredPartDigest
+	readingForms         map[prepareTurnMemoryFormKey]*prepareTurnMemoryForm
+	readingGroups        map[prepareTurnMemoryGroupKey]string
+	matches              map[string]func(store.Memory) prepareTurnRecallEvidence
+	similarities         map[string]map[store.Memory]float64
+	// Scored texts are long; each is hashed once to an id the memos share.
+	scoredTexts prepareTurnTextIDs
 }
 
 func newPrepareTurnRequestPreparation(common *prepareTurnAssemblyCommon) *prepareTurnRequestPreparation {
@@ -43,10 +56,17 @@ func newPrepareTurnRequestPreparation(common *prepareTurnAssemblyCommon) *prepar
 		recall: recall, summaries: map[store.Memory]string{},
 		memorySeeds: map[store.Memory][]prepareTurnPriorityFactSeed{},
 		guards:      map[prepareTurnGuardKey]prepareTurnProtectedMemoryGuardResult{},
-		lexical:     map[string]func(string) float64{}, matches: map[string]func(store.Memory) prepareTurnRecallEvidence{},
+		lexical:     map[string]*prepareTurnRelevanceMemo{}, matches: map[string]func(store.Memory) prepareTurnRecallEvidence{},
 		lexicalTexts: map[string]prepareTurnPriorityLexicalText{},
-		readingForms: map[prepareTurnMemoryFormKey]*prepareTurnMemoryForm{}, readingGroups: map[prepareTurnMemoryGroupKey]string{},
+		lexParts:     map[string]*prepareTurnLexicalPart{}, lexFields: map[string]*prepareTurnLexicalField{},
+		lexIDs: map[string]int32{}, partNeedles: map[string]prepareTurnNeedleSegment{},
+		lexPartsByStorage:    map[prepareTurnTextStorage]*prepareTurnLexicalPart{},
+		partNeedlesByStorage: map[prepareTurnTextStorage]prepareTurnNeedleSegment{},
+		partDigests:          map[prepareTurnPartDigestKey][32]byte{},
+		partDigestsByStorage: map[uint64][]prepareTurnStoredPartDigest{},
+		readingForms:         map[prepareTurnMemoryFormKey]*prepareTurnMemoryForm{}, readingGroups: map[prepareTurnMemoryGroupKey]string{},
 		similarities: map[string]map[store.Memory]float64{},
+		scoredTexts:  prepareTurnTextIDs{ids: map[string]int32{}},
 	}
 }
 
@@ -97,14 +117,30 @@ type prepareTurnSourceTemplate struct {
 }
 
 func prepareTurnSourceSeedKey(seed prepareTurnPriorityFactSeed, query string) prepareTurnSourceTemplateKey {
-	// Query discoveries are observations on the source, not its identity.
+	return prepareTurnSourceSeedKeyWith(seed, query, seed.Fact.Reading.sourceFingerprint())
+}
+
+// prepareTurnSourceSeedJSONDigest is the SHA-256 of the seed's JSON without
+// its query discoveries, which are observations on the source, not its
+// identity. prepareTurnSourceSeedDigest gives seeds the same equality.
+func prepareTurnSourceSeedJSONDigest(seed prepareTurnPriorityFactSeed) [32]byte {
 	seed.SourceSelectionScore = 0
 	seed.SourceSelectionScoreObserved, seed.SourceSelectionScoreIsVector = false, false
 	seed.RecallQueries = nil
 	seed.SemanticSimilarity, seed.SemanticSimilarityObserved = 0, false
 	seed.SemanticUnitID, seed.SemanticSimilaritySource = "", ""
 	encoded, _ := json.Marshal(seed)
-	return prepareTurnSourceTemplateKey{sha256.Sum256(encoded), query, seed.Fact.Reading.sourceFingerprint()}
+	return sha256.Sum256(encoded)
+}
+
+// json writes a loosely typed value as JSON, as the seed's JSON holds it.
+func (w *prepareTurnSeedDigestWriter) json(value any) {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		w.unusable = true
+	}
+	w.length(len(encoded))
+	w.h.Write(encoded)
 }
 
 // Callers that edit a payload must copy its map first (canonical world-state
@@ -207,14 +243,17 @@ func (p *prepareTurnRequestPreparation) lexicalText(text string) prepareTurnPrio
 	return value
 }
 
-func (p *prepareTurnRequestPreparation) relevanceScorer(queries []string, fallback string) func(string) float64 {
+// relevanceMemos resolves the memoized scorers whose maximum is the
+// relevance for these queries, creating them as relevanceScorer always has.
+func (p *prepareTurnRequestPreparation) relevanceMemos(queries []string, fallback string) []*prepareTurnRelevanceMemo {
 	if len(queries) == 0 {
 		queries = []string{fallback}
 	}
-	functions := make([]func(string) float64, 0, len(queries))
+	memos := make([]*prepareTurnRelevanceMemo, 0, len(queries))
 	if p.baseLexical == nil {
 		p.baseQueries = append([]string{}, queries...)
-		p.baseLexical = memoPrepareTurnLexicalScore(prepareTurnPriorityRelevanceScorer(queries, fallback, p.lexicalText))
+		p.baseLexical = &prepareTurnRelevanceMemo{queries: p.baseQueries, fallback: fallback, texts: &p.scoredTexts}
+		p.baseLexical.score = prepareTurnPriorityRelevanceScorer(p.baseQueries, fallback, p.lexicalText)
 	}
 	// Preserve one combined base evaluation (including one text tokenization).
 	// Appended questions add their own evidence without rebuilding that base.
@@ -226,46 +265,41 @@ func (p *prepareTurnRequestPreparation) relevanceScorer(queries []string, fallba
 		}
 	}
 	if basePresent {
-		functions = append(functions, p.baseLexical)
+		memos = append(memos, p.baseLexical)
 		queries = queries[len(p.baseQueries):]
 	}
 	for _, query := range queries {
-		fn, ok := p.lexical[query]
+		memo, ok := p.lexical[query]
 		if !ok {
-			score := prepareTurnPriorityRelevanceScorer([]string{query}, "", p.lexicalText)
-			values := map[string]float64{}
-			fn = func(text string) float64 {
-				if value, ok := values[text]; ok {
-					return value
-				}
-				value := score(text)
-				values[text] = value
-				return value
-			}
-			p.lexical[query] = fn
+			memo = &prepareTurnRelevanceMemo{queries: []string{query}, texts: &p.scoredTexts}
+			memo.score = prepareTurnPriorityRelevanceScorer(memo.queries, "", p.lexicalText)
+			p.lexical[query] = memo
 		}
-		functions = append(functions, fn)
+		memos = append(memos, memo)
 	}
+	return memos
+}
+
+func (p *prepareTurnRequestPreparation) relevanceScorer(queries []string, fallback string) func(string) float64 {
+	memos := p.relevanceMemos(queries, fallback)
 	return func(text string) float64 {
 		defer p.measurement().start("assembly.relevance_score").end()
+		id := p.scoredTexts.id(text)
 		best := 0.0
-		for _, score := range functions {
-			best = math.Max(best, score(text))
+		for _, memo := range memos {
+			best = math.Max(best, memo.getID(id, text))
 		}
 		return best
 	}
 }
 
-func memoPrepareTurnLexicalScore(score func(string) float64) func(string) float64 {
-	values := map[string]float64{}
-	return func(text string) float64 {
-		if value, ok := values[text]; ok {
-			return value
-		}
-		value := score(text)
-		values[text] = value
+// cachedLexicalText reads an analysis primed by primeLexicalTexts; it never
+// writes, so concurrent scorers may share it.
+func (p *prepareTurnRequestPreparation) cachedLexicalText(text string) prepareTurnPriorityLexicalText {
+	if value, ok := p.lexicalTexts[text]; ok {
 		return value
 	}
+	return prepareTurnPriorityAnalyzeText(text)
 }
 
 func (p *prepareTurnRequestPreparation) publicMemorySeeds(item store.Memory) []prepareTurnPriorityFactSeed {

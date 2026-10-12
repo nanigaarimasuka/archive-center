@@ -1374,6 +1374,7 @@ type narrativeCurrentStateView struct {
 
 func narrativeCurrentStateViews(values []store.StatusCurrentValue) []narrativeCurrentStateView {
 	out := []narrativeCurrentStateView{}
+	turns := []int{}
 	for _, value := range values {
 		if value.StatusKey != narrativeStateStatusKey || value.WriteState != "current" {
 			continue
@@ -1384,10 +1385,11 @@ func narrativeCurrentStateViews(values []store.StatusCurrentValue) []narrativeCu
 			continue
 		}
 		out = append(out, view)
+		turns = append(turns, store.StatusCurrentObservationTurn(value))
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return store.StatusCurrentObservationTurn(out[i].Value) > store.StatusCurrentObservationTurn(out[j].Value)
-	})
+	// Read each row's observation turn once (it parses evidence JSON), then
+	// apply the same stable newest-first order.
+	sort.Stable(narrativeCurrentStateViewsByTurn{out, turns})
 	return out
 }
 
@@ -1543,11 +1545,19 @@ func buildNarrativeContinuityCorrection(values []store.StatusCurrentValue, rawUs
 }
 
 func narrativeCurrentStateSupersedesOpenArtifact(values []store.StatusCurrentValue, sourceTurn int, text string) bool {
+	if strings.TrimSpace(text) == "" {
+		return false
+	}
+	return narrativeCurrentStateViewsSupersedeOpenArtifact(narrativeCurrentStateViews(values), sourceTurn, text)
+}
+
+// Callers checking many artifacts build the current views once and pass them.
+func narrativeCurrentStateViewsSupersedeOpenArtifact(views []narrativeCurrentStateView, sourceTurn int, text string) bool {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return false
 	}
-	for _, view := range narrativeCurrentStateViews(values) {
+	for _, view := range views {
 		if view.Scope != "objective" {
 			continue
 		}
@@ -1642,6 +1652,10 @@ func prepareTurnOpenGoalArtifactForTitle(raw any, title string) string {
 }
 
 func filterPrepareTurnOpenGoalContent(raw string, sourceTurn int, values []store.StatusCurrentValue) (string, bool) {
+	return filterPrepareTurnOpenGoalContentViews(raw, sourceTurn, narrativeCurrentStateViews(values))
+}
+
+func filterPrepareTurnOpenGoalContentViews(raw string, sourceTurn int, views []narrativeCurrentStateView) (string, bool) {
 	payload := parseJSONMap(raw)
 	if len(payload) == 0 {
 		return raw, false
@@ -1657,7 +1671,7 @@ func filterPrepareTurnOpenGoalContent(raw string, sourceTurn int, values []store
 					kept := make([]any, 0, len(opened))
 					for _, item := range opened {
 						artifact := prepareTurnOpenGoalArtifact(item)
-						if artifact != "" && narrativeCurrentStateSupersedesOpenArtifact(values, sourceTurn, artifact) {
+						if artifact != "" && narrativeCurrentStateViewsSupersedeOpenArtifact(views, sourceTurn, artifact) {
 							changed = true
 							continue
 						}
@@ -1718,6 +1732,8 @@ func filterPrepareTurnSupersededOpenGoals(
 		"canonical_layers_dropped":   0,
 		"user_owned_items_preserved": 0,
 	}
+	// Every artifact below is checked against the same current state views.
+	views := narrativeCurrentStateViews(values)
 
 	filteredStorylines := make([]store.Storyline, 0, len(storylines))
 	for _, item := range storylines {
@@ -1736,7 +1752,7 @@ func filterPrepareTurnSupersededOpenGoals(
 		artifact := prepareTurnOpenGoalArtifactForTitle(parseJSONMap(item.OngoingTensionsJSON), item.Name)
 		if prepareTurnOpenLifecycleStatus(item.Status, false) &&
 			artifact != "" &&
-			narrativeCurrentStateSupersedesOpenArtifact(values, sourceTurn, artifact) {
+			narrativeCurrentStateViewsSupersedeOpenArtifact(views, sourceTurn, artifact) {
 			trace["storylines_dropped"] = intFromAny(trace["storylines_dropped"], 0) + 1
 			continue
 		}
@@ -1761,7 +1777,7 @@ func filterPrepareTurnSupersededOpenGoals(
 		artifact := prepareTurnOpenGoalArtifactForTitle(metadata, item.Title)
 		if prepareTurnOpenLifecycleStatus(item.Status, true) &&
 			artifact != "" &&
-			narrativeCurrentStateSupersedesOpenArtifact(values, sourceTurn, artifact) {
+			narrativeCurrentStateViewsSupersedeOpenArtifact(views, sourceTurn, artifact) {
 			trace["pending_threads_dropped"] = intFromAny(trace["pending_threads_dropped"], 0) + 1
 			continue
 		}
@@ -1771,11 +1787,11 @@ func filterPrepareTurnSupersededOpenGoals(
 	filteredActiveStates := make([]store.ActiveState, 0, len(activeStates))
 	for _, item := range activeStates {
 		if item.StateType == "unresolved_threads" &&
-			narrativeCurrentStateSupersedesOpenArtifact(values, item.TurnIndex, prepareTurnOpenGoalArtifact(parseJSONMap(item.Content))) {
+			narrativeCurrentStateViewsSupersedeOpenArtifact(views, item.TurnIndex, prepareTurnOpenGoalArtifact(parseJSONMap(item.Content))) {
 			trace["active_states_dropped"] = intFromAny(trace["active_states_dropped"], 0) + 1
 			continue
 		}
-		if content, changed := filterPrepareTurnOpenGoalContent(item.Content, item.TurnIndex, values); changed {
+		if content, changed := filterPrepareTurnOpenGoalContentViews(item.Content, item.TurnIndex, views); changed {
 			item.Content = content
 			if strings.TrimSpace(item.Content) == "" {
 				trace["active_states_dropped"] = intFromAny(trace["active_states_dropped"], 0) + 1
@@ -1792,11 +1808,11 @@ func filterPrepareTurnSupersededOpenGoals(
 			sourceTurn = item.TurnIndex
 		}
 		if item.LayerType == "unresolved_threads" &&
-			narrativeCurrentStateSupersedesOpenArtifact(values, sourceTurn, prepareTurnOpenGoalArtifact(parseJSONMap(item.Content))) {
+			narrativeCurrentStateViewsSupersedeOpenArtifact(views, sourceTurn, prepareTurnOpenGoalArtifact(parseJSONMap(item.Content))) {
 			trace["canonical_layers_dropped"] = intFromAny(trace["canonical_layers_dropped"], 0) + 1
 			continue
 		}
-		if content, changed := filterPrepareTurnOpenGoalContent(item.Content, sourceTurn, values); changed {
+		if content, changed := filterPrepareTurnOpenGoalContentViews(item.Content, sourceTurn, views); changed {
 			item.Content = content
 			if strings.TrimSpace(item.Content) == "" {
 				trace["canonical_layers_dropped"] = intFromAny(trace["canonical_layers_dropped"], 0) + 1

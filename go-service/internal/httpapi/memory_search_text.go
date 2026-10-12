@@ -459,15 +459,12 @@ func publicMemoryProjectionNarrativeSummary(projected map[string]any) string {
 }
 
 func publicMemoryFromCanonical(mem store.Memory) (store.Memory, bool) {
-	projection := buildPublicMemoryProjection(parseJSONMap(mem.SummaryJSON), mem.Evidence)
-	if !projection.Eligible {
+	projected, ok := cachedPublicMemoryProjection(mem.SummaryJSON, mem.Evidence)
+	if !ok {
 		return store.Memory{}, false
 	}
 	out := mem
-	out.SummaryJSON = mustCompactJSON(projection.Extraction)
-	out.Evidence = mustCompactJSON(map[string]any{
-		"evidence_excerpts": stringsFromAny(projection.Extraction["evidence_excerpts"]),
-	})
+	out.SummaryJSON, out.Evidence = projected.summary, projected.evidence
 	return out, true
 }
 
@@ -801,7 +798,7 @@ func appendUniqueMemorySearchText(items []string, value string) []string {
 	}
 	key := strings.ToLower(strings.Join(strings.Fields(value), " "))
 	for _, existing := range items {
-		if strings.ToLower(strings.Join(strings.Fields(existing), " ")) == key {
+		if memorySearchTextKeyEquals(existing, key) {
 			return items
 		}
 	}

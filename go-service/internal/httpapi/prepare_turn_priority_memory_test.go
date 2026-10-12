@@ -1195,6 +1195,7 @@ func (s *priorityPrepareTurnStore) ListGeneralVectorPreciseMemoryUnits(_ context
 type priorityPrepareTurnVector struct {
 	vector.VectorStore
 	doc   vector.VectorDocument
+	mu    sync.Mutex
 	calls []priorityPreciseCandidateSearchCall
 }
 
@@ -1205,6 +1206,7 @@ type priorityPreciseCandidateSearchCall struct {
 
 type priorityPreciseCandidateVector struct {
 	vector.VectorStore
+	mu    sync.Mutex
 	calls []priorityPreciseCandidateSearchCall
 	docs  []vector.VectorDocument
 }
@@ -1214,7 +1216,9 @@ func (v *priorityPreciseCandidateVector) Health(context.Context) (vector.HealthS
 }
 
 func (v *priorityPreciseCandidateVector) Search(_ context.Context, _ string, _ []float32, limit int, filter string) ([]vector.VectorDocument, error) {
+	v.mu.Lock()
 	v.calls = append(v.calls, priorityPreciseCandidateSearchCall{Limit: limit, Filter: filter})
+	v.mu.Unlock()
 	if !strings.Contains(filter, `source_table == "precise_memory_units"`) {
 		return nil, vector.ErrNotFound
 	}
@@ -1268,7 +1272,9 @@ func (v *priorityPrepareTurnVector) Health(context.Context) (vector.HealthSnapsh
 }
 
 func (v *priorityPrepareTurnVector) Search(_ context.Context, _ string, _ []float32, limit int, filter string) ([]vector.VectorDocument, error) {
+	v.mu.Lock()
 	v.calls = append(v.calls, priorityPreciseCandidateSearchCall{Limit: limit, Filter: filter})
+	v.mu.Unlock()
 	if strings.Contains(filter, `tier == "memory"`) {
 		return nil, vector.ErrNotFound
 	}
