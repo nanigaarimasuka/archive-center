@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -179,6 +180,43 @@ func filterChatLogsForTurnRange(logs []store.ChatLog, fromTurn, toTurn, limit in
 	return out
 }
 
+// episodeMissingMemoryTurns lists the turns in a range that have chat logs
+// but no memory. An episode built over such a turn would fill the gap with
+// raw chat text, so the range has to wait until the critic has run for every
+// turn. Sessions without any memory at all (no critic configured) are never
+// blocked.
+func episodeMissingMemoryTurns(sid string, fromTurn, toTurn int, logs []store.ChatLog, sessionMemories []store.Memory) []int {
+	hasMemory := map[int]bool{}
+	anyMemory := false
+	for _, item := range sessionMemories {
+		if item.ChatSessionID != sid || item.TurnIndex <= 0 {
+			continue
+		}
+		anyMemory = true
+		hasMemory[item.TurnIndex] = true
+	}
+	if !anyMemory {
+		return nil
+	}
+	seen := map[int]bool{}
+	missing := []int{}
+	for _, log := range logs {
+		if log.ChatSessionID != sid || log.TurnIndex < fromTurn || log.TurnIndex > toTurn || seen[log.TurnIndex] {
+			continue
+		}
+		role := strings.ToLower(strings.TrimSpace(log.Role))
+		if role != "user" && role != "assistant" {
+			continue
+		}
+		seen[log.TurnIndex] = true
+		if !hasMemory[log.TurnIndex] {
+			missing = append(missing, log.TurnIndex)
+		}
+	}
+	sort.Ints(missing)
+	return missing
+}
+
 func buildEpisodeSummaryForRange(sid string, fromTurn, toTurn int, logs []store.ChatLog) (store.EpisodeSummary, map[string]any) {
 	return buildEpisodeSummaryForRangeWithArtifacts(sid, fromTurn, toTurn, logs, nil, nil)
 }
@@ -209,7 +247,10 @@ func buildEpisodeSummaryForRangeWithArtifacts(sid string, fromTurn, toTurn int, 
 	keyEvents := episodeKeyEvents(lines)
 	relationshipChanges := episodeRelationshipAnchors(lines)
 	openLoops := episodeOpenLoopAnchors(lines)
-	keyEntities := episodeKeyEntities(lines)
+	keyEntities := episodeMemoryCharacterNames(memories)
+	if len(keyEntities) == 0 {
+		keyEntities = episodeKeyEntities(lines)
+	}
 	summary := episodeDenseSummary(keyEvents, lines)
 	if summary == "" {
 		summary = fmt.Sprintf("Episode %d-%d", fromTurn, toTurn)
@@ -276,6 +317,11 @@ func cleanEpisodeSourceText(text string) string {
 		if strings.HasPrefix(line, "#### Chatindex:") || strings.HasPrefix(line, "Chatindex:") {
 			continue
 		}
+		// A Markdown comment ("[//]: # (...)") is a hidden note to the model,
+		// such as a narration instruction repeated in every reply, not story.
+		if markdownCommentLinePattern.MatchString(line) {
+			continue
+		}
 		line = htmlImgTagPattern.ReplaceAllString(line, "")
 		line = strings.Join(strings.Fields(line), " ")
 		if line != "" {
@@ -283,6 +329,46 @@ func cleanEpisodeSourceText(text string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, " "))
+}
+
+var markdownCommentLinePattern = regexp.MustCompile(`^\[[^\]]*\]:\s*#`)
+
+// episodeMemoryCharacterNames lists the characters the range's memories name,
+// in order of first appearance. The capitalized-word fallback cannot find
+// names in Korean or Japanese text.
+func episodeMemoryCharacterNames(memories []store.Memory) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] || len(out) >= 8 {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	for _, mem := range memories {
+		var parsed struct {
+			Entities struct {
+				Characters []struct {
+					Name string `json:"name"`
+				} `json:"characters"`
+			} `json:"entities"`
+			CharacterDeltas []struct {
+				Name string `json:"name"`
+			} `json:"character_deltas"`
+		}
+		if json.Unmarshal([]byte(mem.SummaryJSON), &parsed) != nil {
+			continue
+		}
+		for _, character := range parsed.Entities.Characters {
+			add(character.Name)
+		}
+		for _, delta := range parsed.CharacterDeltas {
+			add(delta.Name)
+		}
+	}
+	return out
 }
 
 func episodeKeyEvents(lines []string) []string {

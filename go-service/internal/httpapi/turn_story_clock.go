@@ -874,27 +874,53 @@ func (s *Server) saveStoryClockFromExtraction(ctx context.Context, sid string, t
 		eventState = "retracted"
 	}
 	result.Attempted++
+	event := store.StatusChangeEvent{
+		ChatSessionID:     sid,
+		RegistryID:        definition.ID,
+		StatusKey:         storyClockStatusKey,
+		OwnerScope:        storyClockOwnerScope,
+		OwnerID:           eventOwnerID,
+		EventKind:         eventKind,
+		PreviousValueJSON: previous.ValueJSON,
+		NewValueJSON:      newValueJSON,
+		EvidenceJSON:      mustCompactJSON(evidencePayload),
+		SourceTurn:        turnIndex,
+		StoryClockJSON:    newValueJSON,
+		EventState:        eventState,
+		CreatedAt:         now,
+	}
 	saved, err := atomicStore.ApplyReversibleStatusTransition(ctx, store.ReversibleStatusTransition{
 		SourceContract: source.ContractVersion,
 		SourceRevision: source.Revision,
 		SourceUnitID:   sourceUnitID,
 		CurrentValue:   currentValue,
-		Event: store.StatusChangeEvent{
-			ChatSessionID:     sid,
-			RegistryID:        definition.ID,
-			StatusKey:         storyClockStatusKey,
-			OwnerScope:        storyClockOwnerScope,
-			OwnerID:           eventOwnerID,
-			EventKind:         eventKind,
-			PreviousValueJSON: previous.ValueJSON,
-			NewValueJSON:      newValueJSON,
-			EvidenceJSON:      mustCompactJSON(evidencePayload),
-			SourceTurn:        turnIndex,
-			StoryClockJSON:    newValueJSON,
-			EventState:        eventState,
-			CreatedAt:         now,
-		},
+		Event:          event,
 	})
+	if errors.Is(err, store.ErrStatusProjectionStale) && currentValue != nil {
+		// The read above did not see a newer clock that the write found: its
+		// source was replaced and not yet rebuilt, as while a repair rebuilds
+		// an edited later turn. The turn is then older than the current clock,
+		// so it is recorded the way an older turn is, as history only.
+		evidencePayload["current_projection"] = false
+		evidencePayload["resolution_status"] = "older_turn_historical_only"
+		result.addSkipReason("story_clock", "older_turn_cannot_replace_current_clock", map[string]any{"incoming_turn": turnIndex, "found_at_write": true})
+		event.OwnerID = "source:" + source.Revision
+		event.NewValueJSON = mustCompactJSON(proposal)
+		event.StoryClockJSON = event.NewValueJSON
+		event.EvidenceJSON = mustCompactJSON(evidencePayload)
+		event.EventState = "recorded"
+		event.EventKind = "observation_recorded"
+		if transition == "retract" {
+			event.EventKind, event.EventState = "retract", "retracted"
+		}
+		currentValue = nil
+		saved, err = atomicStore.ApplyReversibleStatusTransition(ctx, store.ReversibleStatusTransition{
+			SourceContract: source.ContractVersion,
+			SourceRevision: source.Revision,
+			SourceUnitID:   sourceUnitID,
+			Event:          event,
+		})
+	}
 	if err != nil {
 		result.Errors++
 		result.ErrorDetails = append(result.ErrorDetails, "ApplyReversibleStatusTransition(story_clock): "+err.Error())

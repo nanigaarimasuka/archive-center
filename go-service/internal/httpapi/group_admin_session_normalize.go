@@ -32,6 +32,12 @@ type adminSessionNormalizeRequest struct {
 	SkipReindex    bool                            `json:"skip_reindex"`
 	ForceReindex   *bool                           `json:"force_reindex"`
 	ResumeExisting *bool                           `json:"resume_existing"`
+	// ApplyTurnEdits lists past turns whose raw text RisuAI changed and the
+	// user agreed to take over; see applyNormalizeTurnEdits.
+	ApplyTurnEdits []int `json:"apply_turn_edits,omitempty"`
+	// RebuildHierarchy remakes the stored summaries hierarchyRebuildTargets
+	// lists, which the plugin showed the user first.
+	RebuildHierarchy bool `json:"rebuild_hierarchy,omitempty"`
 }
 
 func (s *Server) handleAdminSessionNormalize(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +62,9 @@ func (s *Server) handleAdminSessionNormalize(w http.ResponseWriter, r *http.Requ
 
 	entries := adminSessionNormalizeRepairEntries(req)
 	jobRequest := adminSessionNormalizeJobRequest(sid, req, entries)
-	job := s.AdminJobs.start("session_normalize", sid, jobRequest, func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
+	job := s.AdminJobs.start("session_normalize", sid, jobRequest, s.withdrawVectorWorkOnCancel(func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
 		return s.runAdminSessionNormalize(ctx, sid, req, progress)
-	})
+	}))
 	job["status"] = "accepted"
 	job["job_status"] = "queued"
 	job["poll_route"] = "/admin/jobs/" + fmt.Sprint(job["job_id"])
@@ -135,10 +141,22 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 	)
 	reviewNeededTurns = append(reviewNeededTurns, intSliceFromAny(repairResult["failed_turn_indices"])...)
 	reviewNeededTurns = uniqueSortedInts(reviewNeededTurns)
+	turnEditResult := s.applyNormalizeTurnEdits(ctx, sid, req, entries, intSliceFromAny(repairResult["conflict_turns"]))
+	editedTurns := intSliceFromAny(turnEditResult["edited_turns"])
+	if len(editedTurns) > 0 {
+		editedSet := intsToSet(editedTurns)
+		remaining := []int{}
+		for _, turn := range reviewNeededTurns {
+			if !editedSet[turn] {
+				remaining = append(remaining, turn)
+			}
+		}
+		reviewNeededTurns = remaining
+	}
 	if len(reviewNeededTurns) > 0 {
 		warnings = append(warnings, "raw_mismatch_or_partial_requires_review")
 	}
-	requestedRescanTurns := uniqueSortedNonNegativeInts(req.TurnIndices)
+	requestedRescanTurns := uniqueSortedNonNegativeInts(append(append([]int{}, req.TurnIndices...), editedTurns...))
 	rescanTurns := append([]int{}, requestedRescanTurns...)
 	if len(reviewNeededTurns) > 0 && len(rescanTurns) > 0 {
 		reviewSet := map[int]bool{}
@@ -193,6 +211,11 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	hierarchyEditResult := s.regenerateHierarchyForEditedTurns(ctx, sid, editedTurns, req.ClientMeta)
+	hierarchyRebuildResult := map[string]any{"status": "skipped", "reason": "not_requested"}
+	if req.RebuildHierarchy && !req.DryRun {
+		hierarchyRebuildResult = s.rebuildFlaggedHierarchy(ctx, sid)
+	}
 	if progress != nil {
 		progress(map[string]any{
 			"status":           "running",
@@ -241,6 +264,23 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	// The vectors this repair queued are written by the memory worker; the
+	// repair is done when they are, not when they are queued.
+	var vectorDelivery map[string]any
+	if !req.DryRun {
+		delivery, err := s.waitForQueuedVectorWork(ctx, adminSessionNormalizeProgressAdapter(progress, "vector_delivery", 95, 4))
+		if err != nil {
+			return nil, err
+		}
+		vectorDelivery = delivery
+		if intFromAny(vectorDelivery["waiting"], 0) > 0 {
+			warnings = append(warnings, "vector_delivery_incomplete")
+		}
+		if intFromAny(vectorDelivery["failed"], 0) > 0 {
+			warnings = append(warnings, "vector_delivery_failed")
+		}
+	}
+
 	after, afterWarnings := s.adminSessionNormalizeSnapshot(ctx, sid)
 	warnings = append(warnings, afterWarnings...)
 	status := adminSessionNormalizeStatus(
@@ -250,6 +290,12 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		reindexResult,
 		warnings,
 	)
+	switch {
+	case intFromAny(vectorDelivery["failed"], 0) > 0 && (status == "ok" || status == "partial_deferred"):
+		status = "partial_error"
+	case intFromAny(vectorDelivery["waiting"], 0) > 0 && status == "ok":
+		status = "partial_deferred"
+	}
 	pendingCount := maxInt(
 		intFromAny(rescanResult["deferred"], 0),
 		intFromAny(rescanResult["queued"], 0),
@@ -283,9 +329,13 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		"counts_before":             before,
 		"counts_after":              after,
 		"repair_replay":             repairResult,
+		"turn_edits":                turnEditResult,
+		"edited_hierarchy":          hierarchyEditResult,
+		"hierarchy_rebuild":         hierarchyRebuildResult,
 		"rescan":                    rescanResult,
 		"character_identity_repair": identityRepairResult,
 		"reindex":                   reindexResult,
+		"vector_delivery":           vectorDelivery,
 		"review_needed_turns":       reviewNeededTurns,
 		"pending_count":             pendingCount,
 		"pending_turns_available":   pendingTurnsAvailable,
@@ -1185,4 +1235,59 @@ func uniqueStrings(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// vectorDeliveryPollInterval is how often a repair checks the vector work it
+// queued.
+var vectorDeliveryPollInterval = 2 * time.Second
+
+// waitForQueuedVectorWork waits until the memory worker has written or given
+// up on every vector operation queued under ctx. It stops early when none
+// finishes for longer than a worker lease, reporting what still waits; a
+// cancelled ctx returns its error, and the queued work is withdrawn.
+func (s *Server) waitForQueuedVectorWork(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
+	keys := store.MemoryVectorOperationRecorderFrom(ctx).OperationKeys()
+	counter, ok := s.Store.(store.MemoryVectorOperationStateCounter)
+	if len(keys) == 0 || !ok {
+		return nil, nil
+	}
+	stallLimit := memoryWorkerLeaseDuration(s.runtimeConfigSnapshot()) + time.Minute
+	if stallLimit < 10*time.Minute {
+		stallLimit = 10 * time.Minute
+	}
+	waiting, lastWaiting := 0, -1
+	lastProgress := time.Now()
+	var counts map[string]int
+	for {
+		var err error
+		if counts, err = counter.CountMemoryVectorOperationStates(ctx, keys); err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return map[string]any{"queued": len(keys), "error": err.Error()}, nil
+		}
+		waiting = counts["pending"] + counts["retryable"] + counts["needs_embedding"] + counts["leased"]
+		if waiting != lastWaiting {
+			lastWaiting, lastProgress = waiting, time.Now()
+			if progress != nil {
+				progress(map[string]any{"processed": len(keys) - waiting, "candidate_count": len(keys)})
+			}
+		}
+		if waiting == 0 || time.Since(lastProgress) > stallLimit {
+			break
+		}
+		s.wakeMemoryWorkers()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(vectorDeliveryPollInterval):
+		}
+	}
+	return map[string]any{
+		"queued":    len(keys),
+		"completed": counts["completed"],
+		"rejected":  counts["stale_rejected"],
+		"failed":    counts["permanent"] + counts["failed"],
+		"waiting":   waiting,
+	}, nil
 }

@@ -801,9 +801,15 @@ func TestAdminRescanFullSessionBackfillDoesNotClampHierarchyToProcessedTurns(t *
 		)
 		id += 2
 	}
+	memories := []store.Memory{}
+	for turn := 1; turn <= 20; turn++ {
+		if turn != 18 {
+			memories = append(memories, store.Memory{ID: int64(turn), ChatSessionID: "sess-full-backfill", TurnIndex: turn, SummaryJSON: `{"turn_summary":"earlier turn"}`})
+		}
+	}
 	fake := &adminRegeneratedArtifactStore{
 		adminEpisodeBackfillStore: &adminEpisodeBackfillStore{
-			turnRecordingStore: &turnRecordingStore{returnChatLogs: logs},
+			turnRecordingStore: &turnRecordingStore{returnChatLogs: logs, returnMemories: memories},
 		},
 	}
 	cfg := config.Default()

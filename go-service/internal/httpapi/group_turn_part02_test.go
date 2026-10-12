@@ -596,6 +596,12 @@ func TestCompleteTurnEpisodeCheckpointGeneratesAtIntervalBoundary(t *testing.T) 
 					{ChatSessionID: "sess-live-episode", TurnIndex: 4, Role: "user", Content: "The demolition team prepares the first charge."},
 					{ChatSessionID: "sess-live-episode", TurnIndex: 4, Role: "assistant", Content: "The bridge plan is ready for final timing."},
 				},
+				returnMemories: []store.Memory{
+					{ID: 1, ChatSessionID: "sess-live-episode", TurnIndex: 1},
+					{ID: 2, ChatSessionID: "sess-live-episode", TurnIndex: 2},
+					{ID: 3, ChatSessionID: "sess-live-episode", TurnIndex: 3},
+					{ID: 4, ChatSessionID: "sess-live-episode", TurnIndex: 4},
+				},
 			},
 		},
 	}

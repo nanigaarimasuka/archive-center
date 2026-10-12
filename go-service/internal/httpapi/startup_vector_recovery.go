@@ -219,7 +219,7 @@ func (s *Server) fillRecoveryEmbeddings(ctx context.Context, docs []vector.Vecto
 			id := fmt.Sprintf("memory:%s:%d", sid, mem.ID)
 			if i, ok := missing[id]; ok && len(docs[i].Embedding) == 0 && reindexMemoryDocumentText(mem) == docs[i].DocumentText {
 				storedModel := strings.TrimSpace(extractionStringFromAny(docs[i].Metadata["embedding_model"]))
-				if storedModel == "" || storedModel == strings.TrimSpace(mem.EmbeddingModel) {
+				if storedModel == "" || sameEmbeddingModel(storedModel, mem.EmbeddingModel) {
 					docs[i].Embedding = parseFloat32JSONList(mem.Embedding)
 				}
 			}

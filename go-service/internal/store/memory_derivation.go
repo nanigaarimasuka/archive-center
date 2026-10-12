@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -248,6 +249,17 @@ type MemoryVectorOutboxStore interface {
 // MemoryVectorOutboxLaneStore lets the bounded authority worker reserve fair
 // service for deletes without changing the canonical outbox contract used by
 // other stores and tests.
+// MemoryVectorOperationWithdrawer takes back queued vector operations that
+// were not delivered yet, as when the job that queued them is cancelled.
+type MemoryVectorOperationWithdrawer interface {
+	WithdrawMemoryVectorOperations(ctx context.Context, operationKeys []string, reason string) (int, error)
+}
+
+// MemoryVectorOperationStateCounter counts the given operations by status.
+type MemoryVectorOperationStateCounter interface {
+	CountMemoryVectorOperationStates(ctx context.Context, operationKeys []string) (map[string]int, error)
+}
+
 type MemoryVectorOutboxLaneStore interface {
 	ClaimMemoryVectorOperationsByOperation(ctx context.Context, leaseOwner string, now time.Time, leaseDuration time.Duration, operation string) ([]*MemoryVectorOutboxItem, error)
 }
@@ -279,4 +291,49 @@ type MemoryVectorOutboxMaintenanceStore interface {
 		chatSessionID string,
 		now time.Time,
 	) (staleRejected int64, err error)
+}
+
+type memoryVectorOperationRecorderKey struct{}
+
+// MemoryVectorOperationRecorder collects the outbox operations queued under
+// one context: ones it inserted, and ones it brought back from a finished
+// state. Operations already waiting before are not its own.
+type MemoryVectorOperationRecorder struct {
+	mu   sync.Mutex
+	keys []string
+}
+
+func WithMemoryVectorOperationRecorder(ctx context.Context, recorder *MemoryVectorOperationRecorder) context.Context {
+	return context.WithValue(ctx, memoryVectorOperationRecorderKey{}, recorder)
+}
+
+// MemoryVectorOperationRecorderFrom returns the recorder ctx carries, or nil.
+func MemoryVectorOperationRecorderFrom(ctx context.Context) *MemoryVectorOperationRecorder {
+	if ctx == nil {
+		return nil
+	}
+	recorder, _ := ctx.Value(memoryVectorOperationRecorderKey{}).(*MemoryVectorOperationRecorder)
+	return recorder
+}
+
+// OperationKeys returns the recorded operation keys.
+func (r *MemoryVectorOperationRecorder) OperationKeys() []string {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.keys...)
+}
+
+// RecordMemoryVectorOperation adds an operation queued under ctx to its
+// recorder, if it has one.
+func RecordMemoryVectorOperation(ctx context.Context, operationKey string) {
+	recorder := MemoryVectorOperationRecorderFrom(ctx)
+	if recorder == nil {
+		return
+	}
+	recorder.mu.Lock()
+	recorder.keys = append(recorder.keys, operationKey)
+	recorder.mu.Unlock()
 }

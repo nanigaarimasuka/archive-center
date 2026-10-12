@@ -820,7 +820,7 @@ func TestBeforeRequestSessionRouteFailureKeepsRisuPayloadRuntime(t *testing.T) {
 		}
 	}
 	src := readArchiveCenterJS(t)
-	beforeRequest := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture."
+	beforeRequest := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests."
 	script := beforeRequest + `
 const SESSION_FALLBACK = "default";
 const settings = {enabled:true};
@@ -1177,6 +1177,7 @@ function tf(key,vars){
 function refreshExplorerUI(){}
 function cancelAdminBackgroundJobStream(){ return true; }
 function markAdminBackgroundJobStreamUnavailable(){ throw new Error("unexpected cancel transport failure"); }
+const _summaryFailureState = {sessionId:""};
 function getRequestTimeoutSettingMs(){ return 1000; }
 async function bridgeFetch(path,options){
   requestPath=path; requestMethod=options.method;
@@ -1667,8 +1668,8 @@ func TestRegisteredRequestCallbacksDetachExactBeforeRequestContext(t *testing.T)
 		extractArchiveCenterJSFunction(t, src, "finalConfirmationRequestContextHasReusablePayloadPlan"),
 		extractArchiveCenterJSFunction(t, src, "installFinalConfirmationRequestContext"),
 		extractArchiveCenterJSFunction(t, src, "acceptRisuAfterRequestFinal"),
-		extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
-		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
+		extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
+		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 		extractArchiveCenterJSFunction(t, src, "startTurnWorkflowHUDWatch"),
 	}, "\n")
@@ -1885,7 +1886,7 @@ func TestOverlappingBeforeRequestContextsFailClosedWithoutOwnershipMixing(t *tes
 		extractArchiveCenterJSFunction(t, src, "finalConfirmationRequestContextRetryIdentityMatches"),
 		extractArchiveCenterJSFunction(t, src, "finalConfirmationRequestContextHasReusablePayloadPlan"),
 		extractArchiveCenterJSFunction(t, src, "installFinalConfirmationRequestContext"),
-		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
+		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 	}, "\n")
 	script := functions + `
 let _activeFinalConfirmationRequestContext=null;
@@ -2031,7 +2032,7 @@ func TestFailOnceProviderRetryUsesProductionBeforeRequestFastPath(t *testing.T) 
 		extractArchiveCenterJSFunction(t, src, "installFinalConfirmationRequestContext"),
 		extractArchiveCenterJSFunction(t, src, "renderTurnWorkflowHUDSameRequestRetry"),
 		extractArchiveCenterJSFunction(t, src, "rememberTurnWorkflowHUDHostWarning"),
-		extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
+		extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 	}, "\n")
 	script := functions + `
 const settings={enabled:true,debug:false,turnFinalizationMode:'next_user_input'};
@@ -2229,7 +2230,7 @@ func TestRegisteredAfterRequestCarriesEachCapturedContextIntoCompleteTurn(t *tes
 		extractArchiveCenterJSFunction(t, src, "buildCompletedTurnPairsFromActiveChatMessages"),
 		extractArchiveCenterJSAsyncFunction(t, src, "buildNextInputSourceAcceptanceFinality"),
 		extractArchiveCenterJSFunction(t, src, "acceptRisuAfterRequestFinal"),
-		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture.",
+		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSFunction(t, src, "onAfterRequest")) + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 		extractArchiveCenterJSAsyncFunction(t, src, "registerRisuLifecycleHooks") + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests.",
 	}, "\n")
 	script := functions + `

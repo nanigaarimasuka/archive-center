@@ -164,7 +164,7 @@ func memoryNeedsEmbeddingForModel(mem store.Memory, cfg completeTurnEmbeddingCon
 	embedding := strings.TrimSpace(mem.Embedding)
 	return force || embedding == "" || embedding == "[]" ||
 		(usesVoyageContextualizedEmbedding(cfg) &&
-			!strings.EqualFold(strings.TrimSpace(mem.EmbeddingModel), strings.TrimSpace(cfg.Model)))
+			!sameEmbeddingModel(mem.EmbeddingModel, cfg.Model))
 }
 
 func (s *Server) handleAdminReindex(w http.ResponseWriter, r *http.Request) {
@@ -185,9 +185,9 @@ func (s *Server) handleAdminReindex(w http.ResponseWriter, r *http.Request) {
 		if s.AdminJobs == nil {
 			s.AdminJobs = newAdminJobManager()
 		}
-		job := s.AdminJobs.start("reindex", sid, req, func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
+		job := s.AdminJobs.start("reindex", sid, req, s.withdrawVectorWorkOnCancel(func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
 			return s.runAdminReindexJob(ctx, sid, req, progress)
-		})
+		}))
 		job["status"] = "accepted"
 		job["job_status"] = "queued"
 		job["poll_route"] = "/admin/jobs/" + fmt.Sprint(job["job_id"])
@@ -430,6 +430,38 @@ func (s *Server) runAdminReindexJob(ctx context.Context, sid string, req map[str
 		}
 		return result, nil
 	}
+	// Unless forced, a session whose vectors differ only by some missing or
+	// leftover documents is repaired in place: rows without a vector are
+	// embedded, vectors without a row are removed, and the rest is untouched.
+	// A changed embedding model or missing embeddings still embed everything.
+	var gaps *adminVectorGaps
+	reembedReasons, _ := preIntegrity["reembed_reasons"].([]string)
+	if !dryRun && !force && len(reembedReasons) == 0 {
+		if found, gapErr := s.adminVectorGaps(ctx, sid); gapErr == nil {
+			gaps = &found
+		}
+	}
+	orphanVectorsDeleted := 0
+	if gaps != nil && len(gaps.OrphanIDs) > 0 {
+		if deleter, ok := s.Vector.(vector.DocumentDeleter); ok {
+			if err := deleter.DeleteDocuments(ctx, gaps.OrphanIDs); err != nil {
+				return nil, err
+			}
+			orphanVectorsDeleted = len(gaps.OrphanIDs)
+		}
+	}
+	if gaps != nil {
+		allWorldRules = gaps.onlyGapWorldRules(allWorldRules)
+	}
+	// A dry run lists what a repair would touch, without changing anything.
+	vectorGapPreview := map[string]any(nil)
+	if dryRun {
+		if found, gapErr := s.adminVectorGaps(ctx, sid); gapErr == nil {
+			vectorGapPreview = found.preview()
+		}
+	} else if gaps != nil {
+		vectorGapPreview = gaps.preview()
+	}
 	publicMemories := make([]store.Memory, 0, len(memories))
 	for _, mem := range memories {
 		if strings.TrimSpace(reindexMemoryDocumentText(mem)) != "" {
@@ -511,6 +543,9 @@ func (s *Server) runAdminReindexJob(ctx context.Context, sid string, req map[str
 				markUnmatched(int64(turn), "evidence", item.ID)
 			}
 		}
+	}
+	if gaps != nil {
+		canonicalCandidates = gaps.onlyGapCandidates(canonicalCandidates)
 	}
 	canonicalReplayNeedsEmbedding := false
 	for _, candidate := range canonicalCandidates {
@@ -736,6 +771,9 @@ func (s *Server) runAdminReindexJob(ctx context.Context, sid string, req map[str
 		"canonical_replays_completed": canonicalReplaysCompleted,
 		"vector_replays_queued":       vectorReplaysQueued,
 		"duplicate_deletes_rejected":  staleDeleteOperationsRejected,
+		"vector_gap_repair":           gaps != nil,
+		"orphan_vectors_deleted":      orphanVectorsDeleted,
+		"vector_gaps":                 vectorGapPreview,
 		"vector_delivery_pending":     vectorReplaysQueued > 0,
 		"post_integrity_status":       postIntegrityStatus,
 		"skipped":                     skipped,
@@ -806,7 +844,7 @@ func (s *Server) adminReindexIntegrityReport(ctx context.Context, sid string, me
 			}
 			continue
 		}
-		if expectedEmbeddingModel != "" && model != expectedEmbeddingModel {
+		if expectedEmbeddingModel != "" && !sameEmbeddingModel(model, expectedEmbeddingModel) {
 			if mem.ID > 0 {
 				modelMismatchIDs = append(modelMismatchIDs, mem.ID)
 			}
@@ -972,7 +1010,7 @@ func (s *Server) adminReindexIntegrityReport(ctx context.Context, sid string, me
 		reembedReasons = append(reembedReasons, "embedding_model_mismatch")
 	}
 	projectModel := strings.TrimSpace(stringFromAny(vectorHealth["project_model"]))
-	if expectedEmbeddingModel != "" && projectModel != "" && projectModel != expectedEmbeddingModel {
+	if expectedEmbeddingModel != "" && projectModel != "" && !sameEmbeddingModel(projectModel, expectedEmbeddingModel) {
 		reasons = append(reasons, "vector_project_model_mismatch")
 		reembedReasons = append(reembedReasons, "vector_project_model_mismatch")
 	}

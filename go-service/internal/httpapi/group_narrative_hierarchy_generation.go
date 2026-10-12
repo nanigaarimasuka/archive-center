@@ -30,7 +30,7 @@ func deterministicChapterSummaryForRange(sid string, fromTurn, toTurn, chapterIn
 	}
 }
 
-func (s *Server) buildChapterSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, chapterIndex int, episodes []store.EpisodeSummary) (store.ChapterSummary, map[string]any) {
+func (s *Server) buildChapterSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, chapterIndex int, episodes []store.EpisodeSummary) (store.ChapterSummary, map[string]any, error) {
 	deterministic := deterministicChapterSummaryForRange(sid, fromTurn, toTurn, chapterIndex, episodes)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",
@@ -43,22 +43,23 @@ func (s *Server) buildChapterSummaryForRange(ctx context.Context, sid string, fr
 	cfg := s.chapterLLMConfig()
 	if !cfg.hasConfig() {
 		trace["chapter_shadow_compare"] = chapterShadowCompare(deterministic, deterministic, false, "deterministic_migration_stub")
-		return deterministic, trace
+		return deterministic, trace, nil
 	}
 
 	trace["llm_attempted"] = true
 	llmChapter, llmTrace, err := s.callChapterSummaryLLM(ctx, sid, fromTurn, toTurn, chapterIndex, episodes, cfg)
 	if err != nil {
-		trace["generation_source"] = "deterministic_fallback_after_llm_error"
+		// No deterministic stand-in: the range stays empty so it shows up as
+		// failed and the next session normalize tries the LLM again.
+		trace["generation_source"] = "llm_failed"
 		trace["llm_error"] = err.Error()
 		trace["llm_trace"] = llmTrace
-		trace["chapter_shadow_compare"] = chapterShadowCompare(deterministic, deterministic, true, "deterministic_fallback_after_llm_error")
-		return deterministic, trace
+		return store.ChapterSummary{}, trace, err
 	}
 	trace["generation_source"] = "configured_llm"
 	trace["llm_trace"] = llmTrace
 	trace["chapter_shadow_compare"] = chapterShadowCompare(llmChapter, deterministic, true, "configured_llm")
-	return llmChapter, trace
+	return llmChapter, trace, nil
 }
 
 func (s *Server) callChapterSummaryLLM(ctx context.Context, sid string, fromTurn, toTurn, chapterIndex int, episodes []store.EpisodeSummary, cfg completeTurnLLMConfig) (store.ChapterSummary, map[string]any, error) {
@@ -164,7 +165,13 @@ func compactChapterJSONField(parsed map[string]any, fallback string, keys ...str
 		if !ok || value == nil {
 			continue
 		}
-		if raw := strings.TrimSpace(extractionStringFromAny(value)); raw != "" {
+		// Only a string can hold encoded JSON; printing a list or object with
+		// fmt would flatten it into one unparseable string.
+		if text, isString := value.(string); isString {
+			raw := strings.TrimSpace(text)
+			if raw == "" {
+				continue
+			}
 			var decoded any
 			if err := json.Unmarshal([]byte(raw), &decoded); err == nil {
 				if data, err := json.Marshal(decoded); err == nil {
@@ -259,7 +266,7 @@ func deterministicArcSummaryForRange(sid string, fromTurn, toTurn, arcIndex int,
 	}
 }
 
-func (s *Server) buildArcSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, arcIndex int, chapters []store.ChapterSummary) (store.ArcSummary, map[string]any) {
+func (s *Server) buildArcSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, arcIndex int, chapters []store.ChapterSummary) (store.ArcSummary, map[string]any, error) {
 	deterministic := deterministicArcSummaryForRange(sid, fromTurn, toTurn, arcIndex, chapters)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",
@@ -273,23 +280,24 @@ func (s *Server) buildArcSummaryForRange(ctx context.Context, sid string, fromTu
 	cfg := s.chapterLLMConfig()
 	if !cfg.hasConfig() {
 		trace["shadow_compare"] = arcShadowCompare(deterministic, deterministic, false, "deterministic_migration_stub")
-		return deterministic, trace
+		return deterministic, trace, nil
 	}
 	trace["llm_attempted"] = true
 	parsed, llmTrace, err := s.callHierarchySummaryLLM(ctx, "arc", sid, fromTurn, toTurn, chapters, cfg)
 	if err != nil {
-		trace["generation_source"] = "deterministic_fallback_after_llm_error"
+		// No deterministic stand-in: the range stays empty so it shows up as
+		// failed and the next session normalize tries the LLM again.
+		trace["generation_source"] = "llm_failed"
 		trace["llm_error"] = err.Error()
 		trace["llm_trace"] = llmTrace
-		trace["shadow_compare"] = arcShadowCompare(deterministic, deterministic, true, "deterministic_fallback_after_llm_error")
-		return deterministic, trace
+		return store.ArcSummary{}, trace, err
 	}
 	arc := arcSummaryFromLLMJSON(sid, fromTurn, toTurn, arcIndex, parsed, chapters)
 	trace["generation_source"] = "configured_llm"
 	trace["llm_trace"] = llmTrace
 	trace["status_reason"] = "configured_llm_normalized"
 	trace["shadow_compare"] = arcShadowCompare(arc, deterministic, true, "configured_llm")
-	return arc, trace
+	return arc, trace, nil
 }
 
 func arcSummaryFromLLMJSON(sid string, fromTurn, toTurn, arcIndex int, parsed map[string]any, chapters []store.ChapterSummary) store.ArcSummary {
@@ -354,7 +362,7 @@ func deterministicSagaDigestForRange(sid string, fromTurn, toTurn int, arcs []st
 	}
 }
 
-func (s *Server) buildSagaDigestForRange(ctx context.Context, sid string, fromTurn, toTurn int, arcs []store.ArcSummary) (store.SagaDigest, map[string]any) {
+func (s *Server) buildSagaDigestForRange(ctx context.Context, sid string, fromTurn, toTurn int, arcs []store.ArcSummary) (store.SagaDigest, map[string]any, error) {
 	deterministic := deterministicSagaDigestForRange(sid, fromTurn, toTurn, arcs)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",
@@ -365,22 +373,23 @@ func (s *Server) buildSagaDigestForRange(ctx context.Context, sid string, fromTu
 	cfg := s.chapterLLMConfig()
 	if !cfg.hasConfig() {
 		trace["shadow_compare"] = sagaShadowCompare(deterministic, deterministic, false, "deterministic_migration_stub")
-		return deterministic, trace
+		return deterministic, trace, nil
 	}
 	trace["llm_attempted"] = true
 	parsed, llmTrace, err := s.callHierarchySummaryLLM(ctx, "saga", sid, fromTurn, toTurn, arcs, cfg)
 	if err != nil {
-		trace["generation_source"] = "deterministic_fallback_after_llm_error"
+		// No deterministic stand-in: the range stays empty so it shows up as
+		// failed and the next session normalize tries the LLM again.
+		trace["generation_source"] = "llm_failed"
 		trace["llm_error"] = err.Error()
 		trace["llm_trace"] = llmTrace
-		trace["shadow_compare"] = sagaShadowCompare(deterministic, deterministic, true, "deterministic_fallback_after_llm_error")
-		return deterministic, trace
+		return store.SagaDigest{}, trace, err
 	}
 	saga := sagaDigestFromLLMJSON(sid, fromTurn, toTurn, parsed, arcs)
 	trace["generation_source"] = "configured_llm"
 	trace["llm_trace"] = llmTrace
 	trace["shadow_compare"] = sagaShadowCompare(saga, deterministic, true, "configured_llm")
-	return saga, trace
+	return saga, trace, nil
 }
 
 func sagaDigestFromLLMJSON(sid string, fromTurn, toTurn int, parsed map[string]any, arcs []store.ArcSummary) store.SagaDigest {
@@ -403,9 +412,24 @@ func (s *Server) callHierarchySummaryLLM(ctx context.Context, kind string, sid s
 	systemPrompt := "You generate Archive Center " + kind + " summaries. Return only compact JSON. Ground the result in the provided hierarchy inputs and do not invent unrelated facts."
 	switch kind {
 	case "arc":
-		systemPrompt = "You generate Archive Center arc summaries. Return only compact JSON. Preserve chapter dense anchors before prose in this order: open_loops, relationship_changes, world_changes, callback_candidates, resume_text, summary_text. Include irreversible_turns, callback_debts, and relationship_pivots when supported by the input."
+		// The fields are the ones arcSummaryFromLLMJSON reads; a field left out
+		// falls back to rule-based text.
+		systemPrompt = "You generate Archive Center arc summaries. Return only a compact JSON object with these fields: " +
+			"arc_name (a short title for what this arc is about), arc_status (active, paused, or resolved), " +
+			"core_conflict (one or two sentences on the arc's central conflict), " +
+			"key_turning_points, active_promises, unresolved_debts, resolved_payoffs, callback_candidates, future_payoff_candidates, " +
+			"irreversible_turns, callback_debts, relationship_pivots (each a list of short strings, empty when the input has none), " +
+			"and arc_resume_text (prose that lets the story resume from this arc). " +
+			"Build the lists from the chapters' open loops, relationship changes, world changes, and callback candidates before their prose. " +
+			"Keep facts grounded in the provided chapter summaries and write in the language of the inputs."
 	case "saga":
-		systemPrompt = "You generate Archive Center saga digests. Return only compact JSON. Preserve arc dense anchors before prose in this order: irreversible_turns, callback_debts, relationship_pivots, promises, debts, callbacks, resume_text, core_conflict."
+		// The fields are the ones sagaDigestFromLLMJSON reads.
+		systemPrompt = "You generate Archive Center saga digests. Return only a compact JSON object with these fields: " +
+			"era_label (a short name for this era of the story), saga_summary (prose covering the era), " +
+			"persistent_facts and never_drop_candidates (each a list of short strings), " +
+			"and resume_pack_text (prose that lets the story resume after this era). " +
+			"Build the lists from the arcs' irreversible turns, callback debts, relationship pivots, promises, debts, and callbacks before their prose. " +
+			"Keep facts grounded in the provided arc summaries and write in the language of the inputs."
 	}
 	payload := map[string]any{
 		"chat_session_id": sid,
