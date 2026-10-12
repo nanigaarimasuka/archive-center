@@ -143,7 +143,7 @@ func TestScheduleDateStringReachesGoAndPreprocessing(t *testing.T) {
 		t.Fatal("schedule-bearing source disappeared")
 	}
 	for name, text := range map[string]string{
-		"summary":       summaries[0].Minimum.Text,
+		"summary":       summaries[0].Minimum.text(),
 		"go":            extractionStringFromAny(out.MemoryDeliveryPlan["final_text"]),
 		"preprocessing": mustCompactJSON(multiAgentInput("event_recent", facts, summaries, dto.PrepareTurnRequest{}, defaultMultiAgentSettings(), input.MaxChars, 1, nil)),
 	} {

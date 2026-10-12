@@ -85,6 +85,8 @@ type prepareTurnAssemblyInput struct {
 	RawTurnsInRequestFrom        int
 	ResolvedThreads              []store.PendingThread
 	OverflowMinRelevance         *float64
+	// ReuseReadingForms keeps reading forms across requests (not in debug mode).
+	ReuseReadingForms bool
 }
 
 // Immutable source projections shared only by the initial assembly and searches
@@ -193,6 +195,9 @@ func buildPrepareTurnAssembly(input prepareTurnAssemblyInput, assembleDelivery b
 	preparationSpan := input.Measurement.start("assembly.request_preparation")
 	preparation := newPrepareTurnRequestPreparation(common)
 	preparation.metrics = input.Measurement
+	if input.ReuseReadingForms {
+		preparation.sharedReadingForms = keptReadingFormCache()
+	}
 	preparationSpan.end()
 	generalMemories, publicProjectionTrace := common.GeneralMemories, common.PublicTrace
 	recallLimit := len(memories) + len(kgTriples) + len(evidence) + len(chatLogs) + len(storylines) + len(worldRules) + len(charStates) + len(pendingThreads) + len(canonicalLayers) + len(episodeSums) + len(personaEntries) + len(characterPrivateMemories)

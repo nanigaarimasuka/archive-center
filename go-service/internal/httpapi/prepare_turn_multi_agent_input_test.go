@@ -1157,7 +1157,7 @@ func Test46DistinctContextsSurviveRepeatedDetails(t *testing.T) {
 	for _, key := range order {
 		maxChars := 0
 		for _, c := range grouped[key] {
-			n := utf8.RuneCountInString(c.Minimum.Text)
+			n := utf8.RuneCountInString(c.Minimum.text())
 			if n > maxChars {
 				maxChars = n
 			}

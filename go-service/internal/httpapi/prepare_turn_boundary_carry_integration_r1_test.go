@@ -325,7 +325,7 @@ func TestBoundaryCarryIntegrationR1SummaryNotesMetadata(t *testing.T) {
 	if len(facts) != 1 || len(summaries) != 1 {
 		t.Fatalf("fixture pool facts=%d summaries=%d", len(facts), len(summaries))
 	}
-	if !strings.Contains(summaries[0].Minimum.Text, "unknown_to") {
+	if !strings.Contains(summaries[0].Minimum.text(), "unknown_to") {
 		t.Fatal("summary reading positive control lost boundary")
 	}
 	summaries[0].SelectionStatus = "selected"
