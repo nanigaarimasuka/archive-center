@@ -256,7 +256,7 @@ func TestBoundaryCarry49SummaryKeepsFactScopesAndPublicSibling(t *testing.T) {
 			if !strings.Contains(stringFromMap(notes, "final_text"), "unknown_to") {
 				t.Fatal("summary notes lost scope")
 			}
-			if s.Minimum == nil || !strings.Contains(s.Minimum.Text, "unknown_to") {
+			if s.Minimum == nil || !strings.Contains(s.Minimum.text(), "unknown_to") {
 				t.Fatal("whole summary route lost attributed boundary")
 			}
 		}

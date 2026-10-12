@@ -4,6 +4,21 @@ import (
 	"strings"
 )
 
+// renderedText is RenderedText, rendering a lazy one.
+func (c *prepareTurnPriorityMemoryCandidate) renderedText() string {
+	if c.renderedLazy {
+		return c.renderedPrefix + c.Minimum.text()
+	}
+	return c.RenderedText
+}
+
+// prepareTurnLazyRenderedText is a plan item's rendered text, rendered when
+// the item is encoded; normal responses drop the field.
+type prepareTurnLazyRenderedText struct {
+	prefix string
+	form   *prepareTurnMemoryForm
+}
+
 func prepareTurnPriorityLexicalTermOf(term string) prepareTurnPriorityLexicalTerm {
 	run := []rune(term)
 	v := prepareTurnPriorityLexicalTerm{value: term, nonASCII: len(run) >= 2 && prepareTurnContainsNonASCII(run)}

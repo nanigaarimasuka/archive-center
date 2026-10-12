@@ -41,6 +41,8 @@ type prepareTurnRequestPreparation struct {
 	readingGroups        map[prepareTurnMemoryGroupKey]string
 	matches              map[string]func(store.Memory) prepareTurnRecallEvidence
 	similarities         map[string]map[store.Memory]float64
+	// Forms kept across requests; nil when they are not reused.
+	sharedReadingForms *readingFormCache
 	// Scored texts are long; each is hashed once to an id the memos share.
 	scoredTexts prepareTurnTextIDs
 }

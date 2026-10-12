@@ -3,6 +3,7 @@ package httpapi
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"github.com/risulongmemory/archive-center-go/internal/store"
 	"hash"
@@ -92,15 +93,50 @@ func prepareTurnFingerprintSliceHeader(h hash.Hash, isNil bool, n int) {
 	prepareTurnFingerprintLen(h, n)
 }
 
+// prepareTurnKeptForm holds what is derived from a kept form: its delivery
+// parts, prepareTurnMemoryDeliveryParts(parts), and whether those are
+// distinct, for the parts it was made for (a copy of a form shares it; a
+// copy whose parts changed no longer matches them); and its meaning's
+// lexical analysis.
+type prepareTurnKeptForm struct {
+	once     sync.Once
+	source   []prepareTurnMemoryFormPart
+	parts    []prepareTurnMemoryFormPart
+	distinct bool
+	lexical  prepareTurnKeptLexical
+}
+
+// keptLexical is nil-safe; it is nil for forms that are not kept.
+func (f *prepareTurnMemoryForm) keptLexical() *prepareTurnKeptLexical {
+	if f == nil || f.kept == nil {
+		return nil
+	}
+	return &f.kept.lexical
+}
+
+// keptDelivery returns the form's delivery parts and whether they are
+// distinct when the form keeps them; ok is false otherwise.
+func (f *prepareTurnMemoryForm) keptDelivery() (parts []prepareTurnMemoryFormPart, distinct, ok bool) {
+	d := f.kept
+	if d == nil || len(d.source) != len(f.Parts) || (len(f.Parts) > 0 && &d.source[0] != &f.Parts[0]) {
+		return nil, false, false
+	}
+	d.once.Do(func() {
+		d.parts = prepareTurnMemoryDeliveryParts(d.source)
+		d.distinct = prepareTurnMemoryPartsDistinct(d.parts)
+	})
+	return d.parts, d.distinct, true
+}
+
 // prepareTurnMemoryFormChars is utf8.RuneCountInString(text) for a form text,
 // strings.TrimSpace(heading + "\n" + "  "-indented part texts joined by "\n"),
 // computed from its pieces' counts: a trimmed, non-empty heading leaves only
 // trailing spaces to trim. Invalid UTF-8, where joined bytes could decode
 // differently, or an empty heading counts text itself.
-func prepareTurnMemoryFormChars(heading string, parts []prepareTurnMemoryFormPart, text string, measure func(string) prepareTurnTextRunes) int {
+func prepareTurnMemoryFormChars(heading string, parts []prepareTurnMemoryFormPart, text func() string, measure func(string) prepareTurnTextRunes) int {
 	first := measurePrepareTurnText(heading)
 	if !first.valid || first.runes == 0 {
-		return utf8.RuneCountInString(text)
+		return utf8.RuneCountInString(text())
 	}
 	total, trailing, valid := 0, 0, true
 	add := func(m prepareTurnTextRunes) {
@@ -124,9 +160,49 @@ func prepareTurnMemoryFormChars(heading string, parts []prepareTurnMemoryFormPar
 		add(measure(part.Text))
 	}
 	if !valid {
-		return utf8.RuneCountInString(text)
+		return utf8.RuneCountInString(text())
 	}
 	return total - trailing
+}
+
+// prepareTurnRenderMemoryFormText is a form's text: strings.TrimSpace of the
+// heading, a newline and the "  "-indented part texts joined by newlines.
+func prepareTurnRenderMemoryFormText(heading string, parts []prepareTurnMemoryFormPart) string {
+	size := len(heading) + 1
+	for i, part := range parts {
+		if i > 0 {
+			size++
+		}
+		size += 2 + len(part.Text)
+	}
+	var text strings.Builder
+	text.Grow(size)
+	text.WriteString(heading)
+	text.WriteByte('\n')
+	for i, part := range parts {
+		if i > 0 {
+			text.WriteByte('\n')
+		}
+		text.WriteString("  ")
+		text.WriteString(part.Text)
+	}
+	return strings.TrimSpace(text.String())
+}
+
+// text is the form's reading text. A parts-rendered form builds it each time
+// and does not keep it.
+func (f *prepareTurnMemoryForm) text() string {
+	if f.partsText {
+		return prepareTurnRenderMemoryFormText(f.Heading, f.Parts)
+	}
+	return f.Text
+}
+
+// prepareTurnMemoryPartKeyIsIdentity reports parts identified by their key
+// across readings (linked current and lifecycle state), not by a
+// source-scoped key; see prepareTurnMemorySharedPartIdentity.
+func prepareTurnMemoryPartKeyIsIdentity(key string) bool {
+	return strings.HasPrefix(key, "@current/") || strings.HasPrefix(key, "@lifecycle/") || strings.HasPrefix(key, "@field_current/")
 }
 
 // prepareTurnCurrentStatePlan is what attaching current states needs from the
@@ -289,6 +365,13 @@ func (c *prepareTurnRowCost) add(m prepareTurnTextRunes) bool {
 // Rows with more parts than this find repeated parts through an index.
 const prepareTurnRowPartScanLimit = 16
 
+// hasPart reports whether the row already has a part with this key and text.
+// The index is a cache of the row's parts, which never change once the row
+// is in the layout.
+func (row *prepareTurnMemoryReadingRow) hasPart(part prepareTurnMemoryFormPart) bool {
+	return prepareTurnPartsHave(row.Parts, &row.partIndex, part)
+}
+
 // prepareTurnPartsHave reports whether parts has one with this key and text,
 // scanning a few parts and otherwise building *index once.
 func prepareTurnPartsHave(parts []prepareTurnMemoryFormPart, index *map[string][]string, part prepareTurnMemoryFormPart) bool {
@@ -317,13 +400,6 @@ func prepareTurnPartsHave(parts []prepareTurnMemoryFormPart, index *map[string][
 type prepareTurnTextStorage struct {
 	data *byte
 	n    int
-}
-
-// Runes of a valid UTF-8 text, and how many of its last runes are spaces
-// (all of them when the text is only spaces).
-type prepareTurnTextRunes struct {
-	runes, trailingSpaces int
-	valid                 bool
 }
 
 func measurePrepareTurnText(text string) prepareTurnTextRunes {
@@ -422,6 +498,14 @@ func (row prepareTurnMemoryReadingRow) partRef(part prepareTurnMemoryFormPart) s
 		}
 	}
 	return ""
+}
+
+// text is the row's delivered text, rendering it if the preview deferred it.
+func (row prepareTurnMemoryReadingRow) text() string {
+	if row.renderPending {
+		return renderPrepareTurnMemoryRow(row)
+	}
+	return row.rendered
 }
 
 // renderPrepareTurnMemoryRow is the delivered text of a grouped row.
@@ -608,4 +692,17 @@ func prepareTurnDropLastRune(s string) (string, bool) {
 	}
 	_, size := utf8.DecodeLastRuneInString(s)
 	return s[:len(s)-size], true
+}
+
+// prepareTurnLazyFormText is a plan item's minimum context text, rendered when
+// the item is encoded. Normal responses omit the field, so most are never
+// rendered; text() returns the same string the field held before.
+type prepareTurnLazyFormText struct {
+	form *prepareTurnMemoryForm
+}
+
+func (t prepareTurnLazyFormText) String() string { return t.form.text() }
+
+func (t prepareTurnLazyFormText) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.form.text())
 }

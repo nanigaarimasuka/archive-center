@@ -57,10 +57,20 @@ type prepareTurnMemoryFormPart struct {
 	DeliveryText *string
 }
 type prepareTurnMemoryForm struct {
+	// Meaning is the token of meaning (prepareTurnMeaning); text readers
+	// resolve it to the part values joined by "\n".
 	Group, Heading, Text, Meaning string
+	meaning                       *prepareTurnMeaning
 	Parts                         []prepareTurnMemoryFormPart
 	Refs                          []string
 	Chars                         int
+	// partsText marks a form whose text is its heading and parts, rendered by
+	// text() when read. Readings repeat linked state across thousands of
+	// forms, so keeping each rendered text took gigabytes; Text is then empty.
+	partsText bool
+	// kept is set on forms kept across requests: what later requests derive
+	// from them is then derived once.
+	kept *prepareTurnKeptForm
 }
 
 func prepareTurnMemoryPath(path []string) string {
@@ -289,7 +299,7 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 		if !ok {
 			index = len(created)
 			createdIndex[formKey] = index
-			created = append(created, newForm{key: formKey, source: i})
+			created = append(created, newForm{key: formKey, source: i, form: preparation.keptReadingForms().get(formKey)})
 		}
 		formOf[i] = index
 	}
@@ -298,9 +308,10 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 	type partTextKey struct{ label, value string }
 	// The delivery text a part gets, if any. It depends only on the part,
 	// so equal parts share one string (and its storage) across readings.
+	// A part's delivery text, when it has one, is shared by every form part
+	// made from an equal part: forms only read it.
 	type partDisplay struct {
-		delivery    string
-		hasDelivery bool
+		delivery *string
 	}
 	type partDisplayKey struct {
 		key, label, value, deliveryLabel string
@@ -338,7 +349,19 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 	storageOf := func(text string) prepareTurnTextStorage {
 		return prepareTurnTextStorage{unsafe.StringData(text), len(text)}
 	}
+	built := make([]bool, len(created))
 	prepareTurnParallelFor(len(created), func(index int) {
+		if created[index].form != nil {
+			// Kept from an earlier request; only its part values are needed.
+			parts := candidates[created[index].source].Reading.Parts
+			values := make([]string, len(parts))
+			for i, p := range parts {
+				values[i] = p.Value
+			}
+			created[index].values = values
+			return
+		}
+		built[index] = true
 		memo := memos.Get().(*partMemo)
 		defer memos.Put(memo)
 		c := &candidates[created[index].source]
@@ -397,7 +420,12 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 				}
 				memo.texts[partTextKey{p.Label, p.Value}] = text
 			}
-			part := prepareTurnMemoryFormPart{Key: p.Key, Text: text, SharedKey: sharedPrefix + p.Key}
+			part := prepareTurnMemoryFormPart{Key: p.Key, Text: text}
+			if !prepareTurnMemoryPartKeyIsIdentity(p.Key) {
+				// Linked state parts are identified by their key; only the
+				// others need the source-scoped key (most parts are linked).
+				part.SharedKey = sharedPrefix + p.Key
+			}
 			shown, ok := resolved.shown, stored
 			displayKey := partDisplayKey{p.Key, p.Label, p.Value, p.DeliveryLabel, p.ReferenceOnly}
 			if !ok {
@@ -406,7 +434,7 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 			if !ok {
 				delivery, display := prepareTurnMemoryPartDisplay(p)
 				if !display {
-					shown = partDisplay{delivery: delivery, hasDelivery: true}
+					shown = partDisplay{delivery: &delivery}
 				} else if delivery != p.Value || p.DeliveryLabel != "" {
 					label := p.Label
 					if p.DeliveryLabel != "" {
@@ -415,17 +443,14 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 					if label != "" {
 						delivery = label + ": " + delivery
 					}
-					shown = partDisplay{delivery: delivery, hasDelivery: true}
+					shown = partDisplay{delivery: &delivery}
 				}
 				memo.displays[displayKey] = shown
 			}
 			if !stored {
 				memo.stored[storedKey] = partResolved{text, shown}
 			}
-			if shown.hasDelivery {
-				delivery := shown.delivery
-				part.DeliveryText = &delivery
-			}
+			part.DeliveryText = shown.delivery
 			for _, factText := range p.FactTexts {
 				if ref := sourceRefs[factText]; ref != "" {
 					part.Refs = append(part.Refs, ref)
@@ -437,31 +462,13 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 			}
 			form.Parts = append(form.Parts, part)
 		}
-		// heading + "\n" + "  "-indented part texts joined by "\n"
-		size := len(form.Heading) + 1
-		for i, part := range form.Parts {
-			if i > 0 {
-				size++
-			}
-			size += 2 + len(part.Text)
-		}
-		var formText strings.Builder
-		formText.Grow(size)
-		formText.WriteString(form.Heading)
-		formText.WriteByte('\n')
-		for i, part := range form.Parts {
-			if i > 0 {
-				formText.WriteByte('\n')
-			}
-			formText.WriteString("  ")
-			formText.WriteString(part.Text)
-		}
 		if len(form.Parts) == 0 {
 			form.Parts = nil // as when parts were only appended
 		}
-		form.Meaning = strings.Join(values, "\n")
-		form.Text = strings.TrimSpace(formText.String())
-		form.Chars = prepareTurnMemoryFormChars(form.Heading, form.Parts, form.Text, func(text string) prepareTurnTextRunes {
+		form.meaning = newPrepareTurnMeaning(values)
+		form.Meaning = form.meaning.token
+		form.partsText = true
+		form.Chars = prepareTurnMemoryFormChars(form.Heading, form.Parts, form.text, func(text string) prepareTurnTextRunes {
 			m, ok := memo.runes[storageOf(text)]
 			if !ok {
 				m = measurePrepareTurnText(text)
@@ -475,6 +482,18 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 	for index, item := range created {
 		forms[item.key] = item.form
 		meanings[index] = prepareTurnJoinedLexicalText{joined: item.form.Meaning, parts: item.values}
+	}
+	if kept := preparation.keptReadingForms(); kept != nil {
+		keys, newForms := []prepareTurnMemoryFormKey{}, []*prepareTurnMemoryForm{}
+		for index, item := range created {
+			if built[index] {
+				keys, newForms = append(keys, item.key), append(newForms, item.form)
+			}
+		}
+		kept.put(keys, newForms)
+		for index, item := range created {
+			meanings[index].kept = item.form.keptLexical()
+		}
 	}
 	preparation.primeJoinedLexicalTexts(meanings)
 	if len(primeScores) > 0 {
@@ -580,7 +599,7 @@ func prepareTurnMemoryDisplayFields(value any) string {
 
 func prepareTurnMemoryReadingText(c prepareTurnPriorityMemoryCandidate) string {
 	if c.Minimum != nil {
-		return c.Minimum.Text
+		return c.Minimum.text()
 	}
 	return c.CompleteText
 }
@@ -1253,7 +1272,7 @@ func prepareTurnMemoryModelCandidate(c prepareTurnPriorityMemoryCandidate, refs 
 			}
 		}
 		item["context_refs"] = contextRefs
-		item["minimum_chars"] = utf8.RuneCountInString("- " + prepareTurnMemorySourceHeading(c, false) + " " + c.Minimum.Text)
+		item["minimum_chars"] = utf8.RuneCountInString("- " + prepareTurnMemorySourceHeading(c, false) + " " + c.Minimum.text())
 	}
 	return item
 }
@@ -1301,20 +1320,13 @@ type prepareTurnMemoryReadingRow struct {
 	distinctParts []prepareTurnMemoryFormPart
 }
 
-// hasPart reports whether the row already has a part with this key and text.
-// The index is a cache of the row's parts, which never change once the row
-// is in the layout.
-func (row *prepareTurnMemoryReadingRow) hasPart(part prepareTurnMemoryFormPart) bool {
-	return prepareTurnPartsHave(row.Parts, &row.partIndex, part)
-}
-
 type prepareTurnMemoryPartIdentity struct {
 	Key, Text string
 }
 
 func prepareTurnMemorySharedPartIdentity(part prepareTurnMemoryFormPart) prepareTurnMemoryPartIdentity {
 	key := part.SharedKey
-	if strings.HasPrefix(part.Key, "@current/") || strings.HasPrefix(part.Key, "@lifecycle/") || strings.HasPrefix(part.Key, "@field_current/") {
+	if prepareTurnMemoryPartKeyIsIdentity(part.Key) {
 		key = part.Key
 	}
 	return prepareTurnMemoryPartIdentity{key, part.Text}
@@ -1334,12 +1346,11 @@ type prepareTurnMemoryReadingLayout struct {
 	textRunes map[prepareTurnTextStorage]prepareTurnTextRunes
 }
 
-// text is the row's delivered text, rendering it if the preview deferred it.
-func (row prepareTurnMemoryReadingRow) text() string {
-	if row.renderPending {
-		return renderPrepareTurnMemoryRow(row)
-	}
-	return row.rendered
+// Runes of a valid UTF-8 text, and how many of its last runes are spaces
+// (all of them when the text is only spaces).
+type prepareTurnTextRunes struct {
+	runes, trailingSpaces int
+	valid                 bool
 }
 
 type prepareTurnMemoryReadingEdit struct {

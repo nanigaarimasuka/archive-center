@@ -252,7 +252,7 @@ func prepareTurnPreprocessingSearchTrace(shadow map[string]any) map[string]any {
 }
 
 func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
-	defer releaseJSONMapCache()
+	defer releaseJSONMapCacheAfterRequest()
 	measurement := newPrepareTurnMeasurement()
 	timing := newBackendTimingTrace("prepare_turn.backend_timing.v1")
 	decodeStartedAt := time.Now()
@@ -274,6 +274,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 	diagnosticCtx, finishDiagnostic := diagnosticTurnRequest(r.Context(), "prepare_turn", diagnosticID)
 	defer finishDiagnostic()
 	r = r.WithContext(s.withBackupLLMWorkflowNotice(diagnosticCtx, diagnosticID))
+	if !clientDebugRequested(r) {
+		r = r.WithContext(withQueryEmbeddingCache(r.Context()))
+	}
 	currentInputDecision, enforceCurrentInputContract := buildPrepareTurnCurrentInputDecision(request, sid)
 	sessionBootstrap := buildPrepareTurnSessionBootstrap(request, sid)
 	hostContextSnapshot := buildPrepareTurnRisuHostContextSnapshot(request, sid)
@@ -1263,6 +1266,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				Perspective:                assemblyPerspectiveContext,
 			}
 			assemblyInput.Measurement = measurement
+			assemblyInput.ReuseReadingForms = queryEmbeddingCacheAllowed(r.Context())
 			assemblyInput.Common = prepareTurnCommonAssemblySources(assemblyInput)
 			assemblyTiming.addElapsed("source_preparation", assemblyStageStarted)
 			assemblyStageStarted = time.Now()
@@ -2124,6 +2128,17 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		}
 		delete(compactEffectiveInputPreview, "payload_application_plan")
 		delete(compactEffectiveInputPreview, "memory_transport_plan")
+		responseMemoryDeliveryPlan := compactPrepareTurnMemoryQueryText(mapFromAny(injectionPack["memory_delivery_plan"]))
+		responseInputTransparencyModel := inputTransparencyModel
+		if !clientDebugRequested(r) {
+			// Normal mode: keep the LLM payload and decisions, drop diagnostic
+			// texts the plugin never reads (see prepare_turn_lean_response.go).
+			responseMemoryDeliveryPlan = leanPrepareTurnMemoryDeliveryPlan(responseMemoryDeliveryPlan)
+			languageTrace := []string{"counts", "language_aware_injection"}
+			compactEffectiveInputPreview = withoutNestedKey(compactEffectiveInputPreview, languageTrace, "memory_language_trace")
+			responseInputTransparencyModel = withoutNestedKey(responseInputTransparencyModel, languageTrace, "memory_language_trace")
+			responseInputTransparencyModel = withoutNestedKey(responseInputTransparencyModel, []string{"language_injection_trace"}, "memory_language_trace")
+		}
 		tracePreview["response_projection"] = map[string]any{
 			"contract_version": prepareTurnProductionProjectionV1,
 			"status":           "ready",
@@ -2136,7 +2151,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			},
 			"payload_application_plan":        payloadApplicationPlan,
 			"memory_recall_plan":              injectionPack["memory_recall_plan"],
-			"memory_delivery_plan":            compactPrepareTurnMemoryQueryText(mapFromAny(injectionPack["memory_delivery_plan"])),
+			"memory_delivery_plan":            responseMemoryDeliveryPlan,
 			"memory_delivery_lineage":         boundedMemoryDeliveryLineage,
 			"source_to_payload_lineage":       sourceToPayloadLineage,
 			"memory_injection_baseline":       memoryInjectionBaseline,
@@ -2173,7 +2188,7 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			"memory_transport_payload":        memoryTransportPayload,
 			"memory_budget_resolution":        memoryBudgetResolution,
 			"language_context":                languageContext,
-			"input_transparency_model":        inputTransparencyModel,
+			"input_transparency_model":        responseInputTransparencyModel,
 			"effective_input_preview":         compactEffectiveInputPreview,
 			"backend_timing":                  backendTiming,
 			"turn_workflow_hud":               turnWorkflowHUD,
