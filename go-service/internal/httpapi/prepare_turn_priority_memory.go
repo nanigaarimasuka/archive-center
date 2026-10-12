@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -1253,8 +1254,21 @@ type prepareTurnPriorityLexicalTerm struct {
 }
 
 type prepareTurnPriorityLexicalText struct {
-	terms  []prepareTurnPriorityLexicalTerm
-	needle string
+	terms []prepareTurnPriorityLexicalTerm
+	// termIDs, when set, holds each term's request lexical id (one per term
+	// value), so scorers can remember a term's lookups by id.
+	termIDs []int32
+	needle  string
+	// A composed reading keeps its needle as ordered segments instead of one
+	// joined copy; needle is then empty and the needle is their concatenation.
+	needleSegments []prepareTurnNeedleSegment
+}
+
+// id >= 0 marks a segment shared through the request cache (the same id is the
+// same text), so its containment result can be reused across readings.
+type prepareTurnNeedleSegment struct {
+	text string
+	id   int32
 }
 
 // Source text analysis is independent of the question. Request preparation can
@@ -1262,18 +1276,26 @@ type prepareTurnPriorityLexicalText struct {
 func prepareTurnPriorityAnalyzeText(text string) prepareTurnPriorityLexicalText {
 	terms := []prepareTurnPriorityLexicalTerm{}
 	for _, term := range prepareTurnRecallTerms(text) {
-		run := []rune(term)
-		v := prepareTurnPriorityLexicalTerm{value: term, nonASCII: len(run) >= 2 && prepareTurnContainsNonASCII(run)}
-		if len(run) >= 3 && prepareTurnContainsNonASCII(run[:len(run)-1]) {
-			v.shorter = string(run[:len(run)-1])
-		}
-		terms = append(terms, v)
+		terms = append(terms, prepareTurnPriorityLexicalTermOf(term))
 	}
 	return prepareTurnPriorityLexicalText{terms: terms, needle: normalizePrepareTurnEntityNeedle(text)}
 }
 
+func prepareTurnPriorityLexicalTermOf(term string) prepareTurnPriorityLexicalTerm {
+	run := []rune(term)
+	v := prepareTurnPriorityLexicalTerm{value: term, nonASCII: len(run) >= 2 && prepareTurnContainsNonASCII(run)}
+	if len(run) >= 3 && prepareTurnContainsNonASCII(run[:len(run)-1]) {
+		v.shorter = string(run[:len(run)-1])
+	}
+	return v
+}
+
 // Compile the unchanged lexical policy once per candidate pass. This closure is
 // request-local; it holds no session state and is released with the assembly.
+// Byte length of the screening prefix for long needles; byte search keeps a
+// prefix that splits a rune safe.
+const prepareTurnNeedlePrefixBytes = 32
+
 func prepareTurnPriorityRelevanceScorer(queries []string, fallbackQuery string, textReaders ...func(string) prepareTurnPriorityLexicalText) func(string) float64 {
 	readText := prepareTurnPriorityAnalyzeText
 	if len(textReaders) > 0 {
@@ -1282,19 +1304,33 @@ func prepareTurnPriorityRelevanceScorer(queries []string, fallbackQuery string, 
 	if len(queries) == 0 {
 		queries = []string{fallbackQuery}
 	}
+	// Distinct query terms are numbered; overlap counts distinct numbers,
+	// which is the same count as the distinct matched query-term strings.
+	// A term's lookups in one query index depend only on the term value; for
+	// terms with a request lexical id they are remembered by that id.
+	type termHit struct {
+		known          bool
+		exact, shorter int
+		longer         []int
+	}
 	type termIndex struct {
-		exact  map[string]bool
-		longer map[string][]string
+		ids    map[string]int
+		longer map[string][]int
 		count  int
+		hits   *[]termHit
 	}
 	indexTerms := func(terms []string) termIndex {
-		out := termIndex{exact: map[string]bool{}, longer: map[string][]string{}, count: len(terms)}
+		out := termIndex{ids: map[string]int{}, longer: map[string][]int{}, count: len(terms), hits: &[]termHit{}}
 		for _, term := range terms {
-			out.exact[term] = true
+			id, ok := out.ids[term]
+			if !ok {
+				id = len(out.ids)
+				out.ids[term] = id
+			}
 			run := []rune(term)
 			if len(run) >= 3 && prepareTurnContainsNonASCII(run[:len(run)-1]) {
 				prefix := string(run[:len(run)-1])
-				out.longer[prefix] = append(out.longer[prefix], term)
+				out.longer[prefix] = append(out.longer[prefix], id)
 			}
 		}
 		return out
@@ -1302,6 +1338,12 @@ func prepareTurnPriorityRelevanceScorer(queries []string, fallbackQuery string, 
 	type queryTerms struct {
 		terms, all termIndex
 		needle     string
+		needleText []byte
+		segmentHit map[int32]bool
+		pairHit    map[[2]int32]bool
+		// prefix screens a long needle: it can only occur where its first
+		// bytes do, and that short check reuses segment and pair results.
+		prefix *queryTerms
 	}
 	prepared := make([]queryTerms, 0, len(queries))
 	for _, query := range queries {
@@ -1310,29 +1352,162 @@ func prepareTurnPriorityRelevanceScorer(queries []string, fallbackQuery string, 
 		if len(terms) == 0 {
 			terms = all
 		}
-		prepared = append(prepared, queryTerms{terms: indexTerms(terms), all: indexTerms(all), needle: normalizePrepareTurnEntityNeedle(query)})
+		needle := normalizePrepareTurnEntityNeedle(query)
+		prepared = append(prepared, queryTerms{terms: indexTerms(terms), all: indexTerms(all), needle: needle, needleText: []byte(needle), segmentHit: map[int32]bool{}, pairHit: map[[2]int32]bool{}})
+		if len(needle) > prepareTurnNeedlePrefixBytes {
+			head := needle[:prepareTurnNeedlePrefixBytes]
+			prepared[len(prepared)-1].prefix = &queryTerms{needle: head, needleText: []byte(head), segmentHit: map[int32]bool{}, pairHit: map[[2]int32]bool{}}
+		}
+	}
+	// Equals strings.Contains(concatenated segments, query.needle): each match
+	// lies inside one segment or spans a boundary, where it starts within the
+	// last len-1 bytes before that boundary. Byte search makes rune splits safe.
+	// The bytes before a boundary are the tail of the previous part when that
+	// part is at least len-1 bytes long; the boundary result then depends only
+	// on the two parts, so it is remembered per shared segment pair.
+	var carryBuf, probe []byte
+	var containsNeedle func(analyzed prepareTurnPriorityLexicalText, query *queryTerms) bool
+	containsNeedle = func(analyzed prepareTurnPriorityLexicalText, query *queryTerms) bool {
+		if analyzed.needleSegments == nil {
+			return strings.Contains(analyzed.needle, query.needle)
+		}
+		if query.needle == "" {
+			return true
+		}
+		if query.prefix != nil && !containsNeedle(analyzed, query.prefix) {
+			return false
+		}
+		keep := len(query.needle) - 1
+		// carry is the last keep bytes of the text so far: carryTail when it
+		// is one part's own tail (prevID is that part's shared id, or -1),
+		// otherwise carryBuf.
+		carryTail, inBuf, prevID := "", false, int32(-1)
+		carryBuf = carryBuf[:0]
+		for _, segment := range analyzed.needleSegments {
+			part := segment.text
+			if keep > 0 && (len(carryTail) > 0 || (inBuf && len(carryBuf) > 0)) {
+				pair := [2]int32{prevID, segment.id}
+				hit, known := false, false
+				if prevID >= 0 && segment.id >= 0 {
+					hit, known = query.pairHit[pair]
+				}
+				if !known {
+					head := part
+					if len(head) > keep {
+						head = head[:keep]
+					}
+					if inBuf {
+						probe = append(append(probe[:0], carryBuf...), head...)
+					} else {
+						probe = append(append(probe[:0], carryTail...), head...)
+					}
+					hit = bytes.Contains(probe, query.needleText)
+					if prevID >= 0 && segment.id >= 0 {
+						query.pairHit[pair] = hit
+					}
+				}
+				if hit {
+					return true
+				}
+			}
+			hit, known := false, false
+			if segment.id >= 0 {
+				hit, known = query.segmentHit[segment.id]
+			}
+			if !known {
+				hit = strings.Contains(part, query.needle)
+				if segment.id >= 0 {
+					query.segmentHit[segment.id] = hit
+				}
+			}
+			if hit {
+				return true
+			}
+			if keep > 0 {
+				if len(part) >= keep {
+					carryTail, inBuf, prevID = part[len(part)-keep:], false, segment.id
+				} else {
+					if !inBuf {
+						carryBuf = append(carryBuf[:0], carryTail...)
+						carryTail, inBuf = "", true
+					}
+					carryBuf = append(carryBuf, part...)
+					if len(carryBuf) > keep {
+						carryBuf = append(carryBuf[:0], carryBuf[len(carryBuf)-keep:]...)
+					}
+					prevID = -1
+				}
+			}
+		}
+		return false
 	}
 	return func(text string) float64 {
 		analyzed := readText(text)
 		overlap := func(index termIndex, exactAllowed bool) int {
-			seen := map[string]bool{}
-			for _, term := range analyzed.terms {
-				if exactAllowed && index.exact[term.value] {
-					seen[term.value] = true
+			var small [64]bool
+			seen := small[:0]
+			if len(index.ids) <= len(small) {
+				seen = small[:len(index.ids)]
+			} else {
+				seen = make([]bool, len(index.ids))
+			}
+			lookup := func(term prepareTurnPriorityLexicalTerm) termHit {
+				hit := termHit{known: true, exact: -1, shorter: -1}
+				if id, ok := index.ids[term.value]; ok {
+					hit.exact = id
 				}
 				if term.nonASCII {
-					if term.shorter != "" && index.exact[term.shorter] {
-						seen[term.shorter] = true
+					if term.shorter != "" {
+						if id, ok := index.ids[term.shorter]; ok {
+							hit.shorter = id
+						}
 					}
-					for _, longer := range index.longer[term.value] {
-						seen[longer] = true
+					hit.longer = index.longer[term.value]
+				}
+				return hit
+			}
+			n := 0
+			for k, term := range analyzed.terms {
+				var hit termHit
+				if analyzed.termIDs != nil {
+					id := int(analyzed.termIDs[k])
+					hits := *index.hits
+					if id >= len(hits) {
+						hits = append(hits, make([]termHit, id+1-len(hits))...)
+						*index.hits = hits
+					}
+					if !hits[id].known {
+						hits[id] = lookup(term)
+					}
+					hit = hits[id]
+				} else {
+					hit = lookup(term)
+				}
+				if exactAllowed && hit.exact >= 0 && !seen[hit.exact] {
+					seen[hit.exact] = true
+					n++
+				}
+				if term.nonASCII {
+					if hit.shorter >= 0 && !seen[hit.shorter] {
+						seen[hit.shorter] = true
+						n++
+					}
+					for _, id := range hit.longer {
+						if !seen[id] {
+							seen[id] = true
+							n++
+						}
 					}
 				}
 			}
-			return len(seen)
+			return n
 		}
-		needle, best := analyzed.needle, 0.0
-		for _, query := range prepared {
+		best := 0.0
+		for i := range prepared {
+			if best == 1 {
+				break // no query scores above 1
+			}
+			query := &prepared[i]
 			if query.terms.count == 0 {
 				best = math.Max(best, .5)
 				continue
@@ -1345,7 +1520,8 @@ func prepareTurnPriorityRelevanceScorer(queries []string, fallbackQuery string, 
 				}
 			}
 			score := math.Min(float64(n)/float64(denominator), 1)
-			if strings.Contains(needle, query.needle) {
+			// A contained needle only raises the score to 1.
+			if score < 1 && containsNeedle(analyzed, query) {
 				score = 1
 			}
 			best = math.Max(best, score)
@@ -1522,18 +1698,60 @@ func prepareTurnPrioritySurfaceMatches(query, surface string) bool {
 	return prepareTurnPriorityOverlapCount(terms, query) > 0
 }
 
+// prepareTurnPrioritySurfaceMatcher is prepareTurnPrioritySurfaceMatches
+// for one query, normalizing and tokenizing the query once.
+func prepareTurnPrioritySurfaceMatcher(query string) func(surface string) bool {
+	query = strings.TrimSpace(query)
+	var queryNeedle string
+	var queryTerms []string
+	prepared := false
+	return func(surface string) bool {
+		surface = strings.TrimSpace(surface)
+		if query == "" || surface == "" {
+			return false
+		}
+		if !prepared {
+			queryNeedle, queryTerms, prepared = normalizePrepareTurnEntityNeedle(query), prepareTurnRecallTerms(query), true
+		}
+		surfaceNeedle := normalizePrepareTurnEntityNeedle(surface)
+		if strings.Contains(queryNeedle, surfaceNeedle) || strings.Contains(surfaceNeedle, queryNeedle) {
+			return true
+		}
+		terms := prepareTurnDistinctiveRecallTerms(surface)
+		if len(terms) == 0 {
+			terms = prepareTurnRecallTerms(surface)
+		}
+		for _, term := range terms {
+			for _, queryTerm := range queryTerms {
+				if term == queryTerm || prepareTurnPriorityInflectedNonASCIIMatch(term, queryTerm) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
 func prepareTurnPriorityStructuredBias(query string, fact prepareTurnPriorityMemoryFact) (float64, float64, float64, float64) {
+	return prepareTurnPriorityStructuredBiasMatching(fact, func(surface string) bool {
+		return prepareTurnPrioritySurfaceMatches(query, surface)
+	})
+}
+
+// matches reports prepareTurnPrioritySurfaceMatches(query, surface) for the
+// caller's query; a caller scoring many facts may memoize it per surface.
+func prepareTurnPriorityStructuredBiasMatching(fact prepareTurnPriorityMemoryFact, matches func(string) bool) (float64, float64, float64, float64) {
 	speakerBias := 0.0
 	locationBias := 0.0
 	storylineBias := 0.0
 	speaker := strings.TrimSpace(extractionFirstNonEmpty(fact.SpeakerSurface, fact.EntitySurface))
-	if prepareTurnPrioritySurfaceMatches(query, speaker) {
+	if matches(speaker) {
 		speakerBias = 0.04
 	}
-	if prepareTurnPrioritySurfaceMatches(query, fact.LocationSurface) {
+	if matches(fact.LocationSurface) {
 		locationBias = 0.05
 	}
-	if prepareTurnPrioritySurfaceMatches(query, fact.StorylineSurface) {
+	if matches(fact.StorylineSurface) {
 		storylineBias = 0.06
 	}
 	total := speakerBias + locationBias + storylineBias
@@ -1747,6 +1965,7 @@ func prepareTurnBuildPriorityTurnSummaries(resolved []prepareTurnPriorityMemoryC
 	}
 	bySource := map[string]*prepareTurnPriorityTurnSummaryCandidate{}
 	linkedBySource := map[string][]prepareTurnPriorityMemoryCandidate{}
+	boundarySeen := map[string]map[string]bool{}
 	order := []string{}
 	for _, candidate := range resolved {
 		if candidate.SourceTable != "memories" || strings.TrimSpace(candidate.ParentLineText) == "" {
@@ -1774,15 +1993,18 @@ func prepareTurnBuildPriorityTurnSummaries(resolved []prepareTurnPriorityMemoryC
 			order = append(order, key)
 		}
 		summary.MemberFactIDs = append(summary.MemberFactIDs, candidate.CanonicalFactID)
-		for _, boundary := range candidate.KnowledgeBoundaries {
-			exists := false
+		// Encode each boundary once; a summary keeps the first of equal records.
+		seen := boundarySeen[key]
+		if seen == nil {
+			seen = map[string]bool{}
 			for _, previous := range summary.KnowledgeBoundaries {
-				if mustCompactJSON(previous) == mustCompactJSON(boundary) {
-					exists = true
-					break
-				}
+				seen[mustCompactJSON(previous)] = true
 			}
-			if !exists {
+			boundarySeen[key] = seen
+		}
+		for _, boundary := range candidate.KnowledgeBoundaries {
+			if encoded := mustCompactJSON(boundary); !seen[encoded] {
+				seen[encoded] = true
 				summary.KnowledgeBoundaries = append(summary.KnowledgeBoundaries, boundary)
 			}
 		}
@@ -1952,6 +2174,17 @@ func prepareTurnBuildPriorityCandidates(out *prepareTurnInjectionAssembly, query
 	candidates := []prepareTurnPriorityMemoryCandidate{}
 	identityMetadata := []prepareTurnPriorityIdentityMetadata{}
 	seededParentKeys := map[string]bool{}
+	// Few distinct speaker/location/storyline surfaces recur across facts.
+	surfaceMatches := map[string]bool{}
+	surfaceMatcher := prepareTurnPrioritySurfaceMatcher(query)
+	matchSurface := func(surface string) bool {
+		matched, ok := surfaceMatches[surface]
+		if !ok {
+			matched = surfaceMatcher(surface)
+			surfaceMatches[surface] = matched
+		}
+		return matched
+	}
 	prepareSource := func(seed prepareTurnPriorityFactSeed) prepareTurnSourceTemplate {
 		fact := seed.Fact
 		observationTurn := seed.SourceTurn
@@ -1975,7 +2208,7 @@ func prepareTurnBuildPriorityCandidates(out *prepareTurnInjectionAssembly, query
 			importance = seed.Importance
 			importanceSource = "stored_source_value"
 		}
-		speakerBias, locationBias, storylineBias, structuredBias := prepareTurnPriorityStructuredBias(query, fact)
+		speakerBias, locationBias, storylineBias, structuredBias := prepareTurnPriorityStructuredBiasMatching(fact, matchSurface)
 		identity, entityIdentityObserved := prepareTurnPriorityCanonicalEntityIdentity(fact, out.PriorityEntityAliases)
 		if identity == "" {
 			identity = collapseTextKey(fact.Text)
@@ -2036,7 +2269,7 @@ func prepareTurnBuildPriorityCandidates(out *prepareTurnInjectionAssembly, query
 		}
 		var prepared prepareTurnSourceTemplate
 		if out.preparation != nil {
-			key := prepareTurnSourceSeedKey(seed, query)
+			key := out.preparation.sourceSeedKey(seed, query)
 			var found bool
 			prepared, found = out.preparation.seedTemplates[key]
 			if !found {
@@ -2247,7 +2480,11 @@ func prepareTurnBuildPriorityCandidates(out *prepareTurnInjectionAssembly, query
 		candidate.FinalScore = prepareTurnPriorityScore(candidate.Relevance, candidate.Importance, candidate.Recency, candidate.ContinuityBonus, candidate.StructuredBias)
 		candidate.OriginalRelevance, candidate.OriginalScore = candidate.Relevance, candidate.FinalScore
 	}
-	prepareTurnBuildReadingForms(candidates, relevanceForText, out.preparation)
+	var primeReadingScores []func([]string)
+	if out.preparation != nil {
+		primeReadingScores = append(primeReadingScores, func(texts []string) { out.preparation.primeRelevanceScores(querySet, query, texts) })
+	}
+	prepareTurnBuildReadingForms(candidates, relevanceForText, out.preparation, primeReadingScores...)
 	// Query order comes from the existing recall owner: current input (or its
 	// continuity query), then recent context and supplemental discovery. Keep
 	// the original source scores for canonical resolution and diagnostics.
@@ -2255,6 +2492,14 @@ func prepareTurnBuildPriorityCandidates(out *prepareTurnInjectionAssembly, query
 		currentRelevance := prepareTurnPriorityRelevanceScorer(nil, querySet[0])
 		if out.preparation != nil {
 			currentRelevance = out.preparation.relevanceScorer(querySet[:1], querySet[0])
+			texts := make([]string, 0, 2*len(candidates))
+			for _, candidate := range candidates {
+				texts = append(texts, candidate.CompleteText)
+				if candidate.Minimum != nil {
+					texts = append(texts, candidate.Minimum.Meaning)
+				}
+			}
+			out.preparation.primeRelevanceScores(querySet[:1], querySet[0], texts)
 		}
 		scores := make([]float64, len(candidates))
 		low, high := 1.0, 0.0
@@ -2357,6 +2602,13 @@ func prepareTurnResolvePrioritySourcePool(out *prepareTurnInjectionAssembly, que
 		scorer := prepareTurnPriorityRelevanceScorer(nil, querySet[0])
 		if out.preparation != nil {
 			scorer = out.preparation.relevanceScorer(querySet[:1], querySet[0])
+			texts := []string{}
+			for _, candidate := range resolved {
+				if candidate.SourceTable == "memories" && strings.TrimSpace(candidate.ParentLineText) != "" {
+					texts = append(texts, candidate.ParentLineText)
+				}
+			}
+			out.preparation.primeRelevanceScores(querySet[:1], querySet[0], texts)
 		}
 		currentQuery = append(currentQuery, scorer)
 	}
@@ -2441,9 +2693,23 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	selected := map[string][]string{}
 	layouts := map[string]*prepareTurnMemoryReadingLayout{}
 	currentParts := map[prepareTurnMemoryPartIdentity]bool{}
+	currentLookup := newPrepareTurnCurrentPartLookup()
+	// A form's delivery parts depend only on the form, which is not changed
+	// while rendering; rows read them without changing them.
+	deliveryPartsByForm := map[*prepareTurnMemoryForm][]prepareTurnMemoryFormPart{}
+	distinctDeliveryParts := map[*prepareTurnMemoryForm]bool{}
+	deliveryParts := func(form *prepareTurnMemoryForm) []prepareTurnMemoryFormPart {
+		parts, ok := deliveryPartsByForm[form]
+		if !ok {
+			parts = prepareTurnMemoryDeliveryParts(form.Parts)
+			deliveryPartsByForm[form] = parts
+			distinctDeliveryParts[form] = prepareTurnMemoryPartsDistinct(parts)
+		}
+		return parts
+	}
 	hasUndeliveredCurrentState := func(form *prepareTurnMemoryForm) bool {
 		if form != nil {
-			for _, part := range prepareTurnMemoryDeliveryParts(form.Parts) {
+			for _, part := range deliveryParts(form) {
 				if strings.HasPrefix(part.Key, "@current/") && !currentParts[prepareTurnMemoryPartIdentity{part.Key, part.Text}] {
 					return true
 				}
@@ -2453,7 +2719,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	}
 	layoutFor := func(lane string) *prepareTurnMemoryReadingLayout {
 		if layouts[lane] == nil {
-			layouts[lane] = &prepareTurnMemoryReadingLayout{currentParts: currentParts}
+			layouts[lane] = &prepareTurnMemoryReadingLayout{currentParts: currentParts, currentLookup: currentLookup}
 		}
 		return layouts[lane]
 	}
@@ -2473,14 +2739,44 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	protectedHasGuard := strings.Contains(out.ProtectedMemoryText, prepareTurnProtectedCardGuard)
 	// A later budget pass must not change the original reading/selection order.
 	lineOrder := map[string]map[string]int{}
+	// Lines are long and mostly repeat; a line whose storage was seen before
+	// is found without hashing it. Writing lineOrder directly clears this.
+	type laneLineStorage struct {
+		lane string
+		line prepareTurnTextStorage
+	}
+	lineOrderByStorage := map[laneLineStorage]int{}
 	rememberLineOrder := func(lane, line string) int {
+		stored := laneLineStorage{lane, prepareTurnStorageOf(line)}
+		if order, ok := lineOrderByStorage[stored]; ok {
+			return order
+		}
 		if lineOrder[lane] == nil {
 			lineOrder[lane] = map[string]int{}
 		}
 		if _, exists := lineOrder[lane][line]; !exists {
 			lineOrder[lane][line] = len(lineOrder[lane])
 		}
-		return lineOrder[lane][line]
+		order := lineOrder[lane][line]
+		lineOrderByStorage[stored] = order
+		return order
+	}
+	// Candidates sharing a reading and prefixes share one line string.
+	type candidateLineKey struct {
+		ref, turn string
+		reading   prepareTurnTextStorage
+	}
+	candidateLines := map[candidateLineKey]string{}
+	// The same complete texts are collapsed several times per candidate.
+	collapsedTexts := map[prepareTurnTextStorage]string{}
+	collapsedText := func(text string) string {
+		stored := prepareTurnStorageOf(text)
+		key, ok := collapsedTexts[stored]
+		if !ok {
+			key = collapseTextKey(text)
+			collapsedTexts[stored] = key
+		}
+		return key
 	}
 	// Adding a line cannot change the already selected lines. Count only the
 	// additions; render each complete section once after selection, not for
@@ -2745,7 +3041,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 		row := prepareTurnMemoryReadingRow{Order: order, Plain: line}
 		if summary.Minimum != nil {
 			form := summary.Minimum
-			row.Group, row.Header, row.Parts, row.Ref = form.Group, fmt.Sprintf("[source turn %d]", summary.SourceTurn), prepareTurnMemoryDeliveryParts(form.Parts), preprocessingRefs[summary.SummaryID]
+			row.Group, row.Header, row.Parts, row.Ref = form.Group, fmt.Sprintf("[source turn %d]", summary.SourceTurn), deliveryParts(form), preprocessingRefs[summary.SummaryID]
 		}
 		edit := layoutFor(lane).preview(row)
 		newChars := appendedChars(lane, edit.delta, nil)
@@ -2785,12 +3081,12 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 			}
 			return
 		}
-		if out.Preprocessing == nil && authorityExactKeys[collapseTextKey(candidate.CompleteText)] && !hasUndeliveredCurrentState(candidate.Minimum) {
+		if out.Preprocessing == nil && authorityExactKeys[collapsedText(candidate.CompleteText)] && !hasUndeliveredCurrentState(candidate.Minimum) {
 			candidate.SelectionStatus = "deferred"
 			candidate.SelectionReason = "authority_exact_duplicate"
 			return
 		}
-		if out.Preprocessing == nil && selectedTurnSummaryExactKeys[collapseTextKey(candidate.CompleteText)] && !hasUndeliveredCurrentState(candidate.Minimum) {
+		if out.Preprocessing == nil && selectedTurnSummaryExactKeys[collapsedText(candidate.CompleteText)] && !hasUndeliveredCurrentState(candidate.Minimum) {
 			candidate.SelectionStatus = "deferred"
 			candidate.SelectionReason = "turn_summary_exact_duplicate"
 			return
@@ -2798,24 +3094,39 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 		if !borrowing {
 			quotaEligible[candidate.Lane]++
 		}
-		candidate.RenderedText = prepareTurnMemoryReadingText(*candidate)
+		// The long reading text is copied once, with all its prefixes.
+		turnPrefix, refPrefix := "", ""
 		if candidate.SourceTurn > 0 {
-			candidate.RenderedText = fmt.Sprintf("[source turn %d] %s", candidate.SourceTurn, prepareTurnMemoryReadingText(*candidate))
+			turnPrefix = "[source turn " + strconv.Itoa(candidate.SourceTurn) + "] "
 			if candidate.SourceTable == "character_states" && !strings.HasSuffix(candidate.ProjectionSource, ":field_provenance") {
-				candidate.RenderedText = fmt.Sprintf("[state snapshot turn %d; fields may be older] %s", candidate.SourceTurn, prepareTurnMemoryReadingText(*candidate))
+				turnPrefix = "[state snapshot turn " + strconv.Itoa(candidate.SourceTurn) + "; fields may be older] "
 			}
 		}
 		if ref := preprocessingRefs[candidate.CanonicalFactID]; aiSelected && ref != "" {
-			candidate.RenderedText = "[" + ref + "] " + candidate.RenderedText
+			refPrefix = "[" + ref + "] "
 		}
-		line := "- " + candidate.RenderedText
+		reading := prepareTurnMemoryReadingText(*candidate)
+		lineKey := candidateLineKey{refPrefix, turnPrefix, prepareTurnStorageOf(reading)}
+		line, ok := candidateLines[lineKey]
+		if !ok {
+			line = "- " + refPrefix + turnPrefix + reading
+			candidateLines[lineKey] = line
+		}
+		candidate.RenderedText = line[len("- "):]
 		order := rememberLineOrder(lane, line)
 		extraGuidance := guidanceForCandidate(candidate)
 		ref := ""
 		if aiSelected {
 			ref = preprocessingRefs[candidate.CanonicalFactID]
 		}
-		row := prepareTurnMemoryCandidateRow(*candidate, order, ref)
+		var rowParts []prepareTurnMemoryFormPart
+		if candidate.Minimum != nil {
+			rowParts = deliveryParts(candidate.Minimum)
+		}
+		row := prepareTurnMemoryCandidateRowWithParts(*candidate, order, ref, line, rowParts)
+		if candidate.Minimum != nil && distinctDeliveryParts[candidate.Minimum] {
+			row.distinctParts = rowParts
+		}
 		// Keep the selected fact and its interpretation addressable, but reuse
 		// an already delivered original from this exact stored source. Linked
 		// state and additional qualifiers remain independent reading material.
@@ -2870,6 +3181,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 				if enrichedReason == "" {
 					candidate.RenderedText = enrichedText
 					lineOrder[lane]["- "+enrichedText] = order
+					clear(lineOrderByStorage)
 					candidate.IdentityMetadata = append([]string(nil), metadataText...)
 					line = "- " + enrichedText
 					newChars = enrichedChars
@@ -2893,7 +3205,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 		if candidate.Minimum != nil {
 			candidate.DeliveredContextRefs = append([]string(nil), candidate.Minimum.Refs...)
 		}
-		priorityExactKeys[collapseTextKey(candidate.CompleteText)] = true
+		priorityExactKeys[collapsedText(candidate.CompleteText)] = true
 		usedGlobal += delta
 		usedByLane[lane] = newChars
 		priorityFactSelected++

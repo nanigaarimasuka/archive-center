@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	archivebridge "github.com/risulongmemory/archive-center-go/internal/archive"
 	"github.com/risulongmemory/archive-center-go/internal/store"
@@ -75,6 +77,7 @@ type prepareTurnAssemblyInput struct {
 	Documents                    []map[string]any
 	VectorTrace, LanguageContext map[string]any
 	ProtectedSecretBudgetChars   int
+	knowledgeIndex               *prepareTurnKnowledgeIndexCache
 	BudgetMode                   string
 	Budgets                      map[string]int
 	Perspective                  *prepareTurnAssemblyPerspective
@@ -161,6 +164,10 @@ func buildPrepareTurnAssembly(input prepareTurnAssemblyInput, assembleDelivery b
 	defer input.Measurement.start("assembly.initial_candidates").end()
 	input.Measurement.add("input.memories", len(input.Memories))
 	input.Measurement.add("input.chat_rows", len(input.ChatLogs))
+	if input.knowledgeIndex == nil {
+		// Every boundary carry in this request reads the same immutable sources.
+		input.knowledgeIndex = &prepareTurnKnowledgeIndexCache{}
+	}
 	memories, kgTriples, evidence, chatLogs := input.Memories, input.Triples, input.Evidence, input.ChatLogs
 	storylines, worldRules, charStates := input.Storylines, input.WorldRules, input.CharacterStates
 	pendingThreads, canonicalLayers, episodeSums := input.PendingThreads, input.CanonicalLayers, input.EpisodeSummaries
@@ -1339,10 +1346,33 @@ func buildPrepareTurnAssembly(input prepareTurnAssemblyInput, assembleDelivery b
 	}
 
 	prepareTurnAttachLastConfirmedClock(&out, fieldStoryClock)
+	// The current states' plan depends on the states, the clock and the
+	// target's entity aliases; it is built once per alias map.
+	var currentStatePlansMu sync.Mutex
+	var currentStatePlans []*prepareTurnCurrentStatePlan
+	currentStatePlan := func(aliases map[string]any) *prepareTurnCurrentStatePlan {
+		currentStatePlansMu.Lock()
+		defer currentStatePlansMu.Unlock()
+		for _, plan := range currentStatePlans {
+			if reflect.ValueOf(plan.aliases).UnsafePointer() == reflect.ValueOf(aliases).UnsafePointer() {
+				return plan
+			}
+		}
+		plan := newPrepareTurnCurrentStatePlan(narrativeCurrentValues, aliases, fieldStoryClock)
+		currentStatePlans = append(currentStatePlans, plan)
+		return plan
+	}
+	// Lifecycle readings depend only on the states and the clock.
+	var temporalParts prepareTurnTemporalParts
+	var lifecycleReadingsOnce sync.Once
+	var lifecycleReadings map[string][]prepareTurnMemoryPart
 	out.attachSourceContext = func(target *prepareTurnInjectionAssembly) {
-		prepareTurnAttachLifecycleContext(target, narrativeCurrentValues, fieldStoryClock)
-		prepareTurnAttachCurrentStateContext(target, narrativeCurrentValues, fieldStoryClock)
-		prepareTurnAttachTemporalContext(target, fieldStoryClock)
+		lifecycleReadingsOnce.Do(func() {
+			lifecycleReadings = prepareTurnLifecycleReadings(narrativeCurrentValues, fieldStoryClock)
+		})
+		prepareTurnAttachLifecycleReadings(target, lifecycleReadings)
+		prepareTurnAttachCurrentStatePlan(target, currentStatePlan(target.PriorityEntityAliases))
+		prepareTurnAttachTemporalContextWith(target, fieldStoryClock, &temporalParts)
 		prepareTurnCarryKnowledgeBoundaries(target, input)
 	}
 	// This template contains immutable request sources, not a previous query's
@@ -1746,8 +1776,9 @@ func prepareTurnMemorySummary(m store.Memory) string {
 	if summary == "" {
 		return ""
 	}
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(summary), &parsed); err == nil {
+	// Shared parse: the summary readers below only read it. JSON null is
+	// the one non-object a map accepts.
+	if parsed := parseJSONMapCached(summary); parsed != nil || summary == "null" {
 		summary = memorySummaryFromParsed(parsed)
 		if summary == "" {
 			summary = publicMemoryProjectionNarrativeSummary(parsed)
@@ -1770,7 +1801,8 @@ func prepareTurnMemorySummary(m store.Memory) string {
 }
 
 func prepareTurnMemoryRelevanceText(m store.Memory) string {
-	searchText := strings.TrimSpace(memorySearchTextFromMemory(m).Text)
+	searchText, _ := memorySearchTextOf(m)
+	searchText = strings.TrimSpace(searchText)
 	summary := strings.TrimSpace(prepareTurnMemorySummary(m))
 	if searchText == "" {
 		return summary

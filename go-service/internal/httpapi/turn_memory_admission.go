@@ -649,6 +649,9 @@ func memoryAdmissionAddPerspectiveEvidenceScope(protected map[string]bool, item 
 // Without the original source, retain the existing exact contiguous quote
 // relationship; do not guess partial overlaps from coincidental shared words.
 func memoryAdmissionPerspectiveEvidenceContains(scope memoryPerspectiveEvidenceScope, excerpt string) bool {
+	if len(scope.sourceQuotes) == 0 && len(scope.protected) == 0 {
+		return false // nothing private to match, whatever the excerpt
+	}
 	key := normalizeArtifactDedupeText(excerpt)
 	if key == "" {
 		return false
