@@ -245,6 +245,9 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 	// Passes and queries return mostly the same documents; each stored
 	// embedding is transferred once for all of them.
 	sharedEmbeddingContext := vector.WithSharedEmbeddings(ctx)
+	if diagTapeInstalled { // TEMPORARY (perf/lean-diag): fixed query shapes for record/replay
+		sharedEmbeddingContext = ctx
+	}
 	passContexts := map[string]context.Context{}
 	for _, pass := range []string{"all", "memory", "precise"} {
 		passContexts[pass] = vector.WithQueryResponseObserver(sharedEmbeddingContext, func(size, status int) {

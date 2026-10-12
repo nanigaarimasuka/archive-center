@@ -259,7 +259,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	s.registerUpdateRoutes(sub)
 	sub.HandleFunc("GET /diagnostics/report", s.handleDiagnosticReport)
 	sub.HandleFunc("POST /diagnostics/logging", s.handleDiagnosticLogging)
-	mux.Handle("/", s.diagnosticMiddleware(s.corsMiddleware(s.authMiddleware(gzipRequestMiddleware(s.reverseProxyBasePathMiddleware(sub))))))
+	registerDiagPprofRoutes(sub) // TEMPORARY: perf/lean-diag only
+	mux.Handle("/", s.diagnosticMiddleware(s.corsMiddleware(s.authMiddleware(gzipRequestMiddleware(diagCapturePrepareTurn(s.reverseProxyBasePathMiddleware(sub)))))))
 }
 
 func (s *Server) reverseProxyBasePathMiddleware(next http.Handler) http.Handler {
