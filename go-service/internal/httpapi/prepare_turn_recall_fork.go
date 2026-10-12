@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -150,4 +151,18 @@ func (query *prepareTurnDistinctiveQuery) terms(anchors ...string) []string {
 
 func prepareTurnRecallTermBreak(r rune) bool {
 	return !(r == '_' || r == '-' || unicode.IsLetter(r) || unicode.IsNumber(r))
+}
+
+// prepareTurnSameFloat32s reports whether two vectors hold the same values bit
+// for bit.
+func prepareTurnSameFloat32s(a, b []float32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if math.Float32bits(a[i]) != math.Float32bits(b[i]) {
+			return false
+		}
+	}
+	return true
 }

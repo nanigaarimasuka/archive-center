@@ -85,7 +85,7 @@ func Test46TemporalReadingTravelsWithFactsAndWholeSummary(t *testing.T) {
 	if summaries[0].CompleteText != "Mira promised to bring the charts tomorrow." || summaries[0].Minimum == nil {
 		t.Fatal("whole summary changed or lost non-lifecycle temporal context")
 	}
-	assert46TemporalReading(t, summaries[0].Minimum.Text)
+	assert46TemporalReading(t, summaries[0].Minimum.text())
 	assert46TemporalReading(t, extractionStringFromAny(out.MemoryDeliveryPlan["final_text"]))
 	assert45Budget(t, out.MemoryDeliveryPlan, input.MaxChars)
 	modelInput := multiAgentInput("event_recent", facts, summaries, dto.PrepareTurnRequest{}, defaultMultiAgentSettings(), input.MaxChars, 1, nil)
@@ -95,7 +95,7 @@ func Test46TemporalReadingTravelsWithFactsAndWholeSummary(t *testing.T) {
 	if len(extraFacts) != len(facts) || len(extraSummaries) != len(summaries) {
 		t.Fatal("supplemental assembly changed original candidate breadth")
 	}
-	assert46TemporalReading(t, extraSummaries[0].Minimum.Text)
+	assert46TemporalReading(t, extraSummaries[0].Minimum.text())
 	if strings.Count(extractionStringFromAny(out.MemoryDeliveryPlan["final_text"]), "Last confirmed stored story clock") != 1 {
 		t.Fatal("current clock support was omitted or duplicated outside its existing budget")
 	}
@@ -116,7 +116,7 @@ func Test46TemporalScheduleKeepsReadOnlyLifecycleContext(t *testing.T) {
 	if len(summaries) != 1 || summaries[0].Minimum == nil {
 		t.Fatal("schedule-bearing whole summary missing")
 	}
-	for _, text := range []string{summaries[0].Minimum.Text, extractionStringFromAny(out.MemoryDeliveryPlan["final_text"]), mustCompactJSON(multiAgentInput("event_recent", facts, summaries, dto.PrepareTurnRequest{}, defaultMultiAgentSettings(), 18000, 1, nil))} {
+	for _, text := range []string{summaries[0].Minimum.text(), extractionStringFromAny(out.MemoryDeliveryPlan["final_text"]), mustCompactJSON(multiAgentInput("event_recent", facts, summaries, dto.PrepareTurnRequest{}, defaultMultiAgentSettings(), 18000, 1, nil))} {
 		for _, required := range []string{"estimated next due", "2026-03-08", "2026-03-15", "due_passed_with_explicit_outcome", "reference=", "Rowan accepted the compass", "recurring"} {
 			if !strings.Contains(text, required) {
 				t.Errorf("existing lifecycle reading omitted schedule result %s", required)

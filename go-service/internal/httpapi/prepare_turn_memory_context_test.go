@@ -62,11 +62,11 @@ func Test45MinimumContextBeforeGoAndAISelection(t *testing.T) {
 			if c.Minimum == nil || c.Relevance <= c.OriginalRelevance || c.FinalScore <= c.OriginalScore {
 				t.Fatalf("context did not reach scoring: %+v", c)
 			}
-			if !strings.Contains(c.Minimum.Text, "return cube") || !strings.Contains(c.Minimum.Text, "only outdoors") || strings.Contains(c.Minimum.Text, "promised") {
+			if !strings.Contains(c.Minimum.text(), "return cube") || !strings.Contains(c.Minimum.text(), "only outdoors") || strings.Contains(c.Minimum.text(), "promised") {
 				t.Fatalf("wrong minimum: %+v", c.Minimum)
 			}
 		}
-		if strings.Contains(c.CompleteText, "giver:") && (c.Minimum == nil || !strings.Contains(c.Minimum.Text, "recipient: Mira")) {
+		if strings.Contains(c.CompleteText, "giver:") && (c.Minimum == nil || !strings.Contains(c.Minimum.text(), "recipient: Mira")) {
 			t.Fatal("transfer lost its direction")
 		}
 	}
@@ -260,7 +260,7 @@ func Test45MinimumBudgetConditionsAndSeparateRecords(t *testing.T) {
 			}
 			facts, _ := multiAgentCandidatePool(&out)
 			for _, c := range facts {
-				if c.Minimum != nil && strings.Contains(c.CompleteText, "function:") && strings.Contains(c.Minimum.Text, "red lamp") {
+				if c.Minimum != nil && strings.Contains(c.CompleteText, "function:") && strings.Contains(c.Minimum.text(), "red lamp") {
 					t.Fatal("same stored row mixed independent records")
 				}
 			}
@@ -775,7 +775,7 @@ func Test45ReadingFormsReusedAcrossIndependentQuestions(t *testing.T) {
 			if c.Minimum != byID[c.CanonicalFactID] {
 				t.Fatal("question rebuilt unchanged source form")
 			}
-			if c.SourcePath == "/0/function" && (!strings.Contains(c.Minimum.Text, "only outdoors") || !strings.Contains(c.Minimum.Text, "never during a storm")) {
+			if c.SourcePath == "/0/function" && (!strings.Contains(c.Minimum.text(), "only outdoors") || !strings.Contains(c.Minimum.text(), "never during a storm")) {
 				t.Fatal("nested conditions lost")
 			}
 			if strings.Contains(c.CompleteText, "literal field") && c.SourcePath != "/0/item_1" {

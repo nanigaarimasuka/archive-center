@@ -26,7 +26,10 @@ func TestMemoryFormCharsMatchesRuneCount(t *testing.T) {
 			lines[i] = "  " + parts[i].Text
 		}
 		text := strings.TrimSpace(heading + "\n" + strings.Join(lines, "\n"))
-		if got, want := prepareTurnMemoryFormChars(heading, parts, text, measurePrepareTurnText), utf8.RuneCountInString(text); got != want {
+		if rendered := prepareTurnRenderMemoryFormText(heading, parts); rendered != text {
+			t.Fatalf("heading %q parts %q: rendered %q, want %q", heading, lines, rendered, text)
+		}
+		if got, want := prepareTurnMemoryFormChars(heading, parts, func() string { return text }, measurePrepareTurnText), utf8.RuneCountInString(text); got != want {
 			t.Fatalf("heading %q parts %q: %d, want %d", heading, lines, got, want)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -165,6 +166,12 @@ func (p *prepareTurnRequestPreparation) primeJoinedLexicalTexts(items []prepareT
 			continue
 		}
 		queued[item.joined] = true
+		if item.kept != nil {
+			if data := item.kept.data.Load(); data != nil {
+				p.lexicalTexts[item.joined] = p.keptLexicalText(data)
+				continue
+			}
+		}
 		pending = append(pending, item)
 	}
 	if len(pending) == 0 {
@@ -193,6 +200,9 @@ func (p *prepareTurnRequestPreparation) primeJoinedLexicalTexts(items []prepareT
 	})
 	for i, item := range pending {
 		p.lexicalTexts[item.joined] = analyzed[i]
+		if item.kept != nil {
+			item.kept.keep(item.parts, analyzed[i])
+		}
 	}
 	// One tokenize call per analyzed meaning, as when each was primed alone.
 	p.measurement().record("assembly.tokenize", len(pending), time.Since(started))
@@ -202,6 +212,66 @@ func (p *prepareTurnRequestPreparation) primeJoinedLexicalTexts(items []prepareT
 type prepareTurnJoinedLexicalText struct {
 	joined string
 	parts  []string
+	// kept, when set, keeps the meaning's analysis across requests.
+	kept *prepareTurnKeptLexical
+}
+
+// prepareTurnKeptLexical keeps a meaning's analysis without request ids.
+// Ids only tell equal values apart from others within a request, so each
+// request gives the kept terms and shared segments its own ids.
+type prepareTurnKeptLexical struct {
+	data atomic.Pointer[prepareTurnKeptLexicalData]
+}
+
+type prepareTurnKeptLexicalData struct {
+	terms []prepareTurnPriorityLexicalTerm
+	// segments are the needle segments in order: a shared segment is found
+	// by its part, as when the meaning was analyzed; nil when there were none.
+	segments []prepareTurnKeptNeedleSegment
+}
+
+type prepareTurnKeptNeedleSegment struct {
+	text, part string // text for the meaning's own segments, part for shared ones
+	shared     bool
+}
+
+// keep records a meaning's analysis; the first one kept stays.
+func (k *prepareTurnKeptLexical) keep(parts []string, analyzed prepareTurnPriorityLexicalText) {
+	// analyzed.terms is the request's own copy and is never changed, so it is
+	// kept as is (keptLexicalText shares data.terms the same way).
+	data := &prepareTurnKeptLexicalData{terms: analyzed.terms}
+	if analyzed.needleSegments != nil {
+		first, _ := prepareTurnJoinedTextBounds(parts)
+		data.segments = make([]prepareTurnKeptNeedleSegment, len(analyzed.needleSegments))
+		for j, segment := range analyzed.needleSegments {
+			if segment.id >= 0 {
+				data.segments[j] = prepareTurnKeptNeedleSegment{part: parts[first+j], shared: true}
+			} else {
+				data.segments[j] = prepareTurnKeptNeedleSegment{text: segment.text}
+			}
+		}
+	}
+	k.data.CompareAndSwap(nil, data)
+}
+
+// keptLexicalText is the analysis kept in data, with this request's ids.
+func (p *prepareTurnRequestPreparation) keptLexicalText(data *prepareTurnKeptLexicalData) prepareTurnPriorityLexicalText {
+	analyzed := prepareTurnPriorityLexicalText{terms: data.terms, termIDs: make([]int32, len(data.terms))}
+	for k, term := range data.terms {
+		analyzed.termIDs[k] = p.lexicalID(term.value)
+	}
+	if data.segments != nil {
+		analyzed.needleSegments = make([]prepareTurnNeedleSegment, len(data.segments))
+		for j, segment := range data.segments {
+			if segment.shared {
+				p.fillLexicalPart(segment.part, true)
+				analyzed.needleSegments[j] = p.partNeedles[segment.part]
+			} else {
+				analyzed.needleSegments[j] = prepareTurnNeedleSegment{text: segment.text, id: -1}
+			}
+		}
+	}
+	return analyzed
 }
 
 // A part's distinct recall fields, each with its term forms. Field strings and
@@ -419,6 +489,14 @@ func prepareTurnJoinedTextBounds(parts []string) (int, int) {
 		}
 	}
 	return first, last
+}
+
+// keptReadingForms is nil-safe; it is nil when forms are not reused.
+func (p *prepareTurnRequestPreparation) keptReadingForms() *readingFormCache {
+	if p == nil {
+		return nil
+	}
+	return p.sharedReadingForms
 }
 
 // Same value as sourceFingerprint; digests of parts shared by many readings are
