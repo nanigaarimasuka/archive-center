@@ -234,12 +234,14 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	paged := []timelineItem{}
 	nextBeforeTurn := 0
 	for i, it := range filtered {
-		if i >= limit {
+		// The next page starts before the last returned turn, so a page ends
+		// with that turn's last item; otherwise the rest of it is never read.
+		if i >= limit && it.TurnIndex != paged[len(paged)-1].TurnIndex {
 			break
 		}
 		paged = append(paged, it)
 	}
-	if len(filtered) > limit && len(paged) > 0 {
+	if len(filtered) > len(paged) && len(paged) > 0 {
 		nextBeforeTurn = paged[len(paged)-1].TurnIndex
 	}
 

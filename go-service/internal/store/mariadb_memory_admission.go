@@ -918,6 +918,12 @@ func enqueueAdmissionVectorOperation(
 	} else if affected != 1 {
 		return false, ErrMemoryReprocessingLeased
 	}
+	switch status {
+	case "pending", "retryable", "needs_embedding":
+		// It was waiting already; the refresh did not queue it.
+	default:
+		RecordMemoryVectorOperation(ctx, item.OperationKey)
+	}
 	return true, nil
 }
 

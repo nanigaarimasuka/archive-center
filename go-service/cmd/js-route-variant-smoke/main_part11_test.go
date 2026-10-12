@@ -2432,7 +2432,7 @@ func TestBeforeRequestNonModelSkipsPrepareTurnRuntime(t *testing.T) {
 		}
 	}
 	src := readArchiveCenterJS(t)
-	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture."
+	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests."
 	script := fn + `
 const settings = {enabled: true};
 function debugLog() {}
@@ -2468,7 +2468,7 @@ func TestBeforeRequestModelReconcilesFullHostBeforeDecisionAndPreparationRuntime
 		}
 	}
 	src := readArchiveCenterJS(t)
-	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture."
+	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests."
 	classifyFn := extractArchiveCenterJSFunction(t, src, "classifyLlmFailureReason")
 	gateFn := extractArchiveCenterJSFunction(t, src, "buildLlmGateBlock")
 	traceFn := extractArchiveCenterJSFunction(t, src, "newTurnTrace")
@@ -2617,7 +2617,7 @@ async function runFixture(expectedFresh, expectedContinuity) {
 
 func TestBeforeRequestBuildsObservationOnlySourceEnvelope(t *testing.T) {
 	src := readArchiveCenterJS(t)
-	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture."
+	fn := extractArchiveCenterJSAsyncFunction(t, src, "onBeforeRequest") + "\n" + extractArchiveCenterJSFunction(t, src, "finishFailedBeforeRequestPreparation") + "\nfunction recordHostDiagnostic(event) {} // Device-local logging is an external boundary here." + "\nfunction observeTurnWorkflowHUDTiming() {} // Timing UI is exercised in its dedicated runtime fixture." + "\nfunction startRisuModelBridge() {} // The Risu model bridge has its own tests."
 	observationFunction := extractArchiveCenterJSFunction(t, src, "buildPrepareTurnSourceObservations")
 	dotClass := extractArchiveCenterJSFunction(t, src, "statusDotClass")
 	for _, required := range []string{

@@ -1067,6 +1067,7 @@ func hierarchyLayerBackfillResult(dryRun bool, reason string) map[string]any {
 		"generated": 0,
 		"existing":  0,
 		"skipped":   0,
+		"failed":    0,
 		"blocked":   []map[string]any{},
 		"reason":    reason,
 	}
@@ -1213,7 +1214,11 @@ func (s *Server) backfillChapterSummaries(ctx context.Context, sid string, minTu
 		if dryRun {
 			continue
 		}
-		chapter, _ := s.buildChapterSummaryForRange(ctx, sid, fromTurn, toTurn, groupStart/interval+1, group)
+		chapter, trace, genErr := s.buildChapterSummaryForRange(ctx, sid, fromTurn, toTurn, groupStart/interval+1, group)
+		if genErr != nil {
+			addHierarchyFailed(layer, fromTurn, toTurn, genErr, trace)
+			continue
+		}
 		if err := chapterStore.SaveChapterSummary(ctx, &chapter); err != nil {
 			return layer, err
 		}
@@ -1295,7 +1300,11 @@ func (s *Server) backfillArcSummaries(ctx context.Context, sid string, minTurn, 
 		if dryRun {
 			continue
 		}
-		arc, _ := s.buildArcSummaryForRange(ctx, sid, fromTurn, toTurn, groupStart/interval+1, group)
+		arc, trace, genErr := s.buildArcSummaryForRange(ctx, sid, fromTurn, toTurn, groupStart/interval+1, group)
+		if genErr != nil {
+			addHierarchyFailed(layer, fromTurn, toTurn, genErr, trace)
+			continue
+		}
 		if err := arcStore.SaveArcSummary(ctx, sid, &arc); err != nil {
 			return layer, err
 		}
@@ -1377,7 +1386,11 @@ func (s *Server) backfillSagaDigests(ctx context.Context, sid string, minTurn, m
 		if dryRun {
 			continue
 		}
-		saga, _ := s.buildSagaDigestForRange(ctx, sid, fromTurn, toTurn, group)
+		saga, trace, genErr := s.buildSagaDigestForRange(ctx, sid, fromTurn, toTurn, group)
+		if genErr != nil {
+			addHierarchyFailed(layer, fromTurn, toTurn, genErr, trace)
+			continue
+		}
 		if err := sagaStore.SaveSagaDigest(ctx, sid, &saga); err != nil {
 			return layer, err
 		}
@@ -1610,6 +1623,7 @@ func (s *Server) backfillEpisodeSummariesFromChatLogs(ctx context.Context, sid s
 	}
 	candidates := 0
 	generated := 0
+	blocked := []map[string]any{}
 	existingCount := 0
 	skipped := 0
 	partialSkipped := 0
@@ -1633,6 +1647,16 @@ func (s *Server) backfillEpisodeSummariesFromChatLogs(ctx context.Context, sid s
 			continue
 		}
 		candidates++
+		if missing := episodeMissingMemoryTurns(sid, fromTurn, toTurn, logs, memories); len(missing) > 0 {
+			// Leave any existing episode in place; a new one is built once
+			// every turn of the range has its memory.
+			blocked = append(blocked, map[string]any{
+				"from_turn": fromTurn, "to_turn": toTurn,
+				"reason": "blocked_missing_memory", "missing_memory_turns": missing,
+			})
+			skipped++
+			continue
+		}
 		existing, err := s.Store.ListEpisodeSummaries(ctx, sid, 0, fromTurn, toTurn)
 		if err == nil {
 			foundExact := false
@@ -1682,6 +1706,7 @@ func (s *Server) backfillEpisodeSummariesFromChatLogs(ctx context.Context, sid s
 	result["existing"] = existingCount
 	result["skipped"] = skipped
 	result["partial_skipped"] = partialSkipped
+	result["blocked"] = blocked
 	return result
 }
 

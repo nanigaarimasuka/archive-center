@@ -1306,6 +1306,12 @@ func (s *Server) handleCompleteTurnDecoded(w http.ResponseWriter, r *http.Reques
 			if maintenanceHandoff.Errors > 0 {
 				s.TurnWorkflows.addWarning(workflowRequestID, "MAINTENANCE_HANDOFF_FAILED", "turn_hud.warning.maintenance_handoff_failed", turnWorkflowStageCheckpoints)
 			}
+			if len(blockedRangesWithReason(episodeResult, "blocked_missing_memory")) > 0 {
+				s.TurnWorkflows.addWarning(workflowRequestID, "EPISODE_BLOCKED_MISSING_MEMORY", "turn_hud.warning.episode_blocked_missing_memory", turnWorkflowStageCheckpoints)
+			}
+			if hierarchyLLMFailureCount(hierarchyPromotionResult) > 0 {
+				s.TurnWorkflows.addWarning(workflowRequestID, "HIERARCHY_SUMMARY_FAILED", "turn_hud.warning.hierarchy_summary_failed", turnWorkflowStageCheckpoints)
+			}
 			if sourceAcceptance.Enabled && sourceAcceptance.Accepted && sourceAcceptance.ReplaceExisting {
 				titleKey, messageKey := "turn_hud.notice.reroll_confirmed", "turn_hud.notice.reroll_confirmed_detail"
 				if sourceAcceptance.ReplacementKind == "host_observed_edit" {

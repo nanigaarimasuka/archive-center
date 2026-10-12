@@ -38,6 +38,7 @@ func (s *Server) registerConfigRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /config/body-tracking/{chat_session_id}/state", s.handleBodyTrackingState)
 	mux.HandleFunc("GET /stats", s.handleStats)
 	mux.HandleFunc("GET /long-session-health/{session_id}", s.handleLongSessionHealth)
+	mux.HandleFunc("GET /long-session-health/{session_id}/summary-failures", s.handleSummaryFailures)
 	mux.HandleFunc("GET /prompts", s.handlePromptsList)
 	mux.HandleFunc("GET /prompts/{$}", s.handlePromptsList)
 	mux.HandleFunc("GET /prompts/{prompt_name}", s.handlePromptGet)

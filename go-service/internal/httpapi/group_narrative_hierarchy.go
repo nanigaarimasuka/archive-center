@@ -209,7 +209,10 @@ func buildEpisodeSummaryForRangeWithArtifacts(sid string, fromTurn, toTurn int, 
 	keyEvents := episodeKeyEvents(lines)
 	relationshipChanges := episodeRelationshipAnchors(lines)
 	openLoops := episodeOpenLoopAnchors(lines)
-	keyEntities := episodeKeyEntities(lines)
+	keyEntities := episodeMemoryCharacterNames(memories)
+	if len(keyEntities) == 0 {
+		keyEntities = episodeKeyEntities(lines)
+	}
 	summary := episodeDenseSummary(keyEvents, lines)
 	if summary == "" {
 		summary = fmt.Sprintf("Episode %d-%d", fromTurn, toTurn)
@@ -274,6 +277,11 @@ func cleanEpisodeSourceText(text string) string {
 			continue
 		}
 		if strings.HasPrefix(line, "#### Chatindex:") || strings.HasPrefix(line, "Chatindex:") {
+			continue
+		}
+		// A Markdown comment ("[//]: # (...)") is a hidden note to the model,
+		// such as a narration instruction repeated in every reply, not story.
+		if markdownCommentLinePattern.MatchString(line) {
 			continue
 		}
 		line = htmlImgTagPattern.ReplaceAllString(line, "")
