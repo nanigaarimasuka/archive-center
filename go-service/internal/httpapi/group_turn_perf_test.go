@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/risulongmemory/archive-center-go/internal/store"
@@ -448,6 +449,8 @@ func TestPrepareTurnProductionProjectionExposesRecomposerEnhancementContract(t *
 
 type prepareTurnPerfRangeStore struct {
 	*turnRecordingStore
+	// prepare-turn reads some ranges concurrently; calls are recorded under mu.
+	mu                       sync.Mutex
 	latestTurn               int
 	memoryTurn               int
 	memorySummary            string
@@ -473,16 +476,22 @@ type prepareTurnPerfRangeStore struct {
 }
 
 func (s *prepareTurnPerfRangeStore) LatestSessionTurnIndex(context.Context, string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.latestTurnCalls++
 	return s.latestTurn, nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListMemories(context.Context, string, int, int) ([]store.Memory, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.legacyMemoryCalls++
 	return nil, nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListMemoriesRange(_ context.Context, sid string, fromTurn, toTurn int, includeIDs []int64) ([]store.Memory, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.memoryRangeCalls++
 	s.fromTurn = fromTurn
 	s.toTurn = toTurn
@@ -508,26 +517,36 @@ func (s *prepareTurnPerfRangeStore) ListMemoriesRange(_ context.Context, sid str
 }
 
 func (s *prepareTurnPerfRangeStore) ListEvidence(context.Context, string) ([]store.DirectEvidence, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.legacyEvidenceCalls++
 	return nil, nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListEvidenceRange(context.Context, string, int, int, []int64) ([]store.DirectEvidence, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.evidenceRangeCalls++
 	return append([]store.DirectEvidence(nil), s.evidenceItems...), nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListKGTriples(context.Context, string) ([]store.KGTriple, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.legacyKGCalls++
 	return nil, nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListKGTriplesRange(context.Context, string, int, int) ([]store.KGTriple, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.kgRangeCalls++
 	return append([]store.KGTriple(nil), s.kgItems...), nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListCharacterStatesCurrentBefore(_ context.Context, _ string, beforeTurn int) ([]store.CharacterState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.characterStateCalls++
 	s.characterStateBeforeTurn = beforeTurn
 	latest := map[string]store.CharacterState{}
@@ -552,16 +571,22 @@ func (s *prepareTurnPerfRangeStore) ListCharacterStatesCurrentBefore(_ context.C
 }
 
 func (s *prepareTurnPerfRangeStore) ListActiveStatesRange(context.Context, string, int, int) ([]store.ActiveState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.activeStateCalls++
 	return append([]store.ActiveState(nil), s.activeStates...), nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListCanonicalStateLayersRange(context.Context, string, int, int) ([]store.CanonicalStateLayer, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.canonicalStateCalls++
 	return append([]store.CanonicalStateLayer(nil), s.canonicalStates...), nil
 }
 
 func (s *prepareTurnPerfRangeStore) ListChatLogs(_ context.Context, sid string, fromTurn, toTurn int) ([]store.ChatLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.fromTurn = fromTurn
 	s.toTurn = toTurn
 	return []store.ChatLog{

@@ -156,12 +156,12 @@ func Test47CurrentContextPreviewDoesNotConsumeRejectedBudget(t *testing.T) {
 	a.preview(row) // Rejected reservation; no apply.
 	row.Group = "new"
 	edit := b.preview(row)
-	if !strings.Contains(edit.row.rendered, part.Text) {
+	if !strings.Contains(edit.row.text(), part.Text) {
 		t.Fatal("uncommitted preview consumed state")
 	}
 	b.apply(edit)
 	row.Group = "later"
-	if next := a.preview(row); strings.Contains(next.row.rendered, part.Text) || next.delta != 0 {
+	if next := a.preview(row); strings.Contains(next.row.text(), part.Text) || next.delta != 0 {
 		t.Fatalf("already delivered state was charged again: %+v", next)
 	}
 }
