@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,11 +78,14 @@ type revalidationSourceStore struct {
 	store.SourceRevisionStore
 	sourceReads []string
 	precise     []store.PreciseMemoryUnit
+	sourceMu    sync.Mutex // revisions may be checked concurrently
 }
 
 func (s *revalidationSourceStore) MemoryDerivationLifecycleEnabled() bool { return true }
 func (s *revalidationSourceStore) GetSourceRevision(_ context.Context, sid, revision string) (*store.MemorySourceRevision, error) {
+	s.sourceMu.Lock()
 	s.sourceReads = append(s.sourceReads, sid+":"+revision)
+	s.sourceMu.Unlock()
 	for _, m := range s.returnMemories {
 		if m.ChatSessionID == sid && revision == fmt.Sprintf("offline-rev-%d", m.ID) {
 			return &store.MemorySourceRevision{ChatSessionID: sid, SourceRevision: revision, TurnIndex: m.TurnIndex, LifecycleState: "active"}, nil
@@ -144,6 +148,7 @@ func (s *revalidationAdmissionStore) ListGeneralVectorPreciseMemoryUnits(_ conte
 
 type revalidationVector struct {
 	vector.VectorStore
+	mu           sync.Mutex
 	t            *testing.T
 	sid          string
 	weakerRecent bool
@@ -155,9 +160,12 @@ func (v *revalidationVector) Health(context.Context) (vector.HealthSnapshot, err
 	return vector.HealthSnapshot{Status: "ok", Collection: "isolated-revalidation", ModelReady: true, TotalCount: 6}, nil
 }
 func (v *revalidationVector) Search(_ context.Context, sid string, q []float32, k int, filter string) ([]vector.VectorDocument, error) {
-	v.calls = append(v.calls, fmt.Sprintf("sid=%s q=%v k=%d filter=%s", sid, q, k, filter))
+	call := fmt.Sprintf("sid=%s q=%v k=%d filter=%s", sid, q, k, filter)
+	v.mu.Lock()
+	v.calls = append(v.calls, call)
+	v.mu.Unlock()
 	if sid != v.sid || len(q) != 3 || (q[0] != 1 && q[0] != 2) || k < 1 {
-		v.t.Errorf("unexpected vector request: %s", v.calls[len(v.calls)-1])
+		v.t.Errorf("unexpected vector request: %s", call)
 		return nil, fmt.Errorf("unexpected vector request")
 	}
 	preciseFilter := filter == `source_table == "precise_memory_units"`

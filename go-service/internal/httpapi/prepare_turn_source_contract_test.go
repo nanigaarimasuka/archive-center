@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,24 +31,33 @@ type prepareReadRecordingVectorStore struct {
 }
 
 type prepareRevisionFilterStore struct {
+	mu sync.Mutex // calls may arrive concurrently
 	store.Store
 	active map[string]bool
 	checks map[string]int
 }
 
 func (s *prepareRevisionFilterStore) MemoryDerivationLifecycleEnabled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return true
 }
 
 func (s *prepareRevisionFilterStore) RegisterAcceptedSourceRevision(context.Context, *store.MemorySourceRevision) (store.SourceRevisionRegistration, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return store.SourceRevisionRegistration{}, errors.New("unexpected source revision registration")
 }
 
 func (s *prepareRevisionFilterStore) GetSourceRevision(context.Context, string, string) (*store.MemorySourceRevision, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return nil, store.ErrNotFound
 }
 
 func (s *prepareRevisionFilterStore) IsSourceRevisionActive(_ context.Context, sessionID, sourceRevision string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.checks == nil {
 		s.checks = map[string]int{}
 	}
@@ -57,6 +67,8 @@ func (s *prepareRevisionFilterStore) IsSourceRevisionActive(_ context.Context, s
 }
 
 func (s *prepareRevisionFilterStore) InvalidateSourceRevisions(context.Context, string, int, string, string, time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return errors.New("unexpected source revision invalidation")
 }
 

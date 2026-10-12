@@ -723,16 +723,18 @@ func parseJSONList(raw string) []any {
 	return out
 }
 
+// parseJSONMap returns a private object the caller may modify (see
+// json_map_cache.go for the shared parse cache behind it).
 func parseJSONMap(raw string) map[string]any {
 	text := strings.TrimSpace(raw)
 	if text == "" {
 		return map[string]any{}
 	}
-	var out map[string]any
-	if err := json.Unmarshal([]byte(text), &out); err != nil || out == nil {
+	cached := parseJSONMapCached(text)
+	if cached == nil {
 		return map[string]any{}
 	}
-	return out
+	return copyJSONValue(cached).(map[string]any)
 }
 
 func normalizeDirectEvidenceArchiveState(value string) string {

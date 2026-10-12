@@ -8,8 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/risulongmemory/archive-center-go/internal/store"
 )
@@ -34,12 +36,15 @@ type prepareTurnMemoryContext struct {
 // Source preparation is serialized by the existing request owner. Cache only
 // this immutable value's fingerprint, never any question or selection result.
 func (c *prepareTurnMemoryContext) sourceFingerprint() [32]byte {
+	return c.fingerprintWith(prepareTurnMemoryPartDigest)
+}
+
+func (c *prepareTurnMemoryContext) fingerprintWith(partDigest func(prepareTurnMemoryPart) [32]byte) [32]byte {
 	if c == nil {
 		return [32]byte{}
 	}
 	if c.fingerprint == ([32]byte{}) {
-		b, _ := json.Marshal(c)
-		c.fingerprint = sha256.Sum256(b)
+		c.fingerprint = c.encodedFingerprint(partDigest)
 	}
 	return c.fingerprint
 }
@@ -211,7 +216,9 @@ type prepareTurnMemoryFormKey struct {
 	References string
 }
 
-func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidate, relevance func(string) float64, preparation *prepareTurnRequestPreparation) {
+// primeScores, when given, fills relevance's memo for the reading meanings
+// ahead of the serial scoring loop.
+func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidate, relevance func(string) float64, preparation *prepareTurnRequestPreparation, primeScores ...func([]string)) {
 	defer preparation.measurement().start("assembly.reading_forms").end()
 	refs := map[prepareTurnMemoryReadingSource]map[string]string{}
 	for _, c := range candidates {
@@ -237,7 +244,21 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 		}
 		refs[key][c.CompleteText] = c.CanonicalFactID
 	}
+	// Keys are resolved in candidate order. A form missing from the cache is
+	// built once, from its first candidate; builds are independent of each
+	// other and run concurrently. Cache writes and scoring keep candidate order.
+	type newForm struct {
+		key    prepareTurnMemoryFormKey
+		source int
+		form   *prepareTurnMemoryForm
+		values []string
+	}
+	var created []newForm
+	createdIndex := map[prepareTurnMemoryFormKey]int{}
+	formOf := make([]int, len(candidates)) // -1: no reading, >= 0: created index
+	cachedForm := make([]*prepareTurnMemoryForm, len(candidates))
 	for i := range candidates {
+		formOf[i] = -1
 		c := &candidates[i]
 		if c.Reading == nil {
 			continue
@@ -259,33 +280,111 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 				bindings.WriteByte('\x1f')
 			}
 		}
-		formKey := prepareTurnMemoryFormKey{groupID, c.Reading.sourceFingerprint(), bindings.String()}
-		form := forms[formKey]
-		if form == nil {
-			form = &prepareTurnMemoryForm{Group: groupID}
-			heading := strings.TrimSpace(c.Reading.Label)
-			path := c.Reading.Path
-			if c.Reading.DisplayPath != "" {
-				path = c.Reading.DisplayPath
+		formKey := prepareTurnMemoryFormKey{groupID, preparation.readingFingerprint(c.Reading), bindings.String()}
+		if form := forms[formKey]; form != nil {
+			cachedForm[i] = form
+			continue
+		}
+		index, ok := createdIndex[formKey]
+		if !ok {
+			index = len(created)
+			createdIndex[formKey] = index
+			created = append(created, newForm{key: formKey, source: i})
+		}
+		formOf[i] = index
+	}
+	// Shared state parts recur across thousands of readings. Their reading and
+	// delivery texts depend only on the part, so each worker renders each once.
+	type partTextKey struct{ label, value string }
+	// The delivery text a part gets, if any. It depends only on the part,
+	// so equal parts share one string (and its storage) across readings.
+	type partDisplay struct {
+		delivery    string
+		hasDelivery bool
+	}
+	type partDisplayKey struct {
+		key, label, value, deliveryLabel string
+		referenceOnly                    bool
+	}
+	// A part's value is long; a part seen before with the same value storage
+	// is found without hashing the value.
+	type partStoredKey struct {
+		key, label, deliveryLabel string
+		referenceOnly             bool
+		value                     prepareTurnTextStorage
+	}
+	type partResolved struct {
+		text  string
+		shown partDisplay
+	}
+	// A source's strings are mostly shared between its candidates; the shared
+	// prefix is found by their storage before hashing their contents.
+	type sourceStorageKey struct {
+		ref, occurrence, parent, visibility, owner, viewers prepareTurnTextStorage
+		turn                                                int
+	}
+	type partMemo struct {
+		texts          map[partTextKey]string
+		displays       map[partDisplayKey]partDisplay
+		stored         map[partStoredKey]partResolved
+		prefixes       map[prepareTurnMemoryReadingSource]string
+		storedPrefixes map[sourceStorageKey]string
+		runes          map[prepareTurnTextStorage]prepareTurnTextRunes
+	}
+	memos := sync.Pool{New: func() any {
+		return &partMemo{texts: map[partTextKey]string{}, displays: map[partDisplayKey]partDisplay{}, stored: map[partStoredKey]partResolved{},
+			prefixes: map[prepareTurnMemoryReadingSource]string{}, storedPrefixes: map[sourceStorageKey]string{}, runes: map[prepareTurnTextStorage]prepareTurnTextRunes{}}
+	}}
+	storageOf := func(text string) prepareTurnTextStorage {
+		return prepareTurnTextStorage{unsafe.StringData(text), len(text)}
+	}
+	prepareTurnParallelFor(len(created), func(index int) {
+		memo := memos.Get().(*partMemo)
+		defer memos.Put(memo)
+		c := &candidates[created[index].source]
+		key := prepareTurnMemorySourceKey(*c)
+		form := &prepareTurnMemoryForm{Group: created[index].key.Group}
+		heading := strings.TrimSpace(c.Reading.Label)
+		path := c.Reading.Path
+		if c.Reading.DisplayPath != "" {
+			path = c.Reading.DisplayPath
+		}
+		if path != "" && path != "/" {
+			heading += " [" + path + "]"
+		}
+		form.Heading = strings.TrimSpace(heading)
+		values := make([]string, 0, len(c.Reading.Parts))
+		sourceRefs := refs[key]
+		form.Parts = make([]prepareTurnMemoryFormPart, 0, len(c.Reading.Parts))
+		seenRefs := map[string]bool{}
+		sharedSource := key
+		sharedSource.Lane = ""
+		sourceStorage := sourceStorageKey{storageOf(key.Ref), storageOf(key.Occurrence), storageOf(key.Parent), storageOf(key.Visibility), storageOf(key.Owner), storageOf(key.Viewers), key.Turn}
+		sharedPrefix, ok := memo.storedPrefixes[sourceStorage]
+		if !ok {
+			sharedPrefix, ok = memo.prefixes[sharedSource]
+			if !ok {
+				sharedBytes, _ := json.Marshal(sharedSource)
+				sharedPrefix = fmt.Sprintf("@source/%x/", sha256.Sum256(sharedBytes))
+				memo.prefixes[sharedSource] = sharedPrefix
 			}
-			if path != "" && path != "/" {
-				heading += " [" + path + "]"
+			memo.storedPrefixes[sourceStorage] = sharedPrefix
+		}
+		for _, p := range c.Reading.Parts {
+			// Preprocessing reads and budgets the original candidate form.
+			// Final-prompt cleanup must not expand its candidate packet.
+			values = append(values, p.Value)
+			if p.Label == "source_session_id" {
+				continue
 			}
-			form.Heading = strings.TrimSpace(heading)
-			values, lines := []string{}, []string{}
-			seenRefs := map[string]bool{}
-			sharedSource := key
-			sharedSource.Lane = ""
-			sharedBytes, _ := json.Marshal(sharedSource)
-			sharedPrefix := fmt.Sprintf("@source/%x/", sha256.Sum256(sharedBytes))
-			for _, p := range c.Reading.Parts {
-				// Preprocessing reads and budgets the original candidate form.
-				// Final-prompt cleanup must not expand its candidate packet.
-				values = append(values, p.Value)
-				if p.Label == "source_session_id" {
-					continue
-				}
-				text := p.Value
+			storedKey := partStoredKey{p.Key, p.Label, p.DeliveryLabel, p.ReferenceOnly, prepareTurnTextStorage{unsafe.StringData(p.Value), len(p.Value)}}
+			resolved, stored := memo.stored[storedKey]
+			text, ok := resolved.text, stored
+			if !ok {
+				text, ok = memo.texts[partTextKey{p.Label, p.Value}]
+			}
+			if !ok {
+				text = p.Value
 				switch p.Label {
 				case "source-relative time (last confirmed clock; read only)", "state time (read only)":
 					text = storyTimePromptReading(parseJSONMap(p.Value))
@@ -296,10 +395,18 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 						text = p.Label + ": " + text
 					}
 				}
-				part := prepareTurnMemoryFormPart{Key: p.Key, Text: text, SharedKey: sharedPrefix + p.Key}
+				memo.texts[partTextKey{p.Label, p.Value}] = text
+			}
+			part := prepareTurnMemoryFormPart{Key: p.Key, Text: text, SharedKey: sharedPrefix + p.Key}
+			shown, ok := resolved.shown, stored
+			displayKey := partDisplayKey{p.Key, p.Label, p.Value, p.DeliveryLabel, p.ReferenceOnly}
+			if !ok {
+				shown, ok = memo.displays[displayKey]
+			}
+			if !ok {
 				delivery, display := prepareTurnMemoryPartDisplay(p)
 				if !display {
-					part.DeliveryText = &delivery
+					shown = partDisplay{delivery: delivery, hasDelivery: true}
 				} else if delivery != p.Value || p.DeliveryLabel != "" {
 					label := p.Label
 					if p.DeliveryLabel != "" {
@@ -308,24 +415,87 @@ func prepareTurnBuildReadingForms(candidates []prepareTurnPriorityMemoryCandidat
 					if label != "" {
 						delivery = label + ": " + delivery
 					}
-					part.DeliveryText = &delivery
+					shown = partDisplay{delivery: delivery, hasDelivery: true}
 				}
-				for _, factText := range p.FactTexts {
-					if ref := refs[key][factText]; ref != "" {
-						part.Refs = append(part.Refs, ref)
-						if !seenRefs[ref] {
-							seenRefs[ref] = true
-							form.Refs = append(form.Refs, ref)
-						}
+				memo.displays[displayKey] = shown
+			}
+			if !stored {
+				memo.stored[storedKey] = partResolved{text, shown}
+			}
+			if shown.hasDelivery {
+				delivery := shown.delivery
+				part.DeliveryText = &delivery
+			}
+			for _, factText := range p.FactTexts {
+				if ref := sourceRefs[factText]; ref != "" {
+					part.Refs = append(part.Refs, ref)
+					if !seenRefs[ref] {
+						seenRefs[ref] = true
+						form.Refs = append(form.Refs, ref)
 					}
 				}
-				form.Parts = append(form.Parts, part)
-				lines = append(lines, "  "+text)
 			}
-			form.Meaning = strings.Join(values, "\n")
-			form.Text = strings.TrimSpace(form.Heading + "\n" + strings.Join(lines, "\n"))
-			form.Chars = utf8.RuneCountInString(form.Text)
-			forms[formKey] = form
+			form.Parts = append(form.Parts, part)
+		}
+		// heading + "\n" + "  "-indented part texts joined by "\n"
+		size := len(form.Heading) + 1
+		for i, part := range form.Parts {
+			if i > 0 {
+				size++
+			}
+			size += 2 + len(part.Text)
+		}
+		var formText strings.Builder
+		formText.Grow(size)
+		formText.WriteString(form.Heading)
+		formText.WriteByte('\n')
+		for i, part := range form.Parts {
+			if i > 0 {
+				formText.WriteByte('\n')
+			}
+			formText.WriteString("  ")
+			formText.WriteString(part.Text)
+		}
+		if len(form.Parts) == 0 {
+			form.Parts = nil // as when parts were only appended
+		}
+		form.Meaning = strings.Join(values, "\n")
+		form.Text = strings.TrimSpace(formText.String())
+		form.Chars = prepareTurnMemoryFormChars(form.Heading, form.Parts, form.Text, func(text string) prepareTurnTextRunes {
+			m, ok := memo.runes[storageOf(text)]
+			if !ok {
+				m = measurePrepareTurnText(text)
+				memo.runes[storageOf(text)] = m
+			}
+			return m
+		})
+		created[index].form, created[index].values = form, values
+	})
+	meanings := make([]prepareTurnJoinedLexicalText, len(created))
+	for index, item := range created {
+		forms[item.key] = item.form
+		meanings[index] = prepareTurnJoinedLexicalText{joined: item.form.Meaning, parts: item.values}
+	}
+	preparation.primeJoinedLexicalTexts(meanings)
+	if len(primeScores) > 0 {
+		texts := make([]string, 0, len(candidates))
+		for i := range candidates {
+			if formOf[i] >= 0 {
+				texts = append(texts, created[formOf[i]].form.Meaning)
+			} else if cachedForm[i] != nil {
+				texts = append(texts, cachedForm[i].Meaning)
+			}
+		}
+		primeScores[0](texts)
+	}
+	for i := range candidates {
+		c := &candidates[i]
+		form := cachedForm[i]
+		if formOf[i] >= 0 {
+			form = created[formOf[i]].form
+		}
+		if form == nil {
+			continue
 		}
 		c.Minimum = form
 		c.ContextRelevance = relevance(form.Meaning)
@@ -505,7 +675,12 @@ func prepareTurnLifecycleReadings(values []store.StatusCurrentValue, clocks ...m
 }
 
 func prepareTurnAttachLifecycleContext(out *prepareTurnInjectionAssembly, values []store.StatusCurrentValue, clocks ...map[string]any) {
-	readings := prepareTurnLifecycleReadings(values, clocks...)
+	prepareTurnAttachLifecycleReadings(out, prepareTurnLifecycleReadings(values, clocks...))
+}
+
+// prepareTurnAttachLifecycleReadings attaches readings built by
+// prepareTurnLifecycleReadings, which it only reads.
+func prepareTurnAttachLifecycleReadings(out *prepareTurnInjectionAssembly, readings map[string][]prepareTurnMemoryPart) {
 	for i := range out.PriorityFactSeeds {
 		fact := &out.PriorityFactSeeds[i].Fact
 		parts := readings[normalizeNarrativeLifecycleKey(fact.LifecycleKey)]
@@ -527,8 +702,17 @@ func prepareTurnAttachLifecycleContext(out *prepareTurnInjectionAssembly, values
 // even when the input describes the subject indirectly. This is reading context:
 // source identity, observation time and the canonical state owner stay unchanged.
 func prepareTurnAttachCurrentStateContext(out *prepareTurnInjectionAssembly, values []store.StatusCurrentValue, clock map[string]any) {
+	prepareTurnAttachCurrentStatePlan(out, newPrepareTurnCurrentStatePlan(values, out.PriorityEntityAliases, clock))
+}
+
+func prepareTurnAttachCurrentStatePlan(out *prepareTurnInjectionAssembly, plan *prepareTurnCurrentStatePlan) {
 	// Compile only original source text once. Attached readings cannot recursively
 	// introduce another subject, and large state registries do not re-tokenize it.
+	plan.sourceMu.Lock()
+	defer plan.sourceMu.Unlock()
+	if plan.sources == nil {
+		plan.sources, plan.entityKeys = map[string]prepareTurnStateSource{}, map[string]string{}
+	}
 	sourceTerms := make([][]string, len(out.PriorityFactSeeds))
 	sourcePhrases := make([]string, len(out.PriorityFactSeeds))
 	wordBreak := func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '_' && r != '-' }
@@ -541,83 +725,143 @@ func prepareTurnAttachCurrentStateContext(out *prepareTurnInjectionAssembly, val
 				}
 			}
 		}
-		sourceTerms[i] = prepareTurnRecallTerms(text)
-		sourcePhrases[i] = " " + strings.Join(strings.FieldsFunc(strings.ToLower(text), wordBreak), " ") + " "
+		source, known := plan.sources[text]
+		if !known {
+			source = prepareTurnStateSource{
+				terms:  prepareTurnRecallTerms(text),
+				phrase: " " + strings.Join(strings.FieldsFunc(strings.ToLower(text), wordBreak), " ") + " ",
+			}
+			plan.sources[text] = source
+		}
+		sourceTerms[i], sourcePhrases[i] = source.terms, source.phrase
 	}
-	for _, view := range narrativeCurrentStateViews(values) {
-		switch view.Scope {
-		case "belief", "rumor", "secret":
-			continue // Same public-current projection boundary as lifecycle readings.
-		}
-		if view.Slot == "goal_status" {
-			continue // Commitments retain their explicit lifecycle-key owner.
-		}
-		subjectKey := prepareTurnPriorityEntityKey(view.Subject, out.PriorityEntityAliases)
-		subjectWords := strings.FieldsFunc(strings.ToLower(view.Subject), wordBreak)
-		subjectPhrase := " " + strings.Join(subjectWords, " ") + " "
-		origin, evidence := prepareTurnCurrentStateReadingOrigin(view.Value)
-		prefix := fmt.Sprintf("@current/%s/%s/%s", view.Value.OwnerScope, view.Value.OwnerID, view.Slot)
-		observation := "source turn unknown"
-		if origin.SourceTurn > 0 {
-			observation = fmt.Sprintf("source turn %d", origin.SourceTurn)
-		}
-		parts := []prepareTurnMemoryPart{{Key: prefix, Label: fmt.Sprintf("linked stored state [%s; status_current_values:%d]", observation, view.Value.ID), DeliveryLabel: fmt.Sprintf("linked stored state [%s]", observation), Value: view.Subject + " · " + view.Slot + ": " + view.Current}}
-		if excerpt := stringFromMap(evidence, "evidence_excerpt"); excerpt != "" {
-			parts = append(parts, prepareTurnMemoryPart{Key: prefix + "/evidence", Label: "state evidence", Value: excerpt})
-		}
-		for _, field := range []string{"observed_at", "occurrence_time", "effective_time", "validity"} {
-			if value, exists := view.Payload[field]; exists {
-				evidence[field] = value
+	// Index the sources once: which facts contain each distinct token, and
+	// which tokens could match a subject name. Each state then finds the
+	// facts that mention it directly instead of scanning every fact's tokens.
+	index := newPrepareTurnStateMentionIndex(sourceTerms)
+	// Each matched fact gets one private reading copy in this pass, sized for
+	// all the parts the states attach; they are collected first, in order.
+	type stateAttachment struct {
+		fact   int
+		parts  []prepareTurnMemoryPart
+		linked bool
+	}
+	var attachments []stateAttachment
+	// Facts whose source phrase has a word, for multi-word subject names: a
+	// phrase containing " a b " has the whole word a.
+	var factsByWord map[string][]int
+	// A fact's entity key does not depend on the state; group facts by it once.
+	var factsByEntityKey map[string][]int
+	factStamp := make([]int, len(out.PriorityFactSeeds))
+	// A fact's normalized state slot, computed when the fact is first matched.
+	factSlots := make([]string, len(out.PriorityFactSeeds))
+	factSlotKnown := make([]bool, len(out.PriorityFactSeeds))
+	viewIndex := 0
+	for stateIndex := range plan.states {
+		state := &plan.states[stateIndex]
+		view, subjectKey, subjectWords, subjectPhrase := state.view, state.subjectKey, state.subjectWords, state.subjectPhrase
+		viewIndex++
+		// Facts that mention the subject, in fact order: the same entity key,
+		// a whole source token naming it (Latin name boundaries and Korean
+		// inflection as before), or a multi-word name phrase.
+		if subjectKey != "" && factsByEntityKey == nil {
+			factsByEntityKey = map[string][]int{}
+			for i := range out.PriorityFactSeeds {
+				if out.PriorityFactSeeds[i].SourceTable == "character_states" {
+					continue
+				}
+				surface := out.PriorityFactSeeds[i].Fact.EntitySurface
+				key, known := plan.entityKeys[surface]
+				if !known {
+					key = prepareTurnPriorityEntityKey(surface, out.PriorityEntityAliases)
+					plan.entityKeys[surface] = key
+				}
+				factsByEntityKey[key] = append(factsByEntityKey[key], i)
 			}
 		}
-		for _, field := range []string{"source_revision", "direct_evidence_ids", "observed_at", "occurrence_time", "effective_time", "validity", "repair_source_revision", "repair_recorded_turn"} {
-			if value := evidence[field]; value != nil {
-				parts = append(parts, prepareTurnMemoryPart{Key: prefix + "/" + field, Label: "state " + field, Value: prepareTurnPriorityScalarText(value)})
+		var mentioning []int
+		mark := func(i int) {
+			if factStamp[i] != viewIndex {
+				factStamp[i] = viewIndex
+				mentioning = append(mentioning, i)
 			}
 		}
-		if temporal := prepareTurnSourceTemporalContext(evidence, view.Payload); len(temporal) > 0 {
-			parts = append(parts, prepareTurnMemoryPart{Key: prefix + "/time", Label: "state time (read only)", Value: mustCompactJSON(buildStoryTimeReading(temporal, clock))})
+		if subjectKey != "" {
+			for _, i := range factsByEntityKey[subjectKey] {
+				mark(i)
+			}
 		}
-		for i := range out.PriorityFactSeeds {
+		for _, id := range index.matchingTokensFor(view.Subject, state.subjectKeys) {
+			for _, i := range index.factsByToken[id] {
+				mark(i)
+			}
+		}
+		if len(subjectWords) > 1 {
+			if factsByWord == nil {
+				factsByWord = map[string][]int{}
+				for i, phrase := range sourcePhrases {
+					for _, word := range strings.Fields(phrase) {
+						if facts := factsByWord[word]; len(facts) == 0 || facts[len(facts)-1] != i {
+							factsByWord[word] = append(facts, i)
+						}
+					}
+				}
+			}
+			for _, i := range factsByWord[subjectWords[0]] {
+				if strings.Contains(sourcePhrases[i], subjectPhrase) {
+					mark(i)
+				}
+			}
+		}
+		if len(mentioning) == 0 {
+			continue
+		}
+		sort.Ints(mentioning)
+		parts := plan.statePartsOf(state)
+		for _, i := range mentioning {
 			if out.PriorityFactSeeds[i].SourceTable == "character_states" {
 				continue // Field-linked current readings already own these projections.
 			}
 			fact := &out.PriorityFactSeeds[i].Fact
-			mentioned := subjectKey != "" && prepareTurnPriorityEntityKey(fact.EntitySurface, out.PriorityEntityAliases) == subjectKey
-			// Whole source tokens preserve Latin name boundaries and the existing
-			// Korean inflection handling. Similar spelling never creates an alias.
-			for _, token := range sourceTerms[i] {
-				if strings.EqualFold(token, view.Subject) || prepareTurnPriorityInflectedNonASCIIMatch(token, view.Subject) {
-					mentioned = true
-				}
-			}
-			if len(subjectWords) > 1 && strings.Contains(sourcePhrases[i], subjectPhrase) {
-				mentioned = true
-			}
-			if !mentioned {
-				continue
-			}
-			reading := prepareTurnMemoryContext{Path: fact.SourcePath, Parts: []prepareTurnMemoryPart{{Key: fact.SourcePath, Value: fact.Text, FactTexts: []string{fact.Text}}}}
-			if fact.Reading != nil {
-				reading = *fact.Reading
-				reading.Parts = append([]prepareTurnMemoryPart(nil), fact.Reading.Parts...)
-			}
-			reading.fingerprint = [32]byte{}
 			// A matching name remains discovery/scoring context. It does not make
 			// every stored slot part of an explicitly typed assertion. Unknown
 			// bindings retain the established reading (including indirect clues);
 			// missing optional metadata never removes useful current context.
-			linked := fact.StateSlot == "" || normalizeNarrativeStateSlot(fact.StateSlot) == view.Slot
-			for _, field := range stringsFromAny(view.Payload["source_fields"]) {
+			if !factSlotKnown[i] && fact.StateSlot != "" {
+				factSlots[i], factSlotKnown[i] = normalizeNarrativeStateSlot(fact.StateSlot), true
+			}
+			linked := fact.StateSlot == "" || factSlots[i] == view.Slot
+			for _, field := range state.sourceFields {
 				if fact.SourceFieldPath != "" && (fact.SourceFieldPath == field || strings.HasPrefix(fact.SourceFieldPath, strings.TrimRight(field, "/")+"/")) {
 					linked = true
 				}
 			}
-			for _, part := range parts {
-				part.ReferenceOnly = !linked
-				reading.Parts = append(reading.Parts, part)
+			attachments = append(attachments, stateAttachment{i, parts, linked})
+		}
+	}
+	added := map[int]int{}
+	for _, attachment := range attachments {
+		added[attachment.fact] += len(attachment.parts)
+	}
+	owned := map[int]*prepareTurnMemoryContext{}
+	for _, attachment := range attachments {
+		fact := &out.PriorityFactSeeds[attachment.fact].Fact
+		reading := owned[attachment.fact]
+		if reading == nil {
+			reading = &prepareTurnMemoryContext{Path: fact.SourcePath, Parts: []prepareTurnMemoryPart{{Key: fact.SourcePath, Value: fact.Text, FactTexts: []string{fact.Text}}}}
+			if fact.Reading != nil {
+				*reading = *fact.Reading
+				reading.Parts = append(make([]prepareTurnMemoryPart, 0, len(fact.Reading.Parts)+added[attachment.fact]), fact.Reading.Parts...)
+			} else {
+				reading.Parts = append(make([]prepareTurnMemoryPart, 0, 1+added[attachment.fact]), reading.Parts...)
 			}
-			fact.Reading = &reading
+			reading.fingerprint = [32]byte{}
+			owned[attachment.fact] = reading
+			fact.Reading = reading
+		}
+		for _, part := range attachment.parts {
+			part.ReferenceOnly = !attachment.linked
+			reading.Parts = append(reading.Parts, part)
 		}
 	}
 }
@@ -691,6 +935,34 @@ func prepareTurnAttachCommitmentRelation(fact *prepareTurnPriorityMemoryFact, re
 // Interpret only source-linked metadata already admitted to this request. The
 // helper neither reads additional records nor rewrites the historical text.
 func prepareTurnAttachTemporalContext(out *prepareTurnInjectionAssembly, clock map[string]any) {
+	prepareTurnAttachTemporalContextWith(out, clock, nil)
+}
+
+func prepareTurnAttachTemporalContextWith(out *prepareTurnInjectionAssembly, clock map[string]any, kept *prepareTurnTemporalParts) {
+	temporalPart := func(context map[string]any) prepareTurnMemoryPart {
+		build := func() prepareTurnMemoryPart {
+			value := mustCompactJSON(buildStoryTimeReading(context, clock))
+			return prepareTurnMemoryPart{Key: fmt.Sprintf("@temporal/%x", sha256.Sum256([]byte(value))), Label: "source-relative time (last confirmed clock; read only)", Value: value}
+		}
+		if kept == nil {
+			return build()
+		}
+		var key strings.Builder
+		prepareTurnWriteTypedKey(&key, context)
+		kept.mu.Lock()
+		part, ok := kept.parts[key.String()]
+		kept.mu.Unlock()
+		if !ok {
+			part = build()
+			kept.mu.Lock()
+			if kept.parts == nil {
+				kept.parts = map[string]prepareTurnMemoryPart{}
+			}
+			kept.parts[key.String()] = part
+			kept.mu.Unlock()
+		}
+		return part
+	}
 	for i := range out.PriorityFactSeeds {
 		fact := &out.PriorityFactSeeds[i].Fact
 		if len(fact.TemporalContext) == 0 {
@@ -702,9 +974,7 @@ func prepareTurnAttachTemporalContext(out *prepareTurnInjectionAssembly, clock m
 			reading.Parts = append([]prepareTurnMemoryPart(nil), fact.Reading.Parts...)
 		}
 		reading.fingerprint = [32]byte{}
-		value := mustCompactJSON(buildStoryTimeReading(fact.TemporalContext, clock))
-		part := prepareTurnMemoryPart{Key: fmt.Sprintf("@temporal/%x", sha256.Sum256([]byte(value))), Label: "source-relative time (last confirmed clock; read only)", Value: value}
-		reading.Parts = append(reading.Parts, part)
+		reading.Parts = append(reading.Parts, temporalPart(fact.TemporalContext))
 		fact.Reading = &reading
 	}
 }
@@ -1020,7 +1290,24 @@ type prepareTurnMemoryReadingRow struct {
 	Group, Header, Ref, Plain, rendered string
 	Parts                               []prepareTurnMemoryFormPart
 	partRefs                            map[prepareTurnMemoryPartIdentity]string
+	renderPending                       bool // rendered is built on apply
+	// Kept for the next preview of the group: its parts' texts by key, built
+	// on first use for a row with many parts, and the rune fold of its
+	// rendered text through its last part.
+	partIndex map[string][]string
+	cost      prepareTurnRowCost
+	// distinctParts, when it is the very slice in Parts, is known to hold no
+	// two parts with the same key and text.
+	distinctParts []prepareTurnMemoryFormPart
 }
+
+// hasPart reports whether the row already has a part with this key and text.
+// The index is a cache of the row's parts, which never change once the row
+// is in the layout.
+func (row *prepareTurnMemoryReadingRow) hasPart(part prepareTurnMemoryFormPart) bool {
+	return prepareTurnPartsHave(row.Parts, &row.partIndex, part)
+}
+
 type prepareTurnMemoryPartIdentity struct {
 	Key, Text string
 }
@@ -1037,11 +1324,30 @@ type prepareTurnMemoryReadingLayout struct {
 	rows         []*prepareTurnMemoryReadingRow
 	groups       map[string]*prepareTurnMemoryReadingRow
 	currentParts map[prepareTurnMemoryPartIdentity]bool
+	// currentLookup, when set (shared by the layouts that share
+	// currentParts), answers currentParts lookups by the part strings'
+	// storage. currentParts only gains entries, so a found part stays found
+	// and a missing one is rechecked after any part is added.
+	currentLookup *prepareTurnCurrentPartLookup
+	// Rune measurements of part texts, keyed by the text's storage; parts
+	// shared by many rows are measured once.
+	textRunes map[prepareTurnTextStorage]prepareTurnTextRunes
 }
+
+// text is the row's delivered text, rendering it if the preview deferred it.
+func (row prepareTurnMemoryReadingRow) text() string {
+	if row.renderPending {
+		return renderPrepareTurnMemoryRow(row)
+	}
+	return row.rendered
+}
+
 type prepareTurnMemoryReadingEdit struct {
 	delta    int
 	row      prepareTurnMemoryReadingRow
 	previous *prepareTurnMemoryReadingRow
+	// The previous row's part count when previewed.
+	previousParts int
 }
 
 // Reuse source-scoped constituents in the group's first visible reading. A later
@@ -1054,45 +1360,75 @@ func (l *prepareTurnMemoryReadingLayout) preview(row prepareTurnMemoryReadingRow
 		row.rendered = strings.TrimSpace(row.Plain)
 	} else {
 		incoming, ref := row.Parts, row.Ref
+		incomingDistinct := len(incoming) > 0 && len(row.distinctParts) == len(incoming) && &row.distinctParts[0] == &incoming[0]
+		row.distinctParts = nil
 		row.Parts = nil
-		row.partRefs = map[prepareTurnMemoryPartIdentity]string{}
-		seen := map[prepareTurnMemoryPartIdentity]bool{}
+		row.partIndex = nil
+		// A row's refs are never changed once set: a preview shares the previous
+		// row's and copies them only to add its own.
+		row.partRefs = nil
+		partCapacity := len(incoming)
+		previousParts := 0
+		if previous != nil {
+			partCapacity += len(previous.Parts)
+			previousParts = len(previous.Parts)
+		}
+		appendPart := func(part prepareTurnMemoryFormPart) {
+			if row.Parts == nil {
+				row.Parts = make([]prepareTurnMemoryFormPart, 0, partCapacity)
+			}
+			row.Parts = append(row.Parts, part)
+		}
+		// A part is already in the row when the previous row has it (read
+		// through that row's cached index), or it was added in this preview.
+		// Added parts are the tail of row.Parts after the previous row's.
+		var addedIndex map[string][]string
+		isSeen := func(part prepareTurnMemoryFormPart) bool {
+			if previous != nil && previous.hasPart(part) {
+				return true
+			}
+			if previous == nil && incomingDistinct {
+				return false // added parts come from incoming, which has no repeats
+			}
+			var added []prepareTurnMemoryFormPart
+			if len(row.Parts) > previousParts {
+				added = row.Parts[previousParts:]
+			}
+			return prepareTurnPartsHave(added, &addedIndex, part)
+		}
 		if previous != nil {
 			row.Order = minInt(row.Order, previous.Order)
 			row.Header = previous.Header
-			row.Parts = append(row.Parts, previous.Parts...)
 			for _, part := range previous.Parts {
-				seen[prepareTurnMemoryPartIdentity{part.Key, part.Text}] = true
+				appendPart(part)
 			}
-			for key, value := range previous.partRefs {
-				row.partRefs[key] = value
-			}
+			row.partRefs = previous.partRefs
 		}
 		for _, part := range incoming {
-			key := prepareTurnMemoryPartIdentity{part.Key, part.Text}
 			shared := prepareTurnMemorySharedPartIdentity(part)
-			if shared.Key != "" && l.currentParts[shared] {
+			if shared.Key != "" && l.isCurrentPart(shared) {
 				continue // Same source constituent already present in this input.
 			}
-			if !seen[key] {
-				row.Parts = append(row.Parts, part)
-				seen[key] = true
+			if !isSeen(part) {
+				appendPart(part)
+				if addedIndex != nil {
+					addedIndex[part.Key] = append(addedIndex[part.Key], part.Text)
+				}
 				if ref != "" {
-					row.partRefs[key], ref = ref, ""
+					refs := make(map[prepareTurnMemoryPartIdentity]string, len(row.partRefs)+1)
+					for key, value := range row.partRefs {
+						refs[key] = value
+					}
+					refs[prepareTurnMemoryPartIdentity{part.Key, part.Text}], ref = ref, ""
+					row.partRefs = refs
 				}
 			}
 		}
-		lines := []string{}
-		for _, part := range row.Parts {
-			text := part.Text
-			if ref := row.partRefs[prepareTurnMemoryPartIdentity{part.Key, part.Text}]; ref != "" {
-				text = "[" + ref + "] " + text
-			}
-			lines = append(lines, "  "+text)
-		}
-		row.rendered = ""
-		if len(lines) > 0 {
-			row.rendered = strings.TrimSpace("- " + row.Header + "\n" + strings.Join(lines, "\n"))
+		// The previous row's parts keep their refs, so its fold carries over.
+		if previous != nil && previous.cost.valid {
+			row.cost = l.foldRowCost(row, previous.cost, previousParts)
+		} else {
+			row.cost = l.foldRowCost(row, prepareTurnRowCost{}, 0)
 		}
 	}
 	cost := func(text string) int {
@@ -1101,16 +1437,38 @@ func (l *prepareTurnMemoryReadingLayout) preview(row prepareTurnMemoryReadingRow
 		}
 		return 1 + utf8.RuneCountInString(text)
 	}
-	delta := cost(row.rendered)
+	var delta int
+	if row.Group == "" {
+		delta = cost(row.rendered)
+	} else if measured, ok := row.cost.renderedCost(len(row.Parts)); ok {
+		// Most previewed rows are rejected by the budget; render on apply.
+		delta, row.rendered, row.renderPending = measured, "", true
+	} else {
+		row.rendered = renderPrepareTurnMemoryRow(row)
+		delta = cost(row.rendered)
+	}
 	if previous != nil {
 		delta -= cost(previous.rendered)
 	}
-	return prepareTurnMemoryReadingEdit{delta: delta, row: row, previous: previous}
+	edit := prepareTurnMemoryReadingEdit{delta: delta, row: row, previous: previous}
+	if previous != nil {
+		edit.previousParts = len(previous.Parts)
+	}
+	return edit
 }
 func (l *prepareTurnMemoryReadingLayout) apply(edit prepareTurnMemoryReadingEdit) string {
+	edit.row.rendered, edit.row.renderPending = edit.row.text(), false
 	row := &edit.row
 	if edit.previous != nil {
 		oldOrder := edit.previous.Order
+		// The new row is the previous row's parts followed by the added ones;
+		// the previous row is overwritten, so its part index carries over.
+		if index := edit.previous.partIndex; index != nil && edit.previousParts == len(edit.previous.Parts) {
+			for _, part := range edit.row.Parts[len(edit.previous.Parts):] {
+				index[part.Key] = append(index[part.Key], part.Text)
+			}
+			edit.row.partIndex = index
+		}
 		*edit.previous = edit.row
 		row = edit.previous
 		if row.Order != oldOrder {
@@ -1131,12 +1489,16 @@ func (l *prepareTurnMemoryReadingLayout) apply(edit prepareTurnMemoryReadingEdit
 	}
 	for _, part := range row.Parts {
 		shared := prepareTurnMemorySharedPartIdentity(part)
-		if shared.Key != "" && l.currentParts != nil {
+		if shared.Key != "" && l.currentParts != nil && !l.currentParts[shared] {
 			l.currentParts[shared] = true
+			if l.currentLookup != nil {
+				l.currentLookup.version++
+			}
 		}
 	}
 	return row.rendered
 }
+
 func (l *prepareTurnMemoryReadingLayout) texts() []string {
 	lines := make([]string, 0, len(l.rows))
 	for _, row := range l.rows {
@@ -1147,9 +1509,13 @@ func (l *prepareTurnMemoryReadingLayout) texts() []string {
 	return lines
 }
 func prepareTurnMemoryCandidateRow(c prepareTurnPriorityMemoryCandidate, order int, ref string) prepareTurnMemoryReadingRow {
-	row := prepareTurnMemoryReadingRow{Order: order, FactID: c.CanonicalFactID, Plain: "- " + c.RenderedText}
+	return prepareTurnMemoryCandidateRowWithPlain(c, order, ref, "- "+c.RenderedText)
+}
+
+func prepareTurnMemoryCandidateRowWithParts(c prepareTurnPriorityMemoryCandidate, order int, ref, plain string, parts []prepareTurnMemoryFormPart) prepareTurnMemoryReadingRow {
+	row := prepareTurnMemoryReadingRow{Order: order, FactID: c.CanonicalFactID, Plain: plain}
 	if c.Minimum != nil {
-		row.Group, row.Header, row.Parts, row.Ref = c.Minimum.Group, strings.TrimSpace(prepareTurnMemorySourceHeading(c, true)+" "+c.Minimum.Heading), prepareTurnMemoryDeliveryParts(c.Minimum.Parts), ref
+		row.Group, row.Header, row.Parts, row.Ref = c.Minimum.Group, strings.TrimSpace(prepareTurnMemorySourceHeading(c, true)+" "+c.Minimum.Heading), parts, ref
 	}
 	return row
 }
