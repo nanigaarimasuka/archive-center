@@ -217,15 +217,34 @@ func callDocumentEmbeddings(ctx context.Context, cfg completeTurnEmbeddingConfig
 	return callEmbeddingInputs(ctx, cfg, inputs, "document")
 }
 
+// callEmbeddingInputs calls the provider, trying again up to cfg.RetryCount
+// more times while the caller's ctx lasts. Each try has its own timeout.
 func callEmbeddingInputs(ctx context.Context, cfg completeTurnEmbeddingConfig, inputs []string, inputType string) ([]string, string, error) {
 	if cfg.TimeoutMs < 0 {
 		return nil, "", errors.New("embedding timeout_ms must not be negative")
 	}
+	timeout := time.Duration(0)
 	if cfg.TimeoutMs > 0 {
-		timeout := time.Duration(cfg.TimeoutMs) * time.Millisecond
+		timeout = time.Duration(cfg.TimeoutMs) * time.Millisecond
 		if timeout <= 0 || int64(timeout/time.Millisecond) != cfg.TimeoutMs {
 			return nil, "", errors.New("embedding timeout_ms is outside the supported duration range")
 		}
+	}
+	for retry := 0; ; retry++ {
+		results, model, err := callEmbeddingInputsOnce(ctx, cfg, timeout, inputs, inputType)
+		if err == nil || retry >= cfg.RetryCount || ctx.Err() != nil || !embeddingErrorRetryable(err) {
+			return results, model, err
+		}
+		select {
+		case <-ctx.Done():
+			return results, model, err
+		case <-time.After(embeddingRetryDelay(retry + 1)):
+		}
+	}
+}
+
+func callEmbeddingInputsOnce(ctx context.Context, cfg completeTurnEmbeddingConfig, timeout time.Duration, inputs []string, inputType string) ([]string, string, error) {
+	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -310,7 +329,7 @@ func callOllamaEmbedding(ctx context.Context, cfg completeTurnEmbeddingConfig, i
 		return "", "", err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", fmt.Errorf("embedding upstream returned %s", resp.Status)
+		return "", "", &embeddingStatusError{code: resp.StatusCode, message: "embedding upstream returned " + resp.Status}
 	}
 	var data map[string]any
 	if err := json.Unmarshal(raw, &data); err != nil {
@@ -359,7 +378,7 @@ func callOpenAICompatibleEmbedding(ctx context.Context, cfg completeTurnEmbeddin
 		return "", "", err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", fmt.Errorf("embedding upstream returned %s", resp.Status)
+		return "", "", &embeddingStatusError{code: resp.StatusCode, message: "embedding upstream returned " + resp.Status}
 	}
 	var data map[string]any
 	if err := json.Unmarshal(raw, &data); err != nil {
@@ -415,7 +434,7 @@ func callVoyageContextualizedEmbeddings(ctx context.Context, cfg completeTurnEmb
 		return nil, "", err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("embedding upstream returned %s", resp.Status)
+		return nil, "", &embeddingStatusError{code: resp.StatusCode, message: "embedding upstream returned " + resp.Status}
 	}
 	var data map[string]any
 	if err := json.Unmarshal(raw, &data); err != nil {
@@ -496,7 +515,7 @@ func callGeminiEmbedding(ctx context.Context, cfg completeTurnEmbeddingConfig, i
 		if vertex {
 			detail = proxyVertexEndpointErrorDetail(status, target, data, raw)
 		}
-		return "", "", fmt.Errorf("embedding upstream returned %s: %s", http.StatusText(status), detail)
+		return "", "", &embeddingStatusError{code: status, message: fmt.Sprintf("embedding upstream returned %s: %s", http.StatusText(status), detail)}
 	}
 	embedding := mapFromAny(data["embedding"])["values"]
 	if embedding == nil {

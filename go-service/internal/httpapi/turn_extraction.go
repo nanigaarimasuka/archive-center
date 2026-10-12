@@ -41,7 +41,10 @@ type completeTurnEmbeddingConfig struct {
 	Model     string
 	Provider  string
 	TimeoutMs int64
-	Source    string
+	// RetryCount is how many more times a call that timed out or failed
+	// in transit is tried, each try with its own TimeoutMs.
+	RetryCount int
+	Source     string
 }
 
 type completeTurnExtractionConfig struct {
@@ -616,11 +619,12 @@ func completeTurnExtractionConfigFromMeta(meta map[string]any) completeTurnExtra
 			ForceWorldRuleAudit:   boolFromAny(meta["force_world_rule_backfill"]) || boolFromAny(meta["force_focused_world_rule_audit"]),
 		},
 		Embedder: completeTurnEmbeddingConfig{
-			APIKey:    stringFromMap(embeddingMap, "api_key"),
-			Endpoint:  stringFromMap(embeddingMap, "endpoint"),
-			Model:     stringFromMap(embeddingMap, "model"),
-			Provider:  stringFromMap(embeddingMap, "provider"),
-			TimeoutMs: int64FromMap(embeddingMap, "timeout_ms", 0),
+			APIKey:     stringFromMap(embeddingMap, "api_key"),
+			Endpoint:   stringFromMap(embeddingMap, "endpoint"),
+			Model:      stringFromMap(embeddingMap, "model"),
+			Provider:   stringFromMap(embeddingMap, "provider"),
+			TimeoutMs:  int64FromMap(embeddingMap, "timeout_ms", 0),
+			RetryCount: min(max(intFromAny(embeddingMap["retry_count"], 0), 0), 10),
 		},
 	}
 }
@@ -712,6 +716,10 @@ func (s *Server) selectCompleteTurnEmbeddingConfig(meta map[string]any, metaCfg 
 		timeoutMs = runtimeTimeoutMs(rt.EmbeddingTimeoutSec)
 	}
 	metaCfg.TimeoutMs = timeoutMs
+	if rt.Synced {
+		metaCfg.RetryCount = rt.EmbeddingRetryCount
+	}
+	retryCount := metaCfg.RetryCount
 	metaEmbedding := mapFromAny(meta["embedding"])
 	if len(metaEmbedding) > 0 && metaCfg.hasAnyAuthorityConfigField() {
 		metaCfg.Endpoint = metaCfg.resolvedEndpoint()
@@ -723,12 +731,13 @@ func (s *Server) selectCompleteTurnEmbeddingConfig(meta map[string]any, metaCfg 
 	}
 
 	runtimeCfg := completeTurnEmbeddingConfig{
-		Provider:  strings.TrimSpace(rt.EmbeddingProvider),
-		APIKey:    normalizeConfigSecret(rt.EmbeddingAPIKey),
-		Endpoint:  strings.TrimSpace(rt.EmbeddingEndpoint),
-		Model:     strings.TrimSpace(rt.EmbeddingModel),
-		TimeoutMs: timeoutMs,
-		Source:    "runtime_config",
+		Provider:   strings.TrimSpace(rt.EmbeddingProvider),
+		APIKey:     normalizeConfigSecret(rt.EmbeddingAPIKey),
+		Endpoint:   strings.TrimSpace(rt.EmbeddingEndpoint),
+		Model:      strings.TrimSpace(rt.EmbeddingModel),
+		TimeoutMs:  timeoutMs,
+		RetryCount: retryCount,
+		Source:     "runtime_config",
 	}
 	if runtimeCfg.hasAnyAuthorityConfigField() {
 		runtimeCfg.Endpoint = runtimeCfg.resolvedEndpoint()
@@ -752,8 +761,9 @@ func (s *Server) selectCompleteTurnEmbeddingConfig(meta map[string]any, metaCfg 
 			s.Cfg.EmbedderModel,
 			embeddingEnvFirst("AC_EMBEDDER_MODEL", "AC_LT_EMBEDDING_MODEL", "PROJECT_EMBEDDING_MODEL", "AC_PROJECT_EMBEDDING_MODEL"),
 		)),
-		TimeoutMs: timeoutMs,
-		Source:    "env_or_config",
+		TimeoutMs:  timeoutMs,
+		RetryCount: retryCount,
+		Source:     "env_or_config",
 	}
 	envCfg.Endpoint = envCfg.resolvedEndpoint()
 	if !envCfg.hasConfig() {
