@@ -381,7 +381,7 @@ func (s *Server) runSupervisorLLM(ctx context.Context, sid string, supervisorPac
 func (s *Server) runSupervisorLLMAttempt(ctx context.Context, sid string, supervisorPack map[string]any, cfg completeTurnLLMConfig, reqBody dto.ProxyPluginMainRequest, promptSource string, callLedger map[string]any) (map[string]any, map[string]any, error) {
 	// Transport-level parameter fallback stays disabled. The Publisher owner
 	// alone consumes the configured retry budget.
-	upstream, upstreamStatus, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, reqBody, nil, proxyRequestPolicy{JSONResponse: true, Purpose: "publisher", SessionID: sid})
+	upstream, upstreamStatus, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, reqBody, nil, proxyRequestPolicy{JSONResponse: true, Purpose: "publisher", SessionID: sid, Backup: s.backupLLMFor(backupRolePublisher)})
 	providerResponse := mapFromAny(upstream[proxyResponseMetadataKey])
 	observeProviderJSONResponsePolicy(callLedger, upstream)
 	if err != nil {
@@ -1339,7 +1339,14 @@ func (s *Server) handleProxyPluginMain(w http.ResponseWriter, r *http.Request) {
 	} else {
 		retryBudget = newLLMRetryBudget(s.runtimeConfigSnapshot().LLMRetryCount)
 	}
-	resp, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(r.Context(), req, retryBudget, proxyRequestPolicy{SessionID: r.URL.Query().Get("chat_session_id")})
+	policy := proxyRequestPolicy{SessionID: r.URL.Query().Get("chat_session_id")}
+	if !connectionTest {
+		// The plugin's own publisher and review calls name their role.
+		if role := strings.TrimSpace(r.URL.Query().Get("backup_role")); role != "" {
+			policy.Backup = s.backupLLMFor(role)
+		}
+	}
+	resp, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(r.Context(), req, retryBudget, policy)
 	if connectionTest {
 		writeJSON(w, http.StatusOK, buildProxyConnectionTestViewModel(req, resp, status, err))
 		return

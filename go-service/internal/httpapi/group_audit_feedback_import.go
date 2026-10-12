@@ -420,7 +420,7 @@ func (s *Server) handleImportHypamemory(w http.ResponseWriter, r *http.Request) 
 		if extractionCfg.Critic.hasConfig() {
 			var scoringTrace map[string]any
 			var scoringErr error
-			score, scoringTrace, scoringErr = s.scoreHypaMemoryImport(r.Context(), sid, summary, idx, turnIndex, extractionCfg.Critic)
+			score, scoringTrace, scoringErr = s.scoreHypaMemoryImport(r.Context(), sid, summary, idx, turnIndex, s.llmConfigWithBackup(extractionCfg.Critic, backupRoleMemoryImport))
 			if scoringErr != nil {
 				warnings = append(warnings, fmt.Sprintf("hypamemory_import_score_failed[%d]: %v", idx, scoringErr))
 				score = fallbackHypaMemoryImportScore(summary)
@@ -608,7 +608,7 @@ func (s *Server) scoreHypaMemoryImport(ctx context.Context, sid string, summary 
 	}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
 
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{ExpectJSON: true, Backup: cfg.Backup})
 	if err != nil {
 		return fallback, nil, err
 	}

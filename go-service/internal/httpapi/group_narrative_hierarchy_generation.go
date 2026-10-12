@@ -96,7 +96,9 @@ func (s *Server) callChapterSummaryLLM(ctx context.Context, sid string, fromTurn
 		TimeoutMs:           &cfg.TimeoutMs,
 	}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{
+		Purpose: "chapter_summary", SessionID: sid, ExpectJSON: true, Backup: s.backupLLMFor(backupRoleChapter),
+	})
 	if err != nil {
 		return store.ChapterSummary{}, map[string]any{
 			"configured":    true,
@@ -467,7 +469,9 @@ func (s *Server) callHierarchySummaryLLM(ctx context.Context, kind string, sid s
 		TimeoutMs:           &cfg.TimeoutMs,
 	}
 	applyProxyOverridesFromLLMConfig(&req, cfg)
-	upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, req, cfg.RetryBudget)
+	upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, cfg.RetryBudget, proxyRequestPolicy{
+		Purpose: kind + "_summary", SessionID: sid, ExpectJSON: true, Backup: s.backupLLMFor(kind),
+	})
 	if err != nil {
 		return nil, map[string]any{"configured": true, "endpoint_host": endpointHost(cfg.Endpoint), "model": cfg.Model}, err
 	}

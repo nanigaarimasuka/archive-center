@@ -613,7 +613,7 @@ func (s *Server) resumeSourceDiscoveryJob(ctx context.Context, mutable store.Sou
 	prioritized := prioritizeDiscoverySections(append([]any(nil), sections[offset:]...))
 	sections = append(append([]any(nil), sections[:offset]...), prioritized...)
 	job.Result["section_candidates"] = sections
-	newCandidates, followUps, trace, extractErr := runSourceCandidateExtraction(ctx, cfg, input, map[string]any{"section_candidates": sections[offset:]})
+	newCandidates, followUps, trace, extractErr := runSourceCandidateExtraction(ctx, s.llmConfigWithBackup(cfg, backupRoleSourceSearch), input, map[string]any{"section_candidates": sections[offset:]})
 	if extractErr != nil {
 		job.Result["extraction"] = sourceCandidateExtractionFailure(extractErr)
 		return mutable.UpdateSourceDiscoveryJob(ctx, jobID, "insufficient_source_coverage", job.Result, job.CoverageReport)
@@ -2583,7 +2583,7 @@ func sourceCandidateDerivedText(candidate map[string]any) string {
 
 func callSourceCandidateExtractionLLM(ctx context.Context, cfg completeTurnLLMConfig, request dto.ProxyPluginMainRequest) (string, error) {
 	if !strings.EqualFold(strings.TrimSpace(cfg.Provider), "ollama") {
-		upstream, _, err := performProxyPluginMainWithRetryBudget(ctx, request, cfg.RetryBudget)
+		upstream, _, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, request, cfg.RetryBudget, proxyRequestPolicy{ExpectJSON: true, Backup: cfg.Backup})
 		if err != nil {
 			return "", err
 		}

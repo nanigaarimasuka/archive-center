@@ -37,6 +37,11 @@ type proxyRequestPolicy struct {
 	JSONResponse bool
 	Purpose      string
 	SessionID    string
+	// ExpectJSON marks a call whose caller parses JSON from the answer
+	// without asking the provider for JSON mode. Prose then counts as a
+	// content failure for the backup LLM.
+	ExpectJSON bool
+	Backup     *backupLLMTarget
 }
 
 type proxyEmptyContentError struct {
@@ -83,7 +88,11 @@ func callProxyProvider(ctx context.Context, req dto.ProxyPluginMainRequest) (map
 	return callProxyProviderWithPolicy(ctx, req, proxyRequestPolicy{}, nil)
 }
 
-func callProxyProviderWithPolicy(ctx context.Context, req dto.ProxyPluginMainRequest, policy proxyRequestPolicy, retryBudget *llmRetryBudget) (result map[string]any, status int, callErr error) {
+func callProxyProviderWithPolicy(ctx context.Context, req dto.ProxyPluginMainRequest, policy proxyRequestPolicy, retryBudget *llmRetryBudget) (map[string]any, int, error) {
+	return callProxyProviderWithBackup(ctx, req, policy, retryBudget)
+}
+
+func callProxyProviderOnce(ctx context.Context, req dto.ProxyPluginMainRequest, policy proxyRequestPolicy, retryBudget *llmRetryBudget) (result map[string]any, status int, callErr error) {
 	apiKey := strings.TrimSpace(stringPtrValue(req.APIKey, ""))
 	model := strings.TrimSpace(stringPtrValue(req.Model, ""))
 	provider := strings.ToLower(strings.TrimSpace(stringPtrValue(req.Provider, "")))
@@ -840,6 +849,11 @@ func proxyCallGemini(ctx context.Context, req dto.ProxyPluginMainRequest, endpoi
 		candidate = mapFromAny(candidates[0])
 	}
 	finishReason := strings.TrimSpace(extractionStringFromAny(candidate["finishReason"]))
+	if finishReason == "" {
+		// A blocked prompt comes back without candidates; the reason is in
+		// the prompt feedback instead.
+		finishReason = strings.TrimSpace(extractionStringFromAny(mapFromAny(data["promptFeedback"])["blockReason"]))
+	}
 	resp := proxyNormalizeChatResponse(content, model, finishReason)
 	proxyAttachGeminiUsage(resp, data, overrideTrace)
 	responseMeta := buildProxyResponseMetadata("google_generate_content", finishReason, mapFromAny(data["usageMetadata"]))
@@ -2036,7 +2050,7 @@ func proxyTerminationKind(finishReason string) string {
 		return "complete"
 	case "length", "max_tokens", "max_output_tokens", "model_context_window_exceeded":
 		return "length"
-	case "content_filter", "safety", "recitation", "prohibited_content", "blocked", "blocklist", "spii", "image_safety", "language":
+	case "content_filter", "safety", "recitation", "prohibited_content", "blocked", "blocklist", "spii", "image_safety", "language", "refusal":
 		return "safety"
 	case "tool_calls", "function_call", "tool_use":
 		return "tool"
