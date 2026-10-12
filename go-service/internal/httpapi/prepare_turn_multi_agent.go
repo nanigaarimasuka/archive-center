@@ -1298,6 +1298,42 @@ func multiAgentCurrentRelevanceByText(currentInput string, facts []prepareTurnPr
 	return scores
 }
 
+// multiAgentInputItem is a candidate item of a role's input with what
+// choosing it reads: its id and its text's rune count. A fact's item map is
+// built by get, once it is chosen.
+type multiAgentInputItem struct {
+	id    string
+	chars int
+	item  map[string]any
+	build func() map[string]any
+}
+
+func (m multiAgentInputItem) get() map[string]any {
+	if m.item == nil && m.build != nil {
+		return m.build()
+	}
+	return m.item
+}
+
+func multiAgentEagerItem(item map[string]any) multiAgentInputItem {
+	return multiAgentInputItem{id: extractionStringFromAny(item["id"]), chars: len([]rune(extractionStringFromAny(item["text"]))), item: item}
+}
+
+// multiAgentLazyFactItem is prepareTurnMemoryModelCandidate(c, refs), built
+// when chosen. Its text is prepareTurnMemoryReadingText(c), whose rune count
+// a reading form already holds as Chars.
+func multiAgentLazyFactItem(c prepareTurnPriorityMemoryCandidate, refs map[string]string) multiAgentInputItem {
+	chars := 0
+	if c.Minimum != nil {
+		chars = c.Minimum.Chars
+	} else {
+		chars = len([]rune(prepareTurnMemoryReadingText(c)))
+	}
+	return multiAgentInputItem{id: c.CanonicalFactID, chars: chars, build: func() map[string]any {
+		return prepareTurnMemoryModelCandidate(c, refs)
+	}}
+}
+
 func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, summaries []prepareTurnPriorityTurnSummaryCandidate, req dto.PrepareTurnRequest, cfg multiAgentSettings, capChars, maxItems int, laneCaps map[string]int, context ...map[string]any) map[string]any {
 	var lore []map[string]any
 	var refs map[string]string
@@ -1322,7 +1358,9 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 	}
 	// Selection stays in the first two groups. The other groups are reading
 	// evidence found by this role's own question, within the same input budget.
-	groups := [][]map[string]any{{}, {}, {}, {}}
+	// A fact's item is built only when it is chosen: most are not, and each
+	// carries its whole reading.
+	groups := [][]multiAgentInputItem{{}, {}, {}, {}}
 	// Reorder only this reading copy; source scores and final selection retain
 	// their existing owners. The first reading balances the current input with
 	// recalled context, without weakening a precise semantic match.
@@ -1373,7 +1411,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 			}
 			group = 2
 		}
-		groups[group] = append(groups[group], prepareTurnMemoryModelCandidate(c, refs))
+		groups[group] = append(groups[group], multiAgentLazyFactItem(c, refs))
 	}
 	for _, c := range summaries {
 		group := 1
@@ -1386,17 +1424,17 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 		// Summaries already come from the scoped public-memory projection.
 		text := c.CompleteText
 		if c.Minimum != nil {
-			text = c.Minimum.Text
+			text = c.Minimum.text()
 		}
 		item := map[string]any{"ref": refs[c.SummaryID], "id": c.SummaryID, "source_ref": c.SourceRef, "text": text, "source_turn": c.SourceTurn}
 		if len(c.KnowledgeBoundaries) > 0 {
 			item["knowledge_boundaries"] = c.KnowledgeBoundaries
 		}
-		groups[group] = append(groups[group], item)
+		groups[group] = append(groups[group], multiAgentEagerItem(item))
 	}
 	for g := 2; g < len(groups); g++ {
 		sort.SliceStable(groups[g], func(i, j int) bool {
-			return searchEvidenceRanks[extractionStringFromAny(groups[g][i]["id"])] > searchEvidenceRanks[extractionStringFromAny(groups[g][j]["id"])]
+			return searchEvidenceRanks[groups[g][i].id] > searchEvidenceRanks[groups[g][j].id]
 		})
 	}
 	if role == "world_state" {
@@ -1409,7 +1447,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 			if label := extractionStringFromAny(c["label"]); label != "" {
 				item["label"] = extractionStringFromAny(item["ref"]) + " · " + label
 			}
-			groups[1] = append(groups[1], item)
+			groups[1] = append(groups[1], multiAgentEagerItem(item))
 		}
 	}
 	// Extend the existing whole-entry group reservation to requested reading;
@@ -1421,7 +1459,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 			remainingGroups++
 			minimum[g] = inputCap + 1
 			for _, item := range groups[g] {
-				minimum[g] = minInt(minimum[g], len([]rune(extractionStringFromAny(item["text"]))))
+				minimum[g] = minInt(minimum[g], item.chars)
 			}
 			minimumTotal += minimum[g]
 		}
@@ -1451,8 +1489,8 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 		// These sources already fitted the first packet. A changed group split
 		// in the supplement cannot remove an editor's earlier selections.
 		for i, item := range groups[g] {
-			if retained[extractionStringFromAny(item["id"])] {
-				n := len([]rune(extractionStringFromAny(item["text"])))
+			if retained[item.id] {
+				n := item.chars
 				selected[g][i], usedByGroup[g], chars = true, usedByGroup[g]+n, chars+n
 			}
 		}
@@ -1460,7 +1498,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 	for g := range groups {
 		used := usedByGroup[g]
 		for i, item := range groups[g] {
-			n := len([]rune(extractionStringFromAny(item["text"])))
+			n := item.chars
 			if !selected[g][i] && used+n <= limits[g] && chars+n <= inputCap {
 				selected[g][i], used, chars = true, used+n, chars+n
 			}
@@ -1471,7 +1509,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 			continue
 		}
 		for i, item := range groups[g] {
-			n := len([]rune(extractionStringFromAny(item["text"])))
+			n := item.chars
 			if !selected[g][i] && chars+n <= inputCap {
 				selected[g][i], chars = true, chars+n
 			}
@@ -1482,7 +1520,7 @@ func multiAgentInput(role string, facts []prepareTurnPriorityMemoryCandidate, su
 	for g := range groups {
 		for i, item := range groups[g] {
 			if selected[g][i] {
-				chosen[g] = append(chosen[g], item)
+				chosen[g] = append(chosen[g], item.get())
 			} else {
 				omitted++
 			}
