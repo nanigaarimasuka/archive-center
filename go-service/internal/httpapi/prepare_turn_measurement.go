@@ -93,6 +93,11 @@ func prepareTurnMeasureRead[T any](m *prepareTurnMeasurement, name string, read 
 	span := m.start(name)
 	rows, err := read()
 	span.end()
+	prepareTurnMeasureReadRows(m, name, rows, err)
+	return rows, err
+}
+
+func prepareTurnMeasureReadRows[T any](m *prepareTurnMeasurement, name string, rows T, err error) {
 	if m != nil {
 		observing := m.start("measurement.row_size")
 		v := reflect.ValueOf(rows)
@@ -109,7 +114,6 @@ func prepareTurnMeasureRead[T any](m *prepareTurnMeasurement, name string, read 
 		}
 		observing.end()
 	}
-	return rows, err
 }
 
 func prepareTurnMeasuredTextBytes(v reflect.Value) int {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -134,6 +135,7 @@ type fakeVectorStore struct {
 	searchResults  []vector.VectorDocument
 	memoryResults  []vector.VectorDocument
 	searchErr      error
+	searchMu       sync.Mutex // prepare-turn recall searches run concurrently
 	searchCalls    int
 	searchLimit    int
 	searchFilter   string
@@ -144,6 +146,8 @@ type fakeVectorStore struct {
 }
 
 func (f *fakeVectorStore) Search(ctx context.Context, sessionID string, v []float32, limit int, filter string) ([]vector.VectorDocument, error) {
+	f.searchMu.Lock()
+	defer f.searchMu.Unlock()
 	f.searchCalls++
 	f.searchLimit = limit
 	f.searchFilter = filter
