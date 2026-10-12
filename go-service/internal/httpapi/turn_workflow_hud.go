@@ -133,6 +133,10 @@ type turnWorkflowHUDNotice struct {
 	Code       string `json:"code"`
 	MessageKey string `json:"message_key"`
 	StageKey   string `json:"stage_key,omitempty"`
+	// For BACKUP_LLM_USED: the roles of the call the backup answered and why
+	// the primary model's answer was not taken.
+	BackupRoles  []string `json:"backup_roles,omitempty"`
+	BackupReason string   `json:"backup_reason,omitempty"`
 }
 
 // Optional, request-local timing only. These calls do not add workflow stages.

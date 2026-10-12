@@ -70,6 +70,20 @@ type RuntimeConfig struct {
 	SourceSearchPlannerReasoningPreset string
 	SourceSearchPlannerReasoningEffort string
 	SourceSearchPlannerReasoningBudget *int64
+	BackupEnabled                      bool
+	BackupProvider                     string
+	BackupAPIKey                       string
+	BackupEndpoint                     string
+	BackupModel                        string
+	BackupTimeoutSec                   int64
+	BackupTemperature                  *float64
+	BackupTemperatureFromRole          bool
+	BackupTimeoutFromRole              bool
+	BackupMaxTokens                    *int64
+	BackupReasoningPreset              string
+	BackupReasoningEffort              string
+	BackupReasoningBudget              *int64
+	BackupRoles                        map[string]bool
 	LLMRetryCount                      int
 	FailedQueueMaxAttempts             int
 	CriticReprocessingIntervalSec      int
@@ -284,6 +298,29 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setString("sourceSearchPlannerReasoningPreset", &s.RuntimeConfig.SourceSearchPlannerReasoningPreset)
 	setString("sourceSearchPlannerReasoningEffort", &s.RuntimeConfig.SourceSearchPlannerReasoningEffort)
 	setIntPtr("sourceSearchPlannerReasoningBudgetTokens", &s.RuntimeConfig.SourceSearchPlannerReasoningBudget)
+	setBool := func(pluginKey string, target *bool) {
+		if value, ok := body[pluginKey]; ok {
+			*target = boolFromAny(value)
+			updated = append(updated, pluginKey)
+		}
+	}
+	setBool("backupLlmEnabled", &s.RuntimeConfig.BackupEnabled)
+	setBool("backupTemperatureFromRole", &s.RuntimeConfig.BackupTemperatureFromRole)
+	setBool("backupTimeoutFromRole", &s.RuntimeConfig.BackupTimeoutFromRole)
+	setString("backupProvider", &s.RuntimeConfig.BackupProvider)
+	setString("backupApiKey", &s.RuntimeConfig.BackupAPIKey)
+	setString("backupEndpoint", &s.RuntimeConfig.BackupEndpoint)
+	setString("backupModel", &s.RuntimeConfig.BackupModel)
+	setInt("backupTimeout", &s.RuntimeConfig.BackupTimeoutSec)
+	setFloatPtr("backupTemperature", &s.RuntimeConfig.BackupTemperature)
+	setIntPtr("backupMaxCompletionTokens", &s.RuntimeConfig.BackupMaxTokens)
+	setString("backupReasoningPreset", &s.RuntimeConfig.BackupReasoningPreset)
+	setString("backupReasoningEffort", &s.RuntimeConfig.BackupReasoningEffort)
+	setIntPtr("backupReasoningBudgetTokens", &s.RuntimeConfig.BackupReasoningBudget)
+	if value, ok := body["backupLlmRoles"]; ok {
+		s.RuntimeConfig.BackupRoles = backupLLMRolesFromAny(value)
+		updated = append(updated, "backupLlmRoles")
+	}
 	setClampedInt("llmRetryCount", &s.RuntimeConfig.LLMRetryCount, 0, 10)
 	setClampedInt("failedQueueMaxAttempts", &s.RuntimeConfig.FailedQueueMaxAttempts, 1, 11)
 	setClampedInt("criticReprocessingIntervalSec", &s.RuntimeConfig.CriticReprocessingIntervalSec, 1, 3600)

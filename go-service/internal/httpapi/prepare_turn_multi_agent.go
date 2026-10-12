@@ -642,7 +642,7 @@ func (s *Server) callMultiAgent(ctx context.Context, role string, settings multi
 		sessionID = sessionIDs[0]
 	}
 	providerStarted := time.Now()
-	upstream, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{Purpose: "memory_preprocessing", SessionID: sessionID})
+	upstream, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{Purpose: "memory_preprocessing", SessionID: sessionID, ExpectJSON: true, Backup: s.backupLLMFor(backupRolePreprocessing + role)})
 	call.TimingMS["provider_operation"] = durationMilliseconds(time.Since(providerStarted))
 	decodeStarted := time.Now()
 	call.Raw, _, _ = normalizePublisherResponseContent(upstream)

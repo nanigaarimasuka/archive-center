@@ -351,7 +351,7 @@ Report selections separately for each assignment. Answering every role does not 
 	req.Messages = []any{map[string]any{"role": "system", "content": prompt}, map[string]any{"role": "user", "content": modelInput}}
 	callTiming := map[string]float64{"request_preparation": durationMilliseconds(time.Since(started))}
 	providerStarted := time.Now()
-	upstream, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{Purpose: "memory_preprocessing", SessionID: sessionID})
+	upstream, status, err := performProxyPluginMainWithRetryBudgetAndPolicy(ctx, req, nil, proxyRequestPolicy{Purpose: "memory_preprocessing", SessionID: sessionID, ExpectJSON: true, Backup: s.backupLLMFor(backupPreprocessingRoles(roles)...)})
 	callTiming["provider_operation"] = durationMilliseconds(time.Since(providerStarted))
 	decodeStarted := time.Now()
 	raw, _, _ := normalizePublisherResponseContent(upstream)

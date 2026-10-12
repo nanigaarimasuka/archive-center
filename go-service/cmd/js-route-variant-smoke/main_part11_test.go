@@ -988,7 +988,7 @@ func TestCompleteTurnHUDUsesBackendLedgerRequestBeforeCachedLineage(t *testing.T
 	if backendKey < 0 || lineageFallback < 0 || backendKey > lineageFallback {
 		t.Fatalf("complete-turn HUD key is not aligned with the backend ledger owner: %s", requestID)
 	}
-	presentation := extractArchiveCenterJSFunction(t, src, "buildTurnWorkflowHUDPresentation")
+	presentation := extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDBackupDetails") + "\n" + extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDStageUsedBackup") + "\n" + extractArchiveCenterJSFunction(t, src, "buildTurnWorkflowHUDPresentation")
 	if !strings.Contains(presentation, "turnWorkflowHUDErrorSummaryHTML(error)") {
 		t.Fatal("recovering HUD does not render a short error summary")
 	}
@@ -1010,7 +1010,7 @@ func TestTurnWorkflowHUDTransportFailureClassificationAndPersistenceRuntime(t *t
 	hasWarning := extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDHasHostWarning")
 	warningHTML := extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDWarningListHTML")
 	renderTransport := extractArchiveCenterJSFunction(t, src, "renderTurnWorkflowHUDTransportError")
-	presentation := extractArchiveCenterJSFunction(t, src, "buildTurnWorkflowHUDPresentation")
+	presentation := extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDBackupDetails") + "\n" + extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDStageUsedBackup") + "\n" + extractArchiveCenterJSFunction(t, src, "buildTurnWorkflowHUDPresentation")
 	watch := extractArchiveCenterJSFunction(t, src, "startTurnWorkflowHUDWatch")
 
 	if strings.Contains(renderTransport, `_turnWorkflowHUDTerminalRequestId = requestId`) {
