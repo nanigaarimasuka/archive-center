@@ -1198,6 +1198,7 @@ func enqueueMemoryVectorOperation(ctx context.Context, exec memoryDerivationSQLE
 	if err != nil {
 		return false, err
 	}
+	RecordMemoryVectorOperation(ctx, item.OperationKey)
 	return true, nil
 }
 

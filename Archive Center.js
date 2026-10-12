@@ -1029,7 +1029,7 @@
       "explorer.delete.confirmWarn": "정말 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
       "explorer.delete.rollbackWarn": "선택한 턴부터 이후 대화 원문과 연결된 입력 조립본 / 기억 / 주관 기억 / 직접 근거 / KG / 상태 / 에피소드 요약 / 스토리라인 / 캐릭터-세계-신뢰 기록이 함께 정리됩니다.\n복구 재실행은 실패 큐 또는 로컬 삭제 스냅샷에 남아 있는 원문 대화만 다시 삽입할 수 있습니다. 삭제된 파생 기억/주관 기억/직접 근거/KG/상태는 자동으로 되살아나지 않습니다.\n원문 대화를 복구한 뒤 파생 기록까지 다시 만들려면 재검사를 추가로 실행해야 합니다.\n전체 되돌리기는 보장되지 않습니다.",
       "explorer.edit.confirmSave": "이 항목을 수정하시겠습니까?",
-      "explorer.episodes.regenConfirm": "턴 {from}-{to} 구간을 재생성하시겠습니까?\n기존 에피소드는 유지되며, 새로 생성됩니다.",
+      "explorer.episodes.regenConfirm": "턴 {from}-{to} 구간을 다시 만드시겠습니까?\n이 에피소드를 담은 챕터·아크·사가도 함께 다시 만듭니다.",
       "explorer.episodes.mergeConfirm": "{n}개 에피소드를 병합하시겠습니까?\n기존 에피소드는 유지되며, 새 병합 에피소드가 생성됩니다.",
       "settings.queue.clearConfirm": "과거 오류 기록만 지우시겠습니까?\n재시도 가능한 항목과 현재 확인 대기 항목은 유지됩니다.",
       "settings.queue.corruptConfirm": "pluginStorage의 큐 데이터를 의도적으로 파손합니다.\n다음 재시작 시 복구 안전성을 테스트합니다.",
@@ -1486,6 +1486,35 @@
       "turn_hud.warning.vector_index_skipped": "Vector 색인을 건너뜀",
       "turn_hud.warning.store_writes_disabled": "저장 기능이 꺼져 있음",
       "turn_hud.warning.maintenance_handoff_failed": "후속 정리 작업 연결 실패",
+      "turn_hud.warning.episode_blocked_missing_memory": "기억이 없는 턴이 있어 에피소드 요약을 보류함 (세션 정상화로 복구)",
+      "turn_hud.warning.hierarchy_summary_failed": "챕터·아크·사가 요약 생성 실패 (세션 정상화로 재시도)",
+      "summaryFailures.title": "요약 실패 구간",
+      "summaryFailures.none": "실패한 요약 구간이 없습니다.",
+      "summaryFailures.memories": "기억 없는 턴",
+      "summaryFailures.episodes": "에피소드",
+      "summaryFailures.chapters": "챕터",
+      "summaryFailures.arcs": "아크",
+      "summaryFailures.sagas": "사가",
+      "summaryFailures.blockedOn": "기억 없는 턴",
+      "summaryFailures.hint": "실패한 구간은 저장되지 않습니다. 세션 정상화를 실행하면 다시 시도합니다.",
+      "summaryFailures.normalize": "세션 정상화",
+      "summaryFailures.unavailable": "요약 실패 구간을 확인하지 못했습니다.",
+      "summaryFailures.rebuild": "다시 만들 요약",
+      "summaryFailures.rebuildReason.broken_list_fields": "목록 칸 깨짐",
+      "summaryFailures.rebuildReason.rule_based_summary": "규칙 기반 대체 요약",
+      "summaryFailures.rebuildReason.rule_based_fields": "이름·핵심 갈등이 규칙 기반",
+      "summaryFailures.rebuildReason.contains_rebuilt_summary": "아래 요약을 다시 만듦",
+      "explorer.hierarchy.layer.chapter": "챕터",
+      "explorer.hierarchy.layer.arc": "아크",
+      "explorer.hierarchy.layer.saga": "사가",
+      "explorer.hierarchy.regenTooltip": "이 요약 다시 만들기",
+      "explorer.hierarchy.regenConfirm": "{target}을(를) 다시 만드시겠습니까?\n이 요약을 담은 상위 요약도 함께 다시 만듭니다. 새 요약이 만들어진 경우에만 기존 것을 바꿉니다.",
+      "explorer.hierarchy.regenRunning": "{target} 다시 만드는 중...",
+      "explorer.hierarchy.regenDone": "{target} 다시 만들기 완료",
+      "explorer.hierarchy.regenFailed": "{target} 다시 만들기 실패 (기존 요약 유지): {reason}",
+      "sessionNormalize.confirmRebuild": "다시 만들어야 할 요약이 있습니다.\n\n{items}\n\n세션 정상화와 함께 다시 만들까요? 새 요약이 만들어진 경우에만 기존 것을 바꿉니다.\n\n취소해도 나머지 정상화는 그대로 진행합니다.",
+      "summaryFailures.rowFailed": "생성 실패 · 세션 정상화로 다시 시도",
+      "summaryFailures.rowHeld": "보류 · 기억 없는 턴 {turns}",
       "turn_hud.warning.ooc_turn_skipped": "OOC 턴은 저장하지 않음",
       "turn_hud.warning.duplicate_turn_conflict": "같은 턴에 서로 다른 저장값이 있어 새 값을 저장하지 않음",
       "turn_hud.warning.duplicate_turn_replay": "이미 처리된 턴의 중복 저장을 차단함",
@@ -1521,6 +1550,7 @@
       "sessionNormalize.stage.raw_repair_replay": "원문 검사·복구",
       "sessionNormalize.stage.critic_rescan_backfill": "기억·근거 생성",
       "sessionNormalize.stage.vector_reindex": "벡터 색인 확인",
+      "sessionNormalize.stage.vector_delivery": "검색용 벡터 저장",
       "sessionNormalize.stage.completed": "마무리",
       "sessionNormalize.progress": "진행",
       "sessionNormalize.succeeded": "성공",
@@ -1544,6 +1574,27 @@
       "sessionNormalize.count.vector": "벡터",
       "sessionNormalize.failureTurn": "{turn}턴 실패",
       "sessionNormalize.moreFailures": "외 {count}건",
+      "sessionNormalize.editedTurns": "RisuAI에서 수정된 턴을 반영했습니다: {turns}",
+      "sessionNormalize.confirmEdits": "RisuAI에서 내용이 바뀐 턴이 {count}개 있습니다 ({turns}).\n\n수정된 턴만 반영: 이 턴들의 원문을 RisuAI의 내용으로 바꾸고, 기억과 그 턴이 들어 있는 상위 요약을 다시 만듭니다.\n{from}턴부터 다시 처리: 원문을 바꾼 뒤 {from}턴부터 끝까지 모든 턴을 처음부터 다시 처리합니다. 턴 수만큼 오래 걸립니다.\n\n취소하면 이 턴들은 바꾸지 않고 검토 필요로 남깁니다.",
+      "sessionNormalize.editChoice.apply": "수정된 턴만 반영",
+      "sessionNormalize.editChoice.replay": "{from}턴부터 다시 처리",
+      "sessionNormalize.review.title": "확인 필요 {count}건",
+      "sessionNormalize.review.note": "다른 턴도 함께 만든 기록이라 그대로 두었습니다. 직접 고치거나, 수정한 턴부터 다시 처리할 수 있습니다.",
+      "sessionNormalize.review.kind.pending_thread": "떡밥",
+      "sessionNormalize.review.kind.storyline": "스토리라인",
+      "sessionNormalize.review.kind.status": "상태",
+      "sessionNormalize.review.changedLater": "{turn}턴에서 나온 기록을 {other}턴이 다시 바꿈",
+      "sessionNormalize.review.lastChangedHere": "{other}턴에서 나온 기록을 {turn}턴이 마지막으로 바꿈",
+      "sessionNormalize.review.more": "외 {count}건",
+      "sessionNormalize.review.openTrust": "기억 탭에서 직접 고치기",
+      "sessionNormalize.review.replay": "{from}턴부터 다시 처리",
+      "sessionNormalize.confirmReplay": "{from}턴부터 다시 처리할까요?\n\n{from}턴~{last}턴({count}턴)의 파생 기록을 지우고 평론가로 처음부터 다시 만듭니다. 턴마다 평론가를 한 번씩 부르고, 에피소드부터 사가까지 요약도 다시 만들기 때문에 턴 수만큼 오래 걸립니다.\n\n원문은 그대로입니다. 고정하거나 직접 고친 세계 규칙·떡밥·스토리라인은 유지합니다.",
+      "sessionNormalize.replayed": "{from}턴부터 {count}턴을 다시 처리했습니다",
+      "sessionNormalize.replayStopped": "{turn}턴에서 멈췄습니다. 재시도해도 평론가가 실패해서, 순서가 꼬이지 않도록 뒤의 {count}턴은 처리하지 않았습니다. 이 턴은 백그라운드에서 계속 재시도합니다.",
+      "sessionNormalize.review.resumeNormalize": "{from}턴부터 이어서 정상화",
+      "sessionNormalize.review.resume": "{from}턴부터 이어서 다시 처리",
+      "sessionNormalize.retried": "재시도 후 성공한 턴: {turns}",
+      "sessionNormalize.recovered": "처음엔 실패했지만 재시도로 기억이 만들어진 턴: {turns}",
       "sessionNormalize.error.critic_provider_timeout": "평론가 LLM 응답이 설정된 제한시간을 넘겼습니다. LLM Gateway 상태와 평론가 제한시간을 확인하세요.",
       "sessionNormalize.error.critic_llm_failed": "평론가 LLM 호출에 실패했습니다. 프로바이더 연결과 모델 설정을 확인하세요.",
       "sessionNormalize.error.accepted_source_revision_missing": "확정된 원문 버전을 찾지 못해 이 턴의 기억 생성을 진행하지 못했습니다.",
@@ -2599,7 +2650,7 @@
       "explorer.delete.confirmWarn": "Are you sure you want to delete?\nThis action cannot be undone.",
       "explorer.delete.rollbackWarn": "From the selected turn onward, the chat logs and linked Effective Input / Memory / Subjective Memory / Direct Evidence / KG / state / episode summaries / storyline / character-world-trust records will be removed together.\nRepair Replay can only re-insert raw chat_logs still available in the failed queue or local delete snapshot. It does not automatically rebuild derived Memory/Subjective Memory/Direct Evidence/KG/state records.\nIf you restore raw chat_logs and also need the derived records back, run Rescan afterward.\nA full undo is not guaranteed.",
       "explorer.edit.confirmSave": "Save changes to this item?",
-      "explorer.episodes.regenConfirm": "Regenerate turns {from}-{to}?\nExisting episodes are kept; a new one will be created.",
+      "explorer.episodes.regenConfirm": "Rebuild turns {from}-{to}?\nThe chapter, arc, and saga holding this episode are rebuilt too.",
       "explorer.episodes.mergeConfirm": "Merge {n} episodes?\nExisting episodes are kept; a new merged episode will be created.",
       "settings.queue.clearConfirm": "Clear past error history only?\nRetryable items and current pending confirmations will be preserved.",
       "settings.queue.corruptConfirm": "Intentionally corrupt pluginStorage queue data.\nTests recovery safety on next restart.",
@@ -2840,6 +2891,35 @@
       "turn_hud.warning.vector_index_skipped": "Vector indexing was skipped",
       "turn_hud.warning.store_writes_disabled": "Storage writes are disabled",
       "turn_hud.warning.maintenance_handoff_failed": "Follow-up maintenance handoff failed",
+      "turn_hud.warning.episode_blocked_missing_memory": "Episode summary held: a turn has no memory (run Session Normalize)",
+      "turn_hud.warning.hierarchy_summary_failed": "Chapter/arc/saga summary failed (run Session Normalize to retry)",
+      "summaryFailures.title": "Failed summaries",
+      "summaryFailures.none": "No failed summary ranges.",
+      "summaryFailures.memories": "Turns without memory",
+      "summaryFailures.episodes": "Episodes",
+      "summaryFailures.chapters": "Chapters",
+      "summaryFailures.arcs": "Arcs",
+      "summaryFailures.sagas": "Sagas",
+      "summaryFailures.blockedOn": "turns without memory",
+      "summaryFailures.hint": "Failed ranges are not saved. Run Session Normalize to try them again.",
+      "summaryFailures.normalize": "Session Normalize",
+      "summaryFailures.unavailable": "Could not check failed summary ranges.",
+      "summaryFailures.rebuild": "Summaries to rebuild",
+      "summaryFailures.rebuildReason.broken_list_fields": "broken list fields",
+      "summaryFailures.rebuildReason.rule_based_summary": "rule-based stand-in",
+      "summaryFailures.rebuildReason.rule_based_fields": "rule-based name and conflict",
+      "summaryFailures.rebuildReason.contains_rebuilt_summary": "a summary below is rebuilt",
+      "explorer.hierarchy.layer.chapter": "Chapter",
+      "explorer.hierarchy.layer.arc": "Arc",
+      "explorer.hierarchy.layer.saga": "Saga",
+      "explorer.hierarchy.regenTooltip": "Rebuild this summary",
+      "explorer.hierarchy.regenConfirm": "Rebuild {target}?\nThe summaries above it are rebuilt too. The old one is replaced only when the new one is made.",
+      "explorer.hierarchy.regenRunning": "Rebuilding {target}...",
+      "explorer.hierarchy.regenDone": "Rebuilt {target}",
+      "explorer.hierarchy.regenFailed": "Could not rebuild {target} (old summary kept): {reason}",
+      "sessionNormalize.confirmRebuild": "Some summaries should be rebuilt.\n\n{items}\n\nRebuild them with this session normalize? The old ones are replaced only when the new ones are made.\n\nCancel still runs the rest of the normalize.",
+      "summaryFailures.rowFailed": "Failed · run Session Normalize to retry",
+      "summaryFailures.rowHeld": "Held · turns without memory {turns}",
       "turn_hud.warning.ooc_turn_skipped": "OOC turn was not saved",
       "turn_hud.warning.duplicate_turn_conflict": "Different stored values already exist for this turn; the new value was not saved",
       "turn_hud.warning.duplicate_turn_replay": "Duplicate storage for an already processed turn was blocked",
@@ -2875,6 +2955,7 @@
       "sessionNormalize.stage.raw_repair_replay": "Checking and repairing source turns",
       "sessionNormalize.stage.critic_rescan_backfill": "Building memories and evidence",
       "sessionNormalize.stage.vector_reindex": "Checking the vector index",
+      "sessionNormalize.stage.vector_delivery": "Writing search vectors",
       "sessionNormalize.stage.completed": "Finishing",
       "sessionNormalize.progress": "Progress",
       "sessionNormalize.succeeded": "Succeeded",
@@ -2898,6 +2979,27 @@
       "sessionNormalize.count.vector": "Vectors",
       "sessionNormalize.failureTurn": "Turn {turn} failed",
       "sessionNormalize.moreFailures": "{count} more",
+      "sessionNormalize.editedTurns": "Applied turns edited in RisuAI: {turns}",
+      "sessionNormalize.confirmEdits": "{count} turns now read differently in RisuAI ({turns}).\n\nApply edited turns only: replace their stored text with RisuAI's and rebuild their memories and the summaries that contain them.\nReplay from turn {from}: replace the text, then process every turn from {from} to the end again from scratch. This takes as long as that many turns.\n\nCancel leaves these turns unchanged and marked for review.",
+      "sessionNormalize.editChoice.apply": "Apply edited turns only",
+      "sessionNormalize.editChoice.replay": "Replay from turn {from}",
+      "sessionNormalize.review.title": "{count} to review",
+      "sessionNormalize.review.note": "Other turns built these records too, so they were kept. Fix them yourself, or replay from the edited turn.",
+      "sessionNormalize.review.kind.pending_thread": "Thread",
+      "sessionNormalize.review.kind.storyline": "Storyline",
+      "sessionNormalize.review.kind.status": "Status",
+      "sessionNormalize.review.changedLater": "From turn {turn}, changed again by turn {other}",
+      "sessionNormalize.review.lastChangedHere": "From turn {other}, last changed by turn {turn}",
+      "sessionNormalize.review.more": "{count} more",
+      "sessionNormalize.review.openTrust": "Fix in the memory tab",
+      "sessionNormalize.review.replay": "Replay from turn {from}",
+      "sessionNormalize.confirmReplay": "Replay from turn {from}?\n\nWhat was derived from turns {from}-{last} ({count} turns) is cleared and the Critic builds it again from scratch. The Critic runs once per turn and the summaries from episodes to sagas are rebuilt, so this takes as long as that many turns.\n\nThe raw text stays. World rules, threads, and storylines you pinned or corrected are kept.",
+      "sessionNormalize.replayed": "Replayed {count} turns from turn {from}",
+      "sessionNormalize.replayStopped": "Stopped at turn {turn}. The Critic still failed after retrying, so the {count} turns from there were left unprocessed to keep their order. That turn keeps being retried in the background.",
+      "sessionNormalize.review.resumeNormalize": "Resume normalize from turn {from}",
+      "sessionNormalize.review.resume": "Resume replay from turn {from}",
+      "sessionNormalize.retried": "Turns that succeeded on retry: {turns}",
+      "sessionNormalize.recovered": "Turns that failed at first but got their memories on retry: {turns}",
       "sessionNormalize.error.critic_provider_timeout": "The Critic LLM exceeded its configured response timeout. Check LLM Gateway status and the Critic timeout setting.",
       "sessionNormalize.error.critic_llm_failed": "The Critic LLM call failed. Check the provider connection and model settings.",
       "sessionNormalize.error.accepted_source_revision_missing": "The accepted source revision was unavailable, so memory generation for this turn could not run.",
@@ -3913,7 +4015,7 @@
       "explorer.delete.confirmWarn": "本当に削除しますか？\nこの操作は元に戻せません。",
       "explorer.delete.rollbackWarn": "選択したターン以降の会話原文と、それに連動する入力組立 / 記憶 / 主観記憶 / 直接根拠 / KG / 状態 / エピソード要約 / ストーリーライン / キャラクター-世界-信頼記録がまとめて整理されます。\n復旧再実行は失敗キューまたはローカル削除スナップショットに残っている原文会話だけを再挿入できます。削除された派生記憶/主観記憶/直接根拠/KG/状態は自動では復元されません。\n原文会話を復旧した後に派生記録も戻したい場合は、続けて再検査を実行してください。\n完全な取り消しは保証されません。",
       "explorer.edit.confirmSave": "この項目を修正しますか？",
-      "explorer.episodes.regenConfirm": "ターン{from}-{to}を再生成しますか？\n既存エピソードは保持され、新しく生成されます。",
+      "explorer.episodes.regenConfirm": "ターン{from}-{to}を作り直しますか？\nこのエピソードを含む章・アーク・サーガも作り直します。",
       "explorer.episodes.mergeConfirm": "{n}件のエピソードをマージしますか？\n既存エピソードは保持され、新しいマージエピソードが生成されます。",
       "settings.queue.clearConfirm": "過去のエラー履歴のみ消去しますか？\n再試行可能な項目と現在の確認待ち項目は保持されます。",
       "settings.queue.corruptConfirm": "pluginStorageのキューデータを意図的に破損します。\n次回再起動時の復旧安全性をテストします。",
@@ -4192,6 +4294,35 @@
       "turn_hud.warning.vector_index_skipped": "Vector索引をスキップ",
       "turn_hud.warning.store_writes_disabled": "保存機能が無効",
       "turn_hud.warning.maintenance_handoff_failed": "後続整理処理への接続に失敗",
+      "turn_hud.warning.episode_blocked_missing_memory": "記憶のないターンがあるためエピソード要約を保留 (セッション正常化で復旧)",
+      "turn_hud.warning.hierarchy_summary_failed": "章・アーク・サーガ要約の生成に失敗 (セッション正常化で再試行)",
+      "summaryFailures.title": "要約失敗区間",
+      "summaryFailures.none": "失敗した要約区間はありません。",
+      "summaryFailures.memories": "記憶のないターン",
+      "summaryFailures.episodes": "エピソード",
+      "summaryFailures.chapters": "章",
+      "summaryFailures.arcs": "アーク",
+      "summaryFailures.sagas": "サーガ",
+      "summaryFailures.blockedOn": "記憶のないターン",
+      "summaryFailures.hint": "失敗した区間は保存されません。セッション正常化を実行すると再試行します。",
+      "summaryFailures.normalize": "セッション正常化",
+      "summaryFailures.unavailable": "要約失敗区間を確認できませんでした。",
+      "summaryFailures.rebuild": "作り直す要約",
+      "summaryFailures.rebuildReason.broken_list_fields": "リスト欄の破損",
+      "summaryFailures.rebuildReason.rule_based_summary": "ルールベースの代替要約",
+      "summaryFailures.rebuildReason.rule_based_fields": "名前・中心的対立がルールベース",
+      "summaryFailures.rebuildReason.contains_rebuilt_summary": "下位要約を作り直す",
+      "explorer.hierarchy.layer.chapter": "章",
+      "explorer.hierarchy.layer.arc": "アーク",
+      "explorer.hierarchy.layer.saga": "サーガ",
+      "explorer.hierarchy.regenTooltip": "この要約を作り直す",
+      "explorer.hierarchy.regenConfirm": "{target}を作り直しますか？\nこの要約を含む上位要約も作り直します。新しい要約ができた場合のみ置き換えます。",
+      "explorer.hierarchy.regenRunning": "{target}を作り直し中...",
+      "explorer.hierarchy.regenDone": "{target}の作り直し完了",
+      "explorer.hierarchy.regenFailed": "{target}の作り直しに失敗（既存の要約を維持）: {reason}",
+      "sessionNormalize.confirmRebuild": "作り直すべき要約があります。\n\n{items}\n\nセッション正常化と一緒に作り直しますか？新しい要約ができた場合のみ置き換えます。\n\nキャンセルしても残りの正常化はそのまま進めます。",
+      "summaryFailures.rowFailed": "生成失敗 · セッション正常化で再試行",
+      "summaryFailures.rowHeld": "保留 · 記憶のないターン {turns}",
       "turn_hud.warning.ooc_turn_skipped": "OOCターンは保存しません",
       "turn_hud.warning.duplicate_turn_conflict": "同じターンに異なる保存値があるため、新しい値を保存しませんでした",
       "turn_hud.warning.duplicate_turn_replay": "処理済みターンの重複保存を防止しました",
@@ -4227,6 +4358,7 @@
       "sessionNormalize.stage.raw_repair_replay": "原文の確認・修復",
       "sessionNormalize.stage.critic_rescan_backfill": "記憶・根拠を生成中",
       "sessionNormalize.stage.vector_reindex": "Vector索引を確認中",
+      "sessionNormalize.stage.vector_delivery": "検索用ベクトルを保存中",
       "sessionNormalize.stage.completed": "完了処理",
       "sessionNormalize.progress": "進行",
       "sessionNormalize.succeeded": "成功",
@@ -4250,6 +4382,27 @@
       "sessionNormalize.count.vector": "Vector",
       "sessionNormalize.failureTurn": "ターン{turn}失敗",
       "sessionNormalize.moreFailures": "ほか{count}件",
+      "sessionNormalize.editedTurns": "RisuAIで編集されたターンを反映しました: {turns}",
+      "sessionNormalize.confirmEdits": "RisuAIで内容が変わったターンが{count}件あります（{turns}）。\n\n編集されたターンだけ反映: これらのターンの原文をRisuAIの内容に置き換え、記憶とそのターンを含む上位要約を作り直します。\nターン{from}から再処理: 原文を置き換えたあと、ターン{from}から最後までのすべてのターンを最初から処理し直します。ターン数に応じて時間がかかります。\n\nキャンセルすると、これらのターンは変更せず要確認のまま残します。",
+      "sessionNormalize.editChoice.apply": "編集されたターンだけ反映",
+      "sessionNormalize.editChoice.replay": "ターン{from}から再処理",
+      "sessionNormalize.review.title": "要確認 {count}件",
+      "sessionNormalize.review.note": "他のターンも一緒に作った記録のため、そのまま残しました。直接直すか、編集したターンから再処理できます。",
+      "sessionNormalize.review.kind.pending_thread": "伏線",
+      "sessionNormalize.review.kind.storyline": "ストーリーライン",
+      "sessionNormalize.review.kind.status": "状態",
+      "sessionNormalize.review.changedLater": "ターン{turn}の記録を、ターン{other}が再び変更",
+      "sessionNormalize.review.lastChangedHere": "ターン{other}の記録を、ターン{turn}が最後に変更",
+      "sessionNormalize.review.more": "ほか{count}件",
+      "sessionNormalize.review.openTrust": "記憶タブで直接直す",
+      "sessionNormalize.review.replay": "ターン{from}から再処理",
+      "sessionNormalize.confirmReplay": "ターン{from}から再処理しますか？\n\nターン{from}〜{last}（{count}ターン）の派生記録を消し、評論家で最初から作り直します。ターンごとに評論家を1回呼び、エピソードからサーガまでの要約も作り直すため、ターン数に応じて時間がかかります。\n\n原文はそのままです。固定または直接修正した世界ルール・伏線・ストーリーラインは残ります。",
+      "sessionNormalize.replayed": "ターン{from}から{count}ターンを再処理しました",
+      "sessionNormalize.replayStopped": "ターン{turn}で停止しました。再試行しても評論家が失敗したため、順序が崩れないよう以降の{count}ターンは処理していません。このターンはバックグラウンドで再試行を続けます。",
+      "sessionNormalize.review.resumeNormalize": "ターン{from}から正規化を再開",
+      "sessionNormalize.review.resume": "ターン{from}から再処理を再開",
+      "sessionNormalize.retried": "再試行で成功したターン: {turns}",
+      "sessionNormalize.recovered": "最初は失敗したが再試行で記憶が作られたターン: {turns}",
       "sessionNormalize.error.critic_provider_timeout": "評論家LLMが設定された応答時間を超えました。LLM Gatewayの状態と評論家のタイムアウト設定を確認してください。",
       "sessionNormalize.error.critic_llm_failed": "評論家LLMの呼び出しに失敗しました。プロバイダー接続とモデル設定を確認してください。",
       "sessionNormalize.error.accepted_source_revision_missing": "確定済みの原文リビジョンが見つからず、このターンの記憶生成を実行できませんでした。",
@@ -34807,6 +34960,9 @@
       debugLog("beforeRequest hook fired, type:", type);
       clearArchiveCenterRecomposerBridge();
       if (!settings.enabled || !isSaveType(type)) return payload;
+      // The model bridge stops when the backend stops answering. Each turn
+      // starts it again, so the turn's Risu model calls have a tab to run in.
+      startRisuModelBridge();
 
       recordHostDiagnostic({stage: "before_request", kind: "host_observation_started"});
       const extractedMessages = extractMessages(payload);
@@ -38954,6 +39110,12 @@
     }
     refreshExplorerUI({ preserveScroll: true });
     cancelAdminBackgroundJobStream(kind, jobId);
+    if (String(kind || "") === "session_normalize" && _summaryFailureState.sessionId) {
+      // Normalize retries the failed ranges; show what is still left.
+      loadSummaryFailures(_summaryFailureState.sessionId)
+        .then(function() { refreshExplorerUI({ preserveScroll: true }); })
+        .catch(function() {});
+    }
     return true;
   }
 
@@ -39182,6 +39344,19 @@
   let _activeChatRescanDryRunState = { loading: false, error: null, result: null };
   let _activeChatRecentRebuildState = { loading: false, error: null, result: null };
   let _chatLogRepairState = { loading: false, error: null, progress: null, result: null };
+
+  // Failed summaries are not saved, so the backend finds them as gaps:
+  // turns without a memory and closed ranges without their summary.
+  let _summaryFailureState = { sessionId: "", loading: false, error: null, report: null, failureCount: 0 };
+
+  function summaryFailureQueryString() {
+    return [
+      ["episode_interval_turns", settings.episodeIntervalTurns || DEFAULT_SETTINGS.episodeIntervalTurns],
+      ["chapter_interval_episodes", settings.chapterIntervalEpisodes || DEFAULT_SETTINGS.chapterIntervalEpisodes],
+      ["arc_interval_chapters", settings.arcIntervalChapters || DEFAULT_SETTINGS.arcIntervalChapters],
+      ["saga_interval_arcs", settings.sagaIntervalArcs || DEFAULT_SETTINGS.sagaIntervalArcs],
+    ].map(function(pair) { return pair[0] + "=" + encodeURIComponent(String(pair[1])); }).join("&");
+  }
 
   function setChatLogRepairProgress(kind, detail) {
     _chatLogRepairState.progress = {
@@ -39577,7 +39752,10 @@
           ? "mismatch_or_partial"
           : "missing";
       const derivedTotal = derived ? Number(derived.derivedTotal || 0) : 0;
-      const derivedStatus = derivedTotal > 0 ? "present" : rawStatus === "missing" ? "not_checked_no_raw" : "missing_suspected";
+      // Every turn gets its own memory. Evidence, relations or the episode that
+      // ends on this turn (every fifth turn) do not stand in for a missing one.
+      const memoryCount = derived ? Number(derived.memory || 0) : 0;
+      const derivedStatus = memoryCount > 0 ? "present" : rawStatus === "missing" ? "not_checked_no_raw" : "missing_suspected";
       rows.push({
         turn_index: turnIndex,
         raw_status: rawStatus,
@@ -39587,7 +39765,7 @@
         user_present: !!(dbRaw && dbRaw.userPresent),
         assistant_present: !!(dbRaw && dbRaw.assistantPresent),
         derived_total: derivedTotal,
-        memory_count: derived ? Number(derived.memory || 0) : 0,
+        memory_count: memoryCount,
         evidence_count: derived ? Number(derived.evidence || 0) : 0,
         kg_count: derived ? Number(derived.kg || 0) : 0,
         episode_count: derived ? Number(derived.episode || 0) : 0,
@@ -39999,6 +40177,25 @@
       .filter(Boolean));
   }
 
+  // A turn the user edited in RisuAI: both messages are stored, but RisuAI now
+  // shows other text for them. Turns missing a message are repaired instead.
+  function buildSessionNormalizeEditedTurnsFromDryRunPlan(plan) {
+    const pairByTurn = new Map((Array.isArray(plan && plan.pairs) ? plan.pairs : []).map(function(pair) {
+      return [Number(pair && pair.turnIndex), pair];
+    }));
+    return normalizeTurnIndexList((Array.isArray(plan && plan.rows) ? plan.rows : [])
+      .filter(function(row) {
+        const pair = pairByTurn.get(Number(row && row.turn_index));
+        return row && row.raw_status === "mismatch_or_partial" && row.user_present && row.assistant_present &&
+          pair && String(pair.userContent || "").trim() && String(pair.assistantContent || "").trim();
+      })
+      .map(function(row) { return Number(row.turn_index); }));
+  }
+
+  // Taking over this many edited turns at once asks first; a mass mismatch is
+  // more likely a changed chat than edits.
+  const SESSION_NORMALIZE_EDIT_CONFIRM_TURNS = 20;
+
   function buildSessionNormalizeTargetTurnsFromDryRunPlan(plan) {
     return normalizeTurnIndexList(Array.isArray(plan && plan.processableTurns) ? plan.processableTurns : []);
   }
@@ -40013,6 +40210,8 @@
     const artifactCounts = rescan.artifact_counts && typeof rescan.artifact_counts === "object" ? rescan.artifact_counts : {};
     const warnings = Array.isArray(result.warnings) ? result.warnings : [];
     const reviewTurns = Array.isArray(result.review_needed_turns) ? result.review_needed_turns : [];
+    const turnEdits = result.turn_edits && typeof result.turn_edits === "object" ? result.turn_edits : {};
+    const editedTurns = Array.isArray(turnEdits.edited_turns) ? turnEdits.edited_turns : [];
     const hierarchy = rescan.hierarchy_backfill && typeof rescan.hierarchy_backfill === "object" ? rescan.hierarchy_backfill : null;
     const hierarchyBlocked = hierarchy ? formatHierarchyBlockedSummary(hierarchy) : "";
     const reindexReason = reindex.reason != null ? String(reindex.reason) : "";
@@ -40068,6 +40267,12 @@
         '<span>' + escapeAttr(t("sessionNormalize.skipped")) + ' <strong>' + Number(rescan.skipped || 0) + '</strong></span>' +
         '<span>' + escapeAttr(t("sessionNormalize.deferred")) + ' <strong>' + Number(rescan.deferred || 0) + '</strong></span>' +
       '</div>';
+    if (editedTurns.length > 0) {
+      html += '<div class="mo-session-normalize-more">' +
+        escapeAttr(tf("sessionNormalize.editedTurns", { turns: formatTurnIndexPreview(editedTurns, 12) })) +
+        '</div>';
+    }
+    html += renderSessionNormalizeReviewHtml(result);
     if (failures.length > 0) {
       html += '<div class="mo-session-normalize-failures">';
       failures.slice(0, 3).forEach(function(failure) {
@@ -40105,6 +40310,23 @@
       technicalLines.push("raw import candidates: " + Number(plan.raw_import_candidates || 0));
     }
     if (reviewTurns.length > 0) technicalLines.push("review needed: " + formatTurnIndexPreview(reviewTurns, 16));
+    const rebuildResult = result.hierarchy_rebuild && typeof result.hierarchy_rebuild === "object" ? result.hierarchy_rebuild : null;
+    if (rebuildResult && rebuildResult.status !== "skipped") {
+      // Each started layer climbs, so count every layer each climb reached.
+      const rebuilt = { chapter: 0, arc: 0, saga: 0 };
+      ["chapter", "arc", "saga"].forEach(function(start) {
+        const climb = rebuildResult[start] && typeof rebuildResult[start] === "object" ? rebuildResult[start] : {};
+        Object.keys(rebuilt).forEach(function(layer) {
+          rebuilt[layer] += Number((climb[layer] && climb[layer].generated) || 0);
+        });
+      });
+      technicalLines.push("hierarchy rebuild: " + String(rebuildResult.status || "") +
+        " chapter=" + rebuilt.chapter + " arc=" + rebuilt.arc + " saga=" + rebuilt.saga);
+    }
+    if (editedTurns.length > 0 || (Array.isArray(turnEdits.failed) && turnEdits.failed.length > 0)) {
+      technicalLines.push("turn edits: edited=" + formatTurnIndexPreview(editedTurns, 16) +
+        " failed=" + (Array.isArray(turnEdits.failed) ? turnEdits.failed.length : 0));
+    }
     if (reindexReason) technicalLines.push("reindex reason: " + reindexReason);
     if (reindexAction) technicalLines.push("reindex action: " + reindexAction);
     if (hierarchyBlocked) technicalLines.push("hierarchy blocked: " + hierarchyBlocked);
@@ -40143,6 +40365,9 @@
     );
     if (!confirmed) return false;
 
+    // Normalize may run Risu plugin models (critic, summaries); the bridge
+    // that runs them stops when the backend restarts.
+    startRisuModelBridge();
     _sessionNormalizeState.loading = true;
     _sessionNormalizeState.error = null;
     _sessionNormalizeState.result = null;
@@ -40153,6 +40378,9 @@
 
     let repairEntries = [];
     let turnIndices = [];
+    let applyTurnEdits = [];
+    let rebuildHierarchy = false;
+    let replayFromTurn = Number(opts.replayFromTurn) > 0 ? Number(opts.replayFromTurn) : 0;
     let planMeta = {};
     try {
       if (normalizeHostContext) {
@@ -40165,6 +40393,27 @@
         if (plan && plan.ok) {
           repairEntries = buildSessionNormalizeRepairEntriesFromDryRunPlan(plan);
           turnIndices = buildSessionNormalizeTargetTurnsFromDryRunPlan(plan);
+          applyTurnEdits = buildSessionNormalizeEditedTurnsFromDryRunPlan(plan);
+          if (applyTurnEdits.length >= SESSION_NORMALIZE_EDIT_CONFIRM_TURNS) {
+            const firstEdited = Math.min.apply(null, applyTurnEdits);
+            const choice = await showChoiceModal("Session Normalize", tf("sessionNormalize.confirmEdits", {
+              count: applyTurnEdits.length,
+              turns: formatTurnIndexPreview(applyTurnEdits, 12),
+              from: firstEdited,
+            }), [
+              { value: "replay", label: tf("sessionNormalize.editChoice.replay", { from: firstEdited }) },
+              { value: "apply", label: t("sessionNormalize.editChoice.apply"), primary: true },
+            ]);
+            if (choice === "replay") replayFromTurn = replayFromTurn > 0 ? Math.min(replayFromTurn, firstEdited) : firstEdited;
+            else if (choice !== "apply") applyTurnEdits = [];
+          }
+          const health = await loadSummaryFailures(sid);
+          const rebuild = health && health.report && Array.isArray(health.report.rebuild) ? health.report.rebuild : [];
+          if (rebuild.length > 0 && replayFromTurn <= 0) {
+            rebuildHierarchy = await showConfirmModal("Session Normalize", tf("sessionNormalize.confirmRebuild", {
+              items: formatHierarchyRebuildTargets(rebuild),
+            }));
+          }
           planMeta = {
             active_chat_plan_status: "ok",
             active_chat_pair_count: Array.isArray(plan.pairs) ? plan.pairs.length : 0,
@@ -40196,6 +40445,9 @@
             batch_size: 0,
             repair_entries: repairEntries,
             turn_indices: turnIndices,
+            apply_turn_edits: applyTurnEdits,
+            rebuild_hierarchy: rebuildHierarchy,
+            replay_from_turn: replayFromTurn,
             force_reindex: false,
             resume_existing: true,
             dry_run: false,
@@ -44319,7 +44571,6 @@
       const meta = [
         t("explorer.episodes.turn") + " " + fromTurn + "-" + toTurn,
         t("explorer.episodes.created") + " " + created,
-        t("explorer.hierarchy.readOnly"),
         item && item.embedding_model ? "embedding: " + item.embedding_model : "",
         item && item.source ? "source: " + item.source : "",
       ].filter(Boolean).join(" · ");
@@ -44329,11 +44580,16 @@
         : '';
       const detailsHtml = expanded ? renderExplorerHierarchyDetails(details) : '';
       const expandBtn = '<span class="mo-ex-expand-btn">' + (expanded ? "▼" : "▶") + '</span>';
+      const regenBtn = _explorer.selectedSessionId && item && item.from_turn != null && item.to_turn != null
+        ? '<span class="mo-hier-regen-btn" data-hier-layer="' + escapeAttr(expandType) + '" data-hier-from="' + escapeAttr(String(item.from_turn)) +
+          '" data-hier-to="' + escapeAttr(String(item.to_turn)) + '" title="' + escapeAttr(t("explorer.hierarchy.regenTooltip")) + '" style="cursor:pointer">🔄</span>'
+        : '';
       return '<div class="mo-ex-item" data-expand-type="' + escapeAttr(expandType) + '" data-expand-id="' + escapeAttr(String(id)) + '">' +
         '<div class="mo-ex-item-head">' +
           expandBtn +
           '<span class="mo-ex-item-turn">' + escapeAttr(title || expandType) + '</span>' +
           '<span class="mo-ex-item-date">' + escapeAttr(meta) + '</span>' +
+          regenBtn +
         '</div>' +
         summaryHtml +
         resumeHtml +
@@ -44353,10 +44609,19 @@
   function renderExplorerHierarchy() {
     const subTab = _explorer.hierarchySubTab || "episodes";
     const subtabs = renderExplorerHierarchySubTabs();
+    const failures = renderHierarchyFailureRows(subTab, _summaryFailureState, _explorer.selectedSessionId);
     if (subTab === "chapters" || subTab === "arcs" || subTab === "sagas") {
-      return subtabs + renderExplorerHierarchyList(subTab);
+      const opStatus = _explorer.hierarchyOpStatus;
+      let statusHtml = '';
+      if (opStatus) {
+        const cls = opStatus.status === "ok" ? "mo-ed-success" : opStatus.status === "error" ? "mo-ed-error" : "mo-ed-saving";
+        const icon = opStatus.status === "ok" ? "✅" : opStatus.status === "error" ? "❌" : "⏳";
+        statusHtml = '<div class="mo-ep-status ' + cls + '" style="padding:4px 8px;margin-bottom:6px;font-size:12px">' +
+          icon + ' ' + escapeAttr(opStatus.message || "") + '</div>';
+      }
+      return subtabs + statusHtml + failures + renderExplorerHierarchyList(subTab);
     }
-    return subtabs + renderExplorerEpisodes();
+    return subtabs + failures + renderExplorerEpisodes();
   }
 
   async function explorerFetchEpisodes(reset = true) {
@@ -44449,6 +44714,7 @@
   async function explorerRegenerateEpisode(fromTurn, toTurn) {
     const sid = _explorer.selectedSessionId;
     if (!sid) return;
+    startRisuModelBridge();
     _explorer.episodeOpStatus = { type: "regen", status: "loading", message: "턴 " + fromTurn + "-" + toTurn + " 재생성 중..." };
     try {
       await refreshExplorerUI();
@@ -44472,7 +44738,7 @@
       ));
       if (episodeGenerated) {
         _explorer.episodeOpStatus = { type: "regen", status: "ok", message: "턴 " + fromTurn + "-" + toTurn + " 재생성 완료" };
-        await explorerFetchEpisodes(true);
+        await explorerFetchHierarchySummaries(true);
       } else {
         _explorer.episodeOpStatus = { type: "regen", status: "error", message: "재생성 실패: " + (result ? result.reason || result.status : "no response") };
       }
@@ -45694,6 +45960,7 @@
                 : '▶ ' + escapeAttr(t("sessionNormalize.execute"))) +
             '</button>' +
           '</div>' +
+          renderSummaryFailureListHtml(_summaryFailureState, selectedSid) +
           normalizeResultHtml +
         '</div></details>' +
       '</div>';
@@ -46312,6 +46579,7 @@
           refreshExplorerUI({ preserveScroll: true });
         });
       });
+      bindSessionNormalizeReviewActions();
       document.querySelectorAll("[data-admin-job-refresh]").forEach((button) => {
         button.addEventListener("click", async () => {
           const kind = String(button.getAttribute("data-admin-job-refresh") || "");
@@ -47282,6 +47550,21 @@
         });
       });
 
+      document.querySelectorAll(".mo-hier-regen-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const layer = String(btn.dataset.hierLayer || "");
+          const fromTurn = parseInt(btn.dataset.hierFrom, 10);
+          const toTurn = parseInt(btn.dataset.hierTo, 10);
+          if (!layer || isNaN(fromTurn) || isNaN(toTurn)) return;
+          const confirmed = confirm(tf("explorer.hierarchy.regenConfirm", {
+            target: t("explorer.hierarchy.layer." + layer) + " " + fromTurn + "-" + toTurn,
+          }));
+          if (!confirmed) return;
+          await explorerRegenerateHierarchy(layer, fromTurn, toTurn);
+        });
+      });
+
       // ── Phase 3-4: Episode 재생성 버튼 ──
       document.querySelectorAll(".mo-ep-regen-btn").forEach(btn => {
         btn.addEventListener("click", async (e) => {
@@ -48029,6 +48312,12 @@ details.mo-it-block[open] .mo-it-expand{display:none}
 .mo-session-normalize-failure{display:grid;gap:2px;padding:7px 8px;border-radius:6px;background:#35151d;border:1px solid #7c293b;color:#f4c7d0}
 .mo-session-normalize-failure strong{color:#ff8da2}
 .mo-session-normalize-more{color:#ff9aab;font-size:10px}
+.mo-session-normalize-review{display:grid;gap:4px;margin-top:8px;padding:8px;border-radius:6px;background:#2d2410;border:1px solid #7a5a1c;color:#f1d9a6}
+.mo-session-normalize-review strong{color:#ffcf70}
+.mo-session-normalize-review p{margin:0;font-size:10px;color:#d9c08c}
+.mo-session-normalize-review ul{margin:0;padding-left:16px;font-size:11px}
+.mo-session-normalize-review-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.mo-session-normalize-review-actions button{border:1px solid #8a6a2a;background:#3a2e14;color:#f6e2b4;border-radius:6px;padding:4px 9px;font-size:10px;cursor:pointer}
 .mo-session-normalize-technical{margin-top:7px;color:#7f8a9b}
 .mo-session-normalize-technical summary{cursor:pointer;user-select:none}
 .mo-session-normalize-technical div{margin-top:5px;padding:7px 8px;border-radius:5px;background:#0e1219;border:1px solid #293241;color:#9aa6b8;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;max-height:180px;overflow:auto}
@@ -53988,8 +54277,13 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       // Keep connection settings editable while the backend status request is pending.
       if (settingsFamilyActive) {
         loadDashboardViewModel(rs, s, guideModeDashboardState).then(vm => {
-          if (renderRequestId !== _settingsPanelRenderRequestId) return;
+          if (renderRequestId !== _settingsPanelRenderRequestId) return null;
           overlay.querySelector('#mo-dashboard').innerHTML = renderDashboardViewModel(vm, dashLabel);
+          return getCurrentChatSessionId().then(loadSummaryFailures);
+        }).then(failureState => {
+          if (!failureState || renderRequestId !== _settingsPanelRenderRequestId) return;
+          const dashboardEl = overlay.querySelector('#mo-dashboard');
+          if (dashboardEl) dashboardEl.insertAdjacentHTML("afterbegin", renderSummaryFailureCard(failureState));
         }).catch(err => warnLog('dashboard render failed:', err.message));
       }
       if (activePrimaryTab === "settings" && s.debug) {
@@ -54012,6 +54306,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           const inspectionSessionId = String(_timelineState.selectedSessionId || _timelineState.sessionId || resolvedSid || "");
           await explorerChangeSession(inspectionSessionId, false);
           await explorerFetchSessions();
+          await loadSummaryFailures(inspectionSessionId);
           if (activePrimaryTab === "archive") await explorerLoadTab(_explorer.activeTab, true);
           await refreshExplorerUI();
         } catch { /* explorer init 실패는 무시 */ }
@@ -55352,6 +55647,15 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       const dashboard = $("mo-dashboard");
       if (dashboard) {
         dashboard.addEventListener("click", async (event) => {
+          const normalizeBtn = event.target.closest('#mo-summary-failure-normalize-btn');
+          if (normalizeBtn) {
+            const sid = String(normalizeBtn.getAttribute("data-session-id") || "");
+            if (!sid) return;
+            normalizeBtn.disabled = true;
+            await normalizeSession(sid, 0);
+            normalizeBtn.disabled = !!_sessionNormalizeState.loading;
+            return;
+          }
           if (!event.target.closest('#mo-queue-clear-btn')) return;
           if (!confirm(t('settings.queue.clearConfirm'))) return;
           await clearFailedQueue();
@@ -55684,6 +55988,305 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     }
     await pushSettingsToBackend(settings);
     return false;
+  }
+
+  async function loadSummaryFailures(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid || sid === SESSION_FALLBACK) return null;
+    _summaryFailureState = Object.assign({}, _summaryFailureState, { sessionId: sid, loading: true });
+    const result = await safeCall(() => bridgeFetch(
+      "/long-session-health/" + encodeURIComponent(sid) + "/summary-failures?" + summaryFailureQueryString(),
+      { timeoutMs: getRequestTimeoutSettingMs() }
+    ), null, "loadSummaryFailures");
+    const ok = !!(result && result.status === "ok" && result.failures && typeof result.failures === "object");
+    _summaryFailureState = {
+      sessionId: sid,
+      loading: false,
+      error: ok ? null : String((result && (result.detail || result.code)) || "unavailable"),
+      report: ok ? result.failures : null,
+      failureCount: ok ? Number(result.failure_count || 0) : 0,
+    };
+    return _summaryFailureState;
+  }
+
+  function formatSummaryFailureRanges(items) {
+    return (Array.isArray(items) ? items : []).map(function(item) {
+      const range = String(item.from_turn) + "–" + String(item.to_turn);
+      const missing = Array.isArray(item.missing_memory_turns) ? item.missing_memory_turns : [];
+      return missing.length > 0
+        ? range + " (" + t("summaryFailures.blockedOn") + " " + formatTurnIndexPreview(missing) + ")"
+        : range;
+    }).join(", ");
+  }
+
+  function formatHierarchyRebuildTargets(targets) {
+    return (Array.isArray(targets) ? targets : []).map(function(target) {
+      const reasons = (Array.isArray(target.reasons) ? target.reasons : []).map(function(reason) {
+        return t("summaryFailures.rebuildReason." + reason);
+      }).join(", ");
+      return t("explorer.hierarchy.layer." + target.layer) + " " + target.from_turn + "-" + target.to_turn + (reasons ? " (" + reasons + ")" : "");
+    }).join(" · ");
+  }
+
+  function summaryFailureRows(report) {
+    if (!report) return [];
+    const rows = [];
+    const missingTurns = Array.isArray(report.missing_memory_turns) ? report.missing_memory_turns : [];
+    if (missingTurns.length > 0) rows.push([t("summaryFailures.memories"), formatTurnIndexPreview(missingTurns), missingTurns.length]);
+    [["episodes", "summaryFailures.episodes"], ["chapters", "summaryFailures.chapters"], ["arcs", "summaryFailures.arcs"], ["sagas", "summaryFailures.sagas"]].forEach(function(pair) {
+      const items = Array.isArray(report[pair[0]]) ? report[pair[0]] : [];
+      if (items.length > 0) rows.push([t(pair[1]), formatSummaryFailureRanges(items), items.length]);
+    });
+    const rebuild = Array.isArray(report.rebuild) ? report.rebuild : [];
+    if (rebuild.length > 0) rows.push([t("summaryFailures.rebuild"), formatHierarchyRebuildTargets(rebuild), rebuild.length]);
+    return rows;
+  }
+
+  /** The 상태 tab card: what failed and a button that runs session normalize. */
+  function renderSummaryFailureCard(state) {
+    const current = state && typeof state === "object" ? state : {};
+    if (!current.sessionId || current.loading) return "";
+    if (current.error) {
+      return '<div class="mo-dash-card has-warn"><div class="mo-dash-card-head"><span class="mo-dash-card-icon">⚠</span>'
+        + '<span class="mo-dash-card-title">' + escapeAttr(t("summaryFailures.title")) + '</span></div>'
+        + '<div class="mo-dash-row"><span class="mo-dot mo-dot-warn"></span><span class="mo-dash-value">' + escapeAttr(t("summaryFailures.unavailable")) + '</span></div></div>';
+    }
+    const rows = summaryFailureRows(current.report);
+    if (rows.length === 0) {
+      return '<div class="mo-dash-card"><div class="mo-dash-card-head"><span class="mo-dash-card-icon">✓</span>'
+        + '<span class="mo-dash-card-title">' + escapeAttr(t("summaryFailures.title")) + '</span></div>'
+        + '<div class="mo-dash-row"><span class="mo-dot mo-dot-ok"></span><span class="mo-dash-value">' + escapeAttr(t("summaryFailures.none")) + '</span></div></div>';
+    }
+    return '<div class="mo-dash-card has-fail"><div class="mo-dash-card-head"><span class="mo-dash-card-icon">✕</span>'
+      + '<span class="mo-dash-card-title">' + escapeAttr(t("summaryFailures.title")) + '</span>'
+      + '<div class="mo-dash-card-summary"><span class="mo-dash-chip mo-dash-chip-fail">✕ ' + rows.reduce(function(sum, row) { return sum + Number(row[2] || 0); }, 0) + '</span></div></div>'
+      + rows.map(function(row) {
+        return '<div class="mo-dash-row"><span class="mo-dot mo-dot-fail"></span>'
+          + '<span class="mo-dash-label">' + escapeAttr(row[0] + " (" + row[2] + ")") + '</span>'
+          + '<span class="mo-dash-value">' + escapeAttr(row[1]) + '</span></div>';
+      }).join("")
+      + '<div class="mo-dash-row" style="font-size:11px;color:#a0a0b0">' + escapeAttr(t("summaryFailures.hint")) + '</div>'
+      + '<div class="mo-dash-row"><button class="mo-btn mo-btn-primary" id="mo-summary-failure-normalize-btn" data-session-id="' + escapeAttr(current.sessionId) + '"'
+      + (_sessionNormalizeState.loading ? ' disabled' : '') + '>▶ ' + escapeAttr(t("summaryFailures.normalize")) + '</button></div>'
+      + '</div>';
+  }
+
+  /** The normalize panel lists the same failures before the user runs it. */
+  function renderSummaryFailureListHtml(state, sessionId) {
+    const current = state && typeof state === "object" ? state : {};
+    if (!current.report || String(current.sessionId || "") !== String(sessionId || "")) return "";
+    const rows = summaryFailureRows(current.report);
+    if (rows.length === 0) return "";
+    return '<div class="mo-reindex-row" style="font-size:11px;color:#f87171">'
+      + escapeAttr(t("summaryFailures.title")) + ': '
+      + rows.map(function(row) { return escapeAttr(row[0] + " " + row[1]); }).join(" · ")
+      + '</div>';
+  }
+
+  // Failed ranges have no row of their own, so the list shows them above the
+  // stored summaries until session normalize fills them.
+  function renderHierarchyFailureRows(kind, state, sessionId) {
+    const current = state && typeof state === "object" ? state : {};
+    if (!current.report || String(current.sessionId || "") !== String(sessionId || "")) return "";
+    const items = Array.isArray(current.report[kind]) ? current.report[kind] : [];
+    return items.map(function(item) {
+      const missing = Array.isArray(item.missing_memory_turns) ? item.missing_memory_turns : [];
+      const reason = missing.length > 0
+        ? tf("summaryFailures.rowHeld", { turns: formatTurnIndexPreview(missing) })
+        : t("summaryFailures.rowFailed");
+      return '<div class="mo-ex-item mo-ex-item-failed" style="border-left:3px solid #f87171">' +
+        '<div class="mo-ex-item-head">' +
+          '<span class="mo-ex-item-turn">' + escapeAttr(t("explorer.episodes.turn") + " " + item.from_turn + "-" + item.to_turn) + '</span>' +
+          '<span class="mo-ex-item-date" style="color:#f87171">' + escapeAttr(reason) + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  async function explorerRegenerateHierarchy(layer, fromTurn, toTurn) {
+    const sid = _explorer.selectedSessionId;
+    if (!sid) return;
+    startRisuModelBridge();
+    const label = t("explorer.hierarchy.layer." + layer) + " " + fromTurn + "-" + toTurn;
+    _explorer.hierarchyOpStatus = { status: "loading", message: tf("explorer.hierarchy.regenRunning", { target: label }) };
+    try { await refreshExplorerUI(); } catch { /* silent */ }
+    try {
+      const result = await bridgeFetch("/admin/hierarchy/regenerate", {
+        method: "POST",
+        body: { chat_session_id: sid, layer, from_turn: fromTurn, to_turn: toTurn },
+        timeoutMs: 0,
+      });
+      if (result && result.regenerated) {
+        _explorer.hierarchyOpStatus = { status: "ok", message: tf("explorer.hierarchy.regenDone", { target: label }) };
+      } else {
+        const layerResult = result && result.rebuild && result.rebuild[layer] ? result.rebuild[layer] : {};
+        const blocked = Array.isArray(layerResult.blocked) && layerResult.blocked.length > 0 ? layerResult.blocked[0] : null;
+        const reason = blocked ? String(blocked.llm_error || blocked.reason || "") : String((result && (result.detail || result.status)) || "no response");
+        _explorer.hierarchyOpStatus = { status: "error", message: tf("explorer.hierarchy.regenFailed", { target: label, reason }) };
+      }
+      await explorerFetchHierarchySummaries(true);
+      await loadSummaryFailures(sid);
+    } catch (err) {
+      _explorer.hierarchyOpStatus = { status: "error", message: tf("explorer.hierarchy.regenFailed", { target: label, reason: err.message }) };
+    }
+    try { await refreshExplorerUI(); } catch { /* silent */ }
+  }
+
+  // Asks the user to pick one of choices ({ value, label, primary }); resolves
+  // with the picked value, or null when the dialog is closed or cancelled.
+  function showChoiceModal(title, message, choices) {
+    const existing = document.getElementById("mo-confirm-modal");
+    if (existing) existing.remove();
+    const messageHtml = String(message || "").split("\n").map(line => escapeAttr(line)).join("<br>");
+    return new Promise((resolve) => {
+      let settled = false;
+      const modal = document.createElement("div");
+      modal.id = "mo-confirm-modal";
+      modal.className = "mo-export-overlay";
+      modal.innerHTML =
+        '<div class="mo-export-panel" style="width:min(92%,560px);max-height:none">' +
+          '<div class="mo-export-hdr">' +
+            '<h3>' + escapeAttr(title || "Confirm") + '</h3>' +
+            '<button class="mo-close" data-choice-cancel>✕</button>' +
+          '</div>' +
+          '<div class="mo-export-info" style="white-space:normal;line-height:1.6">' + messageHtml + '</div>' +
+          '<div class="mo-export-actions" style="justify-content:flex-end;flex-wrap:wrap">' +
+            '<button class="mo-btn mo-btn-ghost" data-choice-cancel>' + t('explorer.edit.cancelBtn') + '</button>' +
+            (choices || []).map(function(choice, index) {
+              return '<button class="mo-btn ' + (choice.primary ? 'mo-btn-primary' : 'mo-btn-ghost') + '" data-choice-index="' + index + '">' +
+                escapeAttr(choice.label) + '</button>';
+            }).join("") +
+          '</div>' +
+        '</div>';
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        modal.remove();
+        resolve(value);
+      };
+      document.body.appendChild(modal);
+      const panel = modal.querySelector(".mo-export-panel");
+      if (panel) panel.addEventListener("click", (event) => event.stopPropagation());
+      modal.addEventListener("click", () => finish(null));
+      modal.querySelectorAll("[data-choice-cancel]").forEach((button) => button.addEventListener("click", () => finish(null)));
+      modal.querySelectorAll("[data-choice-index]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const choice = (choices || [])[Number(button.getAttribute("data-choice-index"))];
+          finish(choice ? choice.value : null);
+        });
+      });
+    });
+  }
+
+  // Records an edited turn shares with other turns stay as they were; the
+  // result panel lists them with a way to fix them by hand or replay from the
+  // edited turn.
+  function renderSessionNormalizeReviewHtml(result) {
+    const replay = result && result.replay && typeof result.replay === "object" ? result.replay : {};
+    const rescan = result && result.rescan && typeof result.rescan === "object" ? result.rescan : {};
+    const turnList = function(items) {
+      return (Array.isArray(items) ? items : []).map(function(item) {
+        return Number(item && typeof item === "object" ? item.turn_index : item);
+      }).filter(function(turn) { return turn > 0; }).join(", ");
+    };
+    let html = "";
+    const recovered = turnList(rescan.recovered_turns);
+    if (recovered) {
+      html += '<div class="mo-session-normalize-more">' + escapeAttr(tf("sessionNormalize.recovered", { turns: recovered })) + '</div>';
+    }
+    const retried = turnList((Array.isArray(rescan.retried_turns) ? rescan.retried_turns : []).filter(function(item) {
+      return item && item.state === "completed";
+    }));
+    if (retried) {
+      html += '<div class="mo-session-normalize-more">' + escapeAttr(tf("sessionNormalize.retried", { turns: retried })) + '</div>';
+    }
+    if (replay.status === "ok") {
+      html += '<div class="mo-session-normalize-more">' +
+        escapeAttr(tf("sessionNormalize.replayed", { from: Number(replay.from_turn || 0), count: Number(replay.turns || 0) })) +
+        '</div>';
+      return html;
+    }
+    // A stopped replay resumes by replaying from that turn; a stopped
+    // normalize resumes by running again, which starts at the first turn
+    // still missing its memories.
+    const stoppedAt = Number(rescan.stopped_at_turn || replay.stopped_at_turn || 0);
+    if (stoppedAt > 0) {
+      const replaying = replay.status === "stopped";
+      const remaining = Number((replaying ? replay.remaining_turns : rescan.remaining_turns) || 0);
+      const sid = escapeAttr(String(result.chat_session_id || ""));
+      html += '<div class="mo-session-normalize-review">' +
+        '<p>' + escapeAttr(tf("sessionNormalize.replayStopped", { turn: stoppedAt, count: remaining })) + '</p>' +
+        '<div class="mo-session-normalize-review-actions">' +
+        (replaying
+          ? '<button type="button" data-session-normalize-replay="' + stoppedAt + '"' +
+            ' data-session-normalize-replay-last="' + Number(replay.last_turn || stoppedAt) + '"' +
+            ' data-session-normalize-replay-count="' + remaining + '"' +
+            ' data-session-normalize-replay-sid="' + sid + '">' +
+            escapeAttr(tf("sessionNormalize.review.resume", { from: stoppedAt })) + '</button>'
+          : '<button type="button" data-session-normalize-resume="' + sid + '">' +
+            escapeAttr(tf("sessionNormalize.review.resumeNormalize", { from: stoppedAt })) + '</button>') +
+        '</div></div>';
+      return html;
+    }
+    const edits = result && result.turn_edits && typeof result.turn_edits === "object" ? result.turn_edits : {};
+    const items = Array.isArray(edits.review_items) ? edits.review_items : [];
+    const candidate = edits.replay_candidate && typeof edits.replay_candidate === "object" ? edits.replay_candidate : null;
+    if (items.length === 0) return html;
+    const shown = items.slice(0, 5);
+    html += '<div class="mo-session-normalize-review">' +
+      '<strong>' + escapeAttr(tf("sessionNormalize.review.title", { count: items.length })) + '</strong>' +
+      '<p>' + escapeAttr(t("sessionNormalize.review.note")) + '</p><ul>';
+    shown.forEach(function(item) {
+      const kindKey = "sessionNormalize.review.kind." + String(item.kind || "");
+      const kind = t(kindKey) === kindKey ? String(item.kind || "") : t(kindKey);
+      const reasonKey = item.reason === "last_changed_here" ? "sessionNormalize.review.lastChangedHere" : "sessionNormalize.review.changedLater";
+      html += '<li>' + escapeAttr(kind + ' "' + String(item.label || "") + '" — ' +
+        tf(reasonKey, { turn: Number(item.turn_index || 0), other: Number(item.other_turn || 0) })) + '</li>';
+    });
+    html += '</ul>';
+    if (items.length > shown.length) {
+      html += '<p>' + escapeAttr(tf("sessionNormalize.review.more", { count: items.length - shown.length })) + '</p>';
+    }
+    html += '<div class="mo-session-normalize-review-actions">' +
+      '<button type="button" data-session-normalize-review-open>' + escapeAttr(t("sessionNormalize.review.openTrust")) + '</button>';
+    if (candidate && Number(candidate.from_turn) > 0) {
+      html += '<button type="button" data-session-normalize-replay="' + Number(candidate.from_turn) + '"' +
+        ' data-session-normalize-replay-last="' + Number(candidate.last_turn || candidate.from_turn) + '"' +
+        ' data-session-normalize-replay-count="' + Number(candidate.turns || 0) + '"' +
+        ' data-session-normalize-replay-sid="' + escapeAttr(String(result.chat_session_id || "")) + '">' +
+        escapeAttr(tf("sessionNormalize.review.replay", { from: Number(candidate.from_turn) })) + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function bindSessionNormalizeReviewActions() {
+    document.querySelectorAll("[data-session-normalize-resume]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const sid = String(button.getAttribute("data-session-normalize-resume") || "").trim();
+        if (sid) await normalizeSession(sid, 0, { skipConfirm: true, source: "explorer_session_normalize_resume" });
+      });
+    });
+    document.querySelectorAll("[data-session-normalize-review-open]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const tab = document.querySelector('.mo-ex-tab[data-tab="trust"]');
+        if (tab) tab.click();
+      });
+    });
+    document.querySelectorAll("[data-session-normalize-replay]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const from = Number(button.getAttribute("data-session-normalize-replay"));
+        const sid = String(button.getAttribute("data-session-normalize-replay-sid") || "").trim();
+        if (!(from > 0) || !sid) return;
+        const confirmed = await showConfirmModal("Session Normalize", tf("sessionNormalize.confirmReplay", {
+          from: from,
+          last: Number(button.getAttribute("data-session-normalize-replay-last")) || from,
+          count: Number(button.getAttribute("data-session-normalize-replay-count")) || 0,
+        }));
+        if (!confirmed) return;
+        await normalizeSession(sid, 0, { skipConfirm: true, askRebuild: false, replayFromTurn: from, source: "explorer_session_normalize_replay" });
+      });
+    });
   }
 
   // ──────────────────────────────────────────────────────────────

@@ -34,6 +34,8 @@ const resolveEffectiveCriticConfig = () => ({});
 const getRequestTimeoutSettingMs = () => 15000, buildDashboardQueueObservations = () => ({});
 const _turnWorkflowHUDHostWarningsByRequestId = new Map();
 const renderDashboardViewModel = vm => vm ? vm.html : 'unavailable';
+// The failed-summary card has its own tests.
+const getCurrentChatSessionId = async () => 'default', loadSummaryFailures = async () => null, renderSummaryFailureCard = () => '';
 const renderEffectiveInputSection = () => '', renderPromptEditorSection = () => '', renderBridgeRuntimeNotice = () => '';
 const formatStateRow = () => '', renderStep17InspectionRolesSection = () => '', renderStep17VisibilitySection = () => '';
 const renderStep17ReleaseGateSection = () => '', renderCriticLedgerProbeDebugSection = () => '';

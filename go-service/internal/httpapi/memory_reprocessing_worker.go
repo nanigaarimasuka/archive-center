@@ -332,6 +332,10 @@ func (s *Server) processMemoryReprocessingOnce(
 				derivation.State, "", derivation.SaveResult,
 			)
 		}
+		if derivation.State == "completed" {
+			// The turn's episode was held while its memory was missing.
+			s.fillSummariesAfterRecoveredMemory(context.WithoutCancel(ctx), source.ChatSessionID, source.TurnIndex)
+		}
 		return result, nil
 	case "stale_rejected":
 		finishErr := finishSupersededMemoryReprocessingJob(

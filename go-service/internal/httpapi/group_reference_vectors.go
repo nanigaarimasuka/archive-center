@@ -216,7 +216,7 @@ func validateReferenceQueryEmbeddingSpace(ctx context.Context, vectorStore vecto
 		if indexedProvider == "" || indexedModel == "" {
 			return fmt.Errorf("reference index has no embedding provider/model metadata; reindex before search")
 		}
-		if indexedProvider != wantProvider || !strings.EqualFold(indexedModel, wantModel) {
+		if indexedProvider != wantProvider || !sameEmbeddingModel(indexedModel, wantModel) {
 			return fmt.Errorf("reference index uses %s/%s but current search uses %s/%s; reindex with the current embedding settings", indexedProvider, indexedModel, wantProvider, wantModel)
 		}
 	}

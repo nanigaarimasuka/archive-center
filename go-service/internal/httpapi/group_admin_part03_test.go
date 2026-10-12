@@ -1691,6 +1691,7 @@ func TestAdminSessionNormalizeCancellationReachesBlockedRawChatQuery(t *testing.
 // External provider and storage boundaries are synthetic; the normalization,
 // extraction policy, snapshot and retry owners are the production paths.
 func TestAdminSessionNormalizeConfiguredCriticBudgetAndRetry(t *testing.T) {
+	withoutInOrderRetries(t)
 	ptrBudget := func(value int) *int { return &value }
 	for _, tc := range []struct {
 		name   string

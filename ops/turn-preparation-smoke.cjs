@@ -58,7 +58,7 @@ function beforeContext(transport, inputCount) {
     updateRuntimeState:(...args)=>events.push(args),
     normalizeAssistantPersistenceCandidate:s=>s.trim(),
     renderTurnWorkflowHUDTransportError:(requestId,path,reason,ended)=>hud.push({requestId,path,reason,status:'failed',ended}),
-    finishTurnWorkflowHUDCurrentGeneration:requestId=>hud.push({requestId,status:'finished'}),observeTurnWorkflowHUDTiming:()=>{},
+    finishTurnWorkflowHUDCurrentGeneration:requestId=>hud.push({requestId,status:'finished'}),observeTurnWorkflowHUDTiming:()=>{},startRisuModelBridge:()=>{},
     captureAssistantPrefillSeedForSession:async()=>null,
     getCurrentActiveChatSourceObservationMessages:async()=>({chat,messages:rows.map((r,i)=>({role:'user',content:r.data,risuMessageIndex:i,raw:r}))}),
     reconcileRollbackFromHostSignal:async(sid,_host,options)=>{

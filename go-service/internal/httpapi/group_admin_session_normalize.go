@@ -32,6 +32,15 @@ type adminSessionNormalizeRequest struct {
 	SkipReindex    bool                            `json:"skip_reindex"`
 	ForceReindex   *bool                           `json:"force_reindex"`
 	ResumeExisting *bool                           `json:"resume_existing"`
+	// ApplyTurnEdits lists past turns whose raw text RisuAI changed and the
+	// user agreed to take over; see applyNormalizeTurnEdits.
+	ApplyTurnEdits []int `json:"apply_turn_edits,omitempty"`
+	// RebuildHierarchy remakes the stored summaries hierarchyRebuildTargets
+	// lists, which the plugin showed the user first.
+	RebuildHierarchy bool `json:"rebuild_hierarchy,omitempty"`
+	// ReplayFromTurn derives this turn and every later one again; see
+	// clearDerivedForReplay.
+	ReplayFromTurn int `json:"replay_from_turn,omitempty"`
 }
 
 func (s *Server) handleAdminSessionNormalize(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +65,9 @@ func (s *Server) handleAdminSessionNormalize(w http.ResponseWriter, r *http.Requ
 
 	entries := adminSessionNormalizeRepairEntries(req)
 	jobRequest := adminSessionNormalizeJobRequest(sid, req, entries)
-	job := s.AdminJobs.start("session_normalize", sid, jobRequest, func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
+	job := s.AdminJobs.start("session_normalize", sid, jobRequest, s.withdrawVectorWorkOnCancel(func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
 		return s.runAdminSessionNormalize(ctx, sid, req, progress)
-	})
+	}))
 	job["status"] = "accepted"
 	job["job_status"] = "queued"
 	job["poll_route"] = "/admin/jobs/" + fmt.Sprint(job["job_id"])
@@ -135,10 +144,30 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 	)
 	reviewNeededTurns = append(reviewNeededTurns, intSliceFromAny(repairResult["failed_turn_indices"])...)
 	reviewNeededTurns = uniqueSortedInts(reviewNeededTurns)
+	turnEditResult := s.applyNormalizeTurnEdits(ctx, sid, req, entries, intSliceFromAny(repairResult["conflict_turns"]))
+	editedTurns := intSliceFromAny(turnEditResult["edited_turns"])
+	if len(editedTurns) > 0 {
+		editedSet := intsToSet(editedTurns)
+		remaining := []int{}
+		for _, turn := range reviewNeededTurns {
+			if !editedSet[turn] {
+				remaining = append(remaining, turn)
+			}
+		}
+		reviewNeededTurns = remaining
+	}
 	if len(reviewNeededTurns) > 0 {
 		warnings = append(warnings, "raw_mismatch_or_partial_requires_review")
 	}
-	requestedRescanTurns := uniqueSortedNonNegativeInts(req.TurnIndices)
+	replayResult, replayTurns, err := s.clearDerivedForReplay(ctx, sid, req)
+	if err != nil {
+		return nil, err
+	}
+	inOrder := normalizeInOrder(req.DryRun)
+	if len(replayTurns) > 0 {
+		req.MaxItems = 0
+	}
+	requestedRescanTurns := uniqueSortedNonNegativeInts(append(append(append([]int{}, req.TurnIndices...), editedTurns...), replayTurns...))
 	rescanTurns := append([]int{}, requestedRescanTurns...)
 	if len(reviewNeededTurns) > 0 && len(rescanTurns) > 0 {
 		reviewSet := map[int]bool{}
@@ -153,6 +182,9 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 		rescanTurns = filtered
 	}
+	// Replayed turns lost what was derived from them, so they are derived again
+	// from the stored text even when it waits for review.
+	rescanTurns = uniqueSortedNonNegativeInts(append(rescanTurns, replayTurns...))
 
 	var rescanResult map[string]any
 	if !req.SkipRescan && len(requestedRescanTurns) > 0 && len(rescanTurns) == 0 {
@@ -178,6 +210,7 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 			Background:         false,
 			CanonicalRawReplay: true,
 			SourceObservations: adminSessionNormalizeSourceObservations(entries),
+			InOrder:            inOrder,
 		}
 		res, err := s.runAdminRescanWithProgress(ctx, sid, rescanReq, adminSessionNormalizeProgressAdapter(progress, "critic_rescan_backfill", 18, 52))
 		if err != nil {
@@ -193,6 +226,11 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	hierarchyEditResult := s.regenerateHierarchyForEditedTurns(ctx, sid, turnsBefore(editedTurns, req.ReplayFromTurn), req.ClientMeta)
+	hierarchyRebuildResult := map[string]any{"status": "skipped", "reason": "not_requested"}
+	if req.RebuildHierarchy && !req.DryRun {
+		hierarchyRebuildResult = s.rebuildFlaggedHierarchy(ctx, sid)
+	}
 	if progress != nil {
 		progress(map[string]any{
 			"status":           "running",
@@ -241,6 +279,24 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	// The vectors this repair queued are written by the memory worker; the
+	// repair is done when they are, not when they are queued.
+	var vectorDelivery map[string]any
+	if !req.DryRun {
+		delivery, err := s.waitForQueuedVectorWork(ctx, adminSessionNormalizeProgressAdapter(progress, "vector_delivery", 95, 4))
+		if err != nil {
+			return nil, err
+		}
+		vectorDelivery = delivery
+		if intFromAny(vectorDelivery["waiting"], 0) > 0 {
+			warnings = append(warnings, "vector_delivery_incomplete")
+		}
+		if intFromAny(vectorDelivery["failed"], 0) > 0 {
+			warnings = append(warnings, "vector_delivery_failed")
+		}
+	}
+
+	s.settleNormalizeRescan(ctx, sid, rescanResult, replayResult, inOrder, replayTurns)
 	after, afterWarnings := s.adminSessionNormalizeSnapshot(ctx, sid)
 	warnings = append(warnings, afterWarnings...)
 	status := adminSessionNormalizeStatus(
@@ -250,6 +306,12 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		reindexResult,
 		warnings,
 	)
+	switch {
+	case intFromAny(vectorDelivery["failed"], 0) > 0 && (status == "ok" || status == "partial_deferred"):
+		status = "partial_error"
+	case intFromAny(vectorDelivery["waiting"], 0) > 0 && status == "ok":
+		status = "partial_deferred"
+	}
 	pendingCount := maxInt(
 		intFromAny(rescanResult["deferred"], 0),
 		intFromAny(rescanResult["queued"], 0),
@@ -283,9 +345,14 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		"counts_before":             before,
 		"counts_after":              after,
 		"repair_replay":             repairResult,
+		"turn_edits":                turnEditResult,
+		"edited_hierarchy":          hierarchyEditResult,
+		"replay":                    replayResult,
+		"hierarchy_rebuild":         hierarchyRebuildResult,
 		"rescan":                    rescanResult,
 		"character_identity_repair": identityRepairResult,
 		"reindex":                   reindexResult,
+		"vector_delivery":           vectorDelivery,
 		"review_needed_turns":       reviewNeededTurns,
 		"pending_count":             pendingCount,
 		"pending_turns_available":   pendingTurnsAvailable,

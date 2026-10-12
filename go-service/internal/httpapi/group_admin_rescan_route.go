@@ -39,11 +39,11 @@ func (s *Server) handleAdminRescan(w http.ResponseWriter, r *http.Request) {
 			"dry_run":         req.DryRun,
 			"background":      true,
 		}
-		job := s.AdminJobs.start("rescan", sid, jobRequest, func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
+		job := s.AdminJobs.start("rescan", sid, jobRequest, s.withdrawVectorWorkOnCancel(func(ctx context.Context, progress adminJobProgressFunc) (map[string]any, error) {
 			bgReq := req
 			bgReq.Background = false
 			return s.runAdminRescanWithProgress(ctx, sid, bgReq, progress)
-		})
+		}))
 		reusedRunningJob := boolFromAny(job["reused_running_job"])
 		jobStatus := strings.TrimSpace(fmt.Sprint(job["status"]))
 		job["status"] = "accepted"

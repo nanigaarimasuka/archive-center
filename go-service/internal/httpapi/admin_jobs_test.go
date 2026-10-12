@@ -153,6 +153,7 @@ func TestAdminJobManagerOtherKindsKeepCompletedTerminalStatus(t *testing.T) {
 }
 
 func TestAdminSessionNormalizeHandlerReportsQueuedDerivedRetryAsDeferred(t *testing.T) {
+	withoutInOrderRetries(t)
 	st := newAdminDuplicateReprocessingStore()
 	st.source.DerivedAdmissionState = "pending"
 	st.source.DerivedAdmissionVersion = ""

@@ -1037,6 +1037,8 @@ const _timelineState = { selectedSessionId: "sid-b", sessionId: "sid-b", viewMod
   { session_id: "sid-b", label: "current", can_attach: true, can_copy: true, can_migrate: true },
 ] } };
 const _sessionMigrationUi = { status: "idle", message: "", running: false, sourceSessionId: "", targetSessionId: "", migrationId: 0, migrationMode: "" };
+const _summaryFailureState = {sessionId: ""};
+function renderSummaryFailureListHtml() { return ""; } // The failed-summary list has its own tests.
 const _explorer = {
   viewModel: { sync_state: "current", tabs: [{ key: "memories", count: 1 }, { key: "kg_triples", count: 2 }] },
   activeTab: "memories",

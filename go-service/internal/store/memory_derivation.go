@@ -248,6 +248,12 @@ type MemoryVectorOutboxStore interface {
 // MemoryVectorOutboxLaneStore lets the bounded authority worker reserve fair
 // service for deletes without changing the canonical outbox contract used by
 // other stores and tests.
+// MemoryVectorOperationWithdrawer takes back queued vector operations that
+// were not delivered yet, as when the job that queued them is cancelled.
+type MemoryVectorOperationWithdrawer interface {
+	WithdrawMemoryVectorOperations(ctx context.Context, operationKeys []string, reason string) (int, error)
+}
+
 type MemoryVectorOutboxLaneStore interface {
 	ClaimMemoryVectorOperationsByOperation(ctx context.Context, leaseOwner string, now time.Time, leaseDuration time.Duration, operation string) ([]*MemoryVectorOutboxItem, error)
 }

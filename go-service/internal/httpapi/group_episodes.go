@@ -161,6 +161,21 @@ func (s *Server) generateEpisodeSummaryResponse(ctx context.Context, req narrati
 		}, http.StatusOK
 	}
 
+	if missing := episodeMissingMemoryTurns(req.ChatSessionID, fromTurn, toTurn, ev.ChatLogs, ev.Memories); len(missing) > 0 {
+		return map[string]any{
+			"status":               "skipped",
+			"code":                 "blocked_missing_memory",
+			"chat_session_id":      req.ChatSessionID,
+			"from_turn":            fromTurn,
+			"to_turn":              toTurn,
+			"interval":             interval,
+			"blocking_reasons":     []string{"blocked_missing_memory"},
+			"missing_memory_turns": missing,
+			"llm_attempted":        false,
+			"saved":                false,
+		}, http.StatusOK
+	}
+
 	replaced := int64(0)
 	if req.Force {
 		deleter, ok := s.Store.(episodeSummaryRangeDeleter)
@@ -320,7 +335,23 @@ func (s *Server) handleChapterGenerate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	chapter, generationTrace := s.buildChapterSummaryForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, chapterIndex, episodes)
+	chapter, generationTrace, genErr := s.buildChapterSummaryForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, chapterIndex, episodes)
+	if genErr != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"status":            "error",
+			"code":              "chapter_llm_failed",
+			"detail":            genErr.Error(),
+			"chat_session_id":   req.ChatSessionID,
+			"from_turn":         fromTurn,
+			"to_turn":           toTurn,
+			"generation_source": generationTrace["generation_source"],
+			"llm_attempted":     true,
+			"llm_error":         generationTrace["llm_error"],
+			"chapter_llm_trace": generationTrace["llm_trace"],
+			"saved":             false,
+		})
+		return
+	}
 	if err := chapterStore.SaveChapterSummary(r.Context(), &chapter); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"status":          "error",
@@ -430,7 +461,23 @@ func (s *Server) handleArcGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	arcIndex := hierarchyIndexFromChildren(chapterChildren, toTurn, interval, len(chapters))
-	arc, generationTrace := s.buildArcSummaryForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, arcIndex, chapters)
+	arc, generationTrace, genErr := s.buildArcSummaryForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, arcIndex, chapters)
+	if genErr != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"status":            "error",
+			"code":              "arc_llm_failed",
+			"detail":            genErr.Error(),
+			"chat_session_id":   req.ChatSessionID,
+			"from_turn":         fromTurn,
+			"to_turn":           toTurn,
+			"generation_source": generationTrace["generation_source"],
+			"llm_attempted":     true,
+			"llm_error":         generationTrace["llm_error"],
+			"arc_llm_trace":     generationTrace["llm_trace"],
+			"saved":             false,
+		})
+		return
+	}
 	if err := arcStore.SaveArcSummary(r.Context(), req.ChatSessionID, &arc); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "code": "arc_save_failed", "detail": err.Error(), "saved": false})
 		return
@@ -531,7 +578,23 @@ func (s *Server) handleSagaGenerate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "skipped", "chat_session_id": req.ChatSessionID, "from_turn": fromTurn, "to_turn": toTurn, "interval": interval, "interval_check": intervalCheck, "blocking_reasons": []string{"saga_arc_interval_incomplete"}, "arc_count": len(arcs), "saved": false})
 		return
 	}
-	saga, generationTrace := s.buildSagaDigestForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, arcs)
+	saga, generationTrace, genErr := s.buildSagaDigestForRange(r.Context(), req.ChatSessionID, fromTurn, toTurn, arcs)
+	if genErr != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"status":            "error",
+			"code":              "saga_llm_failed",
+			"detail":            genErr.Error(),
+			"chat_session_id":   req.ChatSessionID,
+			"from_turn":         fromTurn,
+			"to_turn":           toTurn,
+			"generation_source": generationTrace["generation_source"],
+			"llm_attempted":     true,
+			"llm_error":         generationTrace["llm_error"],
+			"saga_llm_trace":    generationTrace["llm_trace"],
+			"saved":             false,
+		})
+		return
+	}
 	if err := sagaStore.SaveSagaDigest(r.Context(), req.ChatSessionID, &saga); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "code": "saga_save_failed", "detail": err.Error(), "saved": false})
 		return
@@ -789,6 +852,10 @@ func (s *Server) handleEpisodeRegenerate(w http.ResponseWriter, r *http.Request)
 	}
 	req.Force = true
 	resp, statusCode := s.generateEpisodeSummaryResponse(r.Context(), req, episodeStore, "episode_regenerated")
+	if resp["saved"] == true {
+		// The chapter over this episode still describes the old one.
+		resp["hierarchy_cascade"] = s.cascadeAfterEpisodeRebuild(r.Context(), req.ChatSessionID, intFromAny(resp["from_turn"], 0))
+	}
 	writeJSON(w, statusCode, resp)
 }
 

@@ -29,6 +29,7 @@ function t(k){return k;}
 function alert(message){throw Error(message);}
 async function showConfirmModal(_title, message){assert.match(message,/삭제된 끝부분/);return true;}
 function refreshExplorerUI(){}
+function startRisuModelBridge(){} // The Risu model bridge has its own tests.
 async function reconcileRollbackFromHostSignal(sid, context, options){
  assert.equal(sid,'fixture-session');assert.match(options.reason,/full_active_chat_observed/);
  calls.push('reconcile');await Promise.resolve();calls.push('reconciled');return true;

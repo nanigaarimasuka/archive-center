@@ -29,6 +29,7 @@ func (s *Server) registerAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/dedupe-cleanup", s.handleAdminDedupeCleanup)
 	mux.HandleFunc("POST /admin/rescan", s.handleAdminRescan)
 	mux.HandleFunc("POST /admin/session-normalize", s.handleAdminSessionNormalize)
+	mux.HandleFunc("POST /admin/hierarchy/regenerate", s.handleHierarchyRegenerate)
 	mux.HandleFunc("GET /admin/jobs", s.handleAdminJobs)
 	mux.HandleFunc("GET /admin/jobs/{job_id}", s.handleAdminJob)
 	mux.HandleFunc("GET /admin/jobs/{job_id}/events", s.handleAdminJobEvents)
