@@ -73,11 +73,11 @@ func Test47TimeRenderingPreservesScoringAndSourceIdentity(t *testing.T) {
 		for _, part := range fact.Reading.Parts {
 			values = append(values, part.Value)
 		}
-		if strings.Join(values, "\n") != fact.Minimum.Meaning {
+		if strings.Join(values, "\n") != prepareTurnMeaningText(fact.Minimum.Meaning) {
 			t.Fatal("new display prose changed scoring material")
 		}
-		if strings.Contains(fact.Minimum.Text, "elapsed_days") || !strings.Contains(fact.Minimum.Text, "⏳") {
-			t.Fatal(fact.Minimum.Text)
+		if strings.Contains(fact.Minimum.text(), "elapsed_days") || !strings.Contains(fact.Minimum.text(), "⏳") {
+			t.Fatal(fact.Minimum.text())
 		}
 		if fact.SourceTurn != memory.TurnIndex || fact.SourceRef != "memories:481" {
 			t.Fatal("time formatting changed identity")

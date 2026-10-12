@@ -211,6 +211,29 @@ type prepareTurnPriorityMemoryCandidate struct {
 	StorylineSurface             string
 	IdentityMetadata             []string
 	RenderedText                 string
+	// renderedPrefix, when renderedLazy, makes RenderedText its prefix and
+	// Minimum.text(): a deferred candidate's long line is not kept.
+	renderedPrefix string
+	renderedLazy   bool
+}
+
+// renderedText is RenderedText, rendering a lazy one.
+func (c *prepareTurnPriorityMemoryCandidate) renderedText() string {
+	if c.renderedLazy {
+		return c.renderedPrefix + c.Minimum.text()
+	}
+	return c.RenderedText
+}
+
+// prepareTurnLazyRenderedText is a plan item's rendered text, rendered when
+// the item is encoded; normal responses drop the field.
+type prepareTurnLazyRenderedText struct {
+	prefix string
+	form   *prepareTurnMemoryForm
+}
+
+func (t prepareTurnLazyRenderedText) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.prefix + t.form.text())
 }
 
 type prepareTurnPriorityTurnSummaryCandidate struct {
@@ -1274,6 +1297,7 @@ type prepareTurnNeedleSegment struct {
 // Source text analysis is independent of the question. Request preparation can
 // reuse it while each question still computes its own overlap and relevance.
 func prepareTurnPriorityAnalyzeText(text string) prepareTurnPriorityLexicalText {
+	text = prepareTurnMeaningText(text)
 	terms := []prepareTurnPriorityLexicalTerm{}
 	for _, term := range prepareTurnRecallTerms(text) {
 		terms = append(terms, prepareTurnPriorityLexicalTermOf(term))
@@ -1886,13 +1910,19 @@ func prepareTurnPriorityCandidateMap(candidate prepareTurnPriorityMemoryCandidat
 	if len(candidate.IdentityMetadata) > 0 {
 		out["identity_metadata"] = append([]string(nil), candidate.IdentityMetadata...)
 	}
-	if strings.TrimSpace(candidate.RenderedText) != "" && candidate.RenderedText != candidate.CompleteText {
-		out["rendered_text"] = candidate.RenderedText
+	if rendered := candidate.renderedText(); strings.TrimSpace(rendered) != "" && rendered != candidate.CompleteText {
+		if candidate.renderedLazy {
+			// Rendered again only when encoded: normal responses drop it.
+			out["rendered_text"] = prepareTurnLazyRenderedText{candidate.renderedPrefix, candidate.Minimum}
+		} else {
+			out["rendered_text"] = rendered
+		}
 	}
 	if exposeText {
 		out["complete_text"] = candidate.CompleteText
 		if candidate.Minimum != nil {
-			out["minimum_context_text"] = candidate.Minimum.Text
+			// Rendered only when the response is encoded: normal responses drop it.
+			out["minimum_context_text"] = prepareTurnLazyFormText{candidate.Minimum}
 			out["context_refs"] = candidate.Minimum.Refs
 			out["minimum_context_chars"] = candidate.Minimum.Chars
 			out["context_group"] = candidate.Minimum.Group
@@ -2076,6 +2106,7 @@ func prepareTurnBuildPriorityTurnSummaries(resolved []prepareTurnPriorityMemoryC
 				lines = append(lines, part.Text)
 			}
 			form.Text = strings.Join(lines, "\n")
+			form.partsText = false
 			form.Chars = len([]rune(form.Text))
 			summary.Minimum = form
 		}
@@ -2701,9 +2732,13 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	deliveryParts := func(form *prepareTurnMemoryForm) []prepareTurnMemoryFormPart {
 		parts, ok := deliveryPartsByForm[form]
 		if !ok {
-			parts = prepareTurnMemoryDeliveryParts(form.Parts)
+			var distinct, kept bool
+			if parts, distinct, kept = form.keptDelivery(); !kept {
+				parts = prepareTurnMemoryDeliveryParts(form.Parts)
+				distinct = prepareTurnMemoryPartsDistinct(parts)
+			}
 			deliveryPartsByForm[form] = parts
-			distinctDeliveryParts[form] = prepareTurnMemoryPartsDistinct(parts)
+			distinctDeliveryParts[form] = distinct
 		}
 		return parts
 	}
@@ -2738,35 +2773,39 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 	borrowing := false
 	protectedHasGuard := strings.Contains(out.ProtectedMemoryText, prepareTurnProtectedCardGuard)
 	// A later budget pass must not change the original reading/selection order.
-	lineOrder := map[string]map[string]int{}
-	// Lines are long and mostly repeat; a line whose storage was seen before
-	// is found without hashing it. Writing lineOrder directly clears this.
-	type laneLineStorage struct {
-		lane string
-		line prepareTurnTextStorage
-	}
-	lineOrderByStorage := map[laneLineStorage]int{}
-	rememberLineOrder := func(lane, line string) int {
-		stored := laneLineStorage{lane, prepareTurnStorageOf(line)}
-		if order, ok := lineOrderByStorage[stored]; ok {
-			return order
-		}
+	// Lines are kept by their SHA-256: equal lines share an order as before,
+	// and the long lines of deferred candidates need not be kept.
+	lineOrder := map[string]map[[sha256.Size]byte]int{}
+	rememberLineOrderHash := func(lane string, sum [sha256.Size]byte) int {
 		if lineOrder[lane] == nil {
-			lineOrder[lane] = map[string]int{}
+			lineOrder[lane] = map[[sha256.Size]byte]int{}
 		}
-		if _, exists := lineOrder[lane][line]; !exists {
-			lineOrder[lane][line] = len(lineOrder[lane])
+		if _, exists := lineOrder[lane][sum]; !exists {
+			lineOrder[lane][sum] = len(lineOrder[lane])
 		}
-		order := lineOrder[lane][line]
-		lineOrderByStorage[stored] = order
-		return order
+		return lineOrder[lane][sum]
 	}
-	// Candidates sharing a reading and prefixes share one line string.
+	rememberLineOrder := func(lane, line string) int {
+		return rememberLineOrderHash(lane, sha256.Sum256([]byte(line)))
+	}
+	// The hash of "- " + ref + turn + a form's text, once per form and prefixes.
 	type candidateLineKey struct {
 		ref, turn string
-		reading   prepareTurnTextStorage
+		form      *prepareTurnMemoryForm
 	}
-	candidateLines := map[candidateLineKey]string{}
+	candidateLineHashes := map[candidateLineKey][sha256.Size]byte{}
+	candidateLineHash := func(ref, turn string, form *prepareTurnMemoryForm) [sha256.Size]byte {
+		key := candidateLineKey{ref, turn, form}
+		sum, ok := candidateLineHashes[key]
+		if !ok {
+			h := sha256.New()
+			h.Write([]byte("- " + ref + turn))
+			h.Write([]byte(form.text()))
+			h.Sum(sum[:0])
+			candidateLineHashes[key] = sum
+		}
+		return sum
+	}
 	// The same complete texts are collapsed several times per candidate.
 	collapsedTexts := map[prepareTurnTextStorage]string{}
 	collapsedText := func(text string) string {
@@ -3105,15 +3144,26 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 		if ref := preprocessingRefs[candidate.CanonicalFactID]; aiSelected && ref != "" {
 			refPrefix = "[" + ref + "] "
 		}
-		reading := prepareTurnMemoryReadingText(*candidate)
-		lineKey := candidateLineKey{refPrefix, turnPrefix, prepareTurnStorageOf(reading)}
-		line, ok := candidateLines[lineKey]
-		if !ok {
-			line = "- " + refPrefix + turnPrefix + reading
-			candidateLines[lineKey] = line
+		// A row with a reading is previewed from its parts, so its line is
+		// rendered only when the candidate is delivered.
+		line := ""
+		var order int
+		if candidate.Minimum != nil && candidate.Minimum.partsText {
+			candidate.RenderedText = ""
+			candidate.renderedPrefix, candidate.renderedLazy = refPrefix+turnPrefix, true
+			order = rememberLineOrderHash(lane, candidateLineHash(refPrefix, turnPrefix, candidate.Minimum))
+		} else {
+			line = "- " + refPrefix + turnPrefix + prepareTurnMemoryReadingText(*candidate)
+			candidate.RenderedText = line[len("- "):]
+			candidate.renderedLazy = false
+			order = rememberLineOrder(lane, line)
 		}
-		candidate.RenderedText = line[len("- "):]
-		order := rememberLineOrder(lane, line)
+		renderLine := func() {
+			if candidate.renderedLazy {
+				candidate.RenderedText, candidate.renderedLazy = candidate.renderedText(), false
+				line = "- " + candidate.RenderedText
+			}
+		}
 		extraGuidance := guidanceForCandidate(candidate)
 		ref := ""
 		if aiSelected {
@@ -3169,7 +3219,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 				metadataText = append(metadataText, text)
 			}
 			if len(metadataText) > 0 {
-				enrichedText := candidate.RenderedText + " | identity_metadata: " + strings.Join(metadataText, "; ")
+				enrichedText := candidate.renderedText() + " | identity_metadata: " + strings.Join(metadataText, "; ")
 				enrichedRow := row
 				enrichedRow.Plain = "- " + enrichedText
 				if candidate.Minimum != nil {
@@ -3179,9 +3229,8 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 				enrichedChars := appendedChars(lane, enrichedEdit.delta, extraGuidance)
 				enrichedDelta, enrichedReason := budgetReason(lane, enrichedChars)
 				if enrichedReason == "" {
-					candidate.RenderedText = enrichedText
-					lineOrder[lane]["- "+enrichedText] = order
-					clear(lineOrderByStorage)
+					candidate.RenderedText, candidate.renderedLazy = enrichedText, false
+					lineOrder[lane][sha256.Sum256([]byte("- "+enrichedText))] = order
 					candidate.IdentityMetadata = append([]string(nil), metadataText...)
 					line = "- " + enrichedText
 					newChars = enrichedChars
@@ -3200,6 +3249,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 			guidanceByLane[lane] = append(guidanceByLane[lane], extraGuidance...)
 			guidanceSourceApplied[candidate.SourceTable] = true
 		}
+		renderLine()
 		selected[lane] = append(selected[lane], line)
 		candidate.RenderedText = strings.TrimPrefix(layoutFor(lane).apply(edit), "- ")
 		if candidate.Minimum != nil {

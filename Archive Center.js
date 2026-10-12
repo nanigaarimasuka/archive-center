@@ -15432,6 +15432,9 @@
       if (headers && typeof headers === "object") {
         Object.assign(mergedHeaders, headers);
       }
+      // Every backend request states the client debug mode, so the server
+      // can keep its full diagnostic response only while debugging.
+      mergedHeaders["X-Archive-Center-Debug"] = bridgeSettings && bridgeSettings.debug ? "1" : "0";
 
       const fetchInit = {
         method,
@@ -17305,7 +17308,10 @@
     }
     const response = await streamFetch(url, {
       method: "GET",
-      headers: { "Accept": "application/x-ndjson" },
+      headers: {
+        "Accept": "application/x-ndjson",
+        "X-Archive-Center-Debug": typeof settings !== "undefined" && settings && settings.debug ? "1" : "0",
+      },
       signal,
     });
     const status = response && Number(response.status || 0);

@@ -72,7 +72,7 @@ func Test47PresentationKeepsConditionalMemoryAndDiagnosticIdentity(t *testing.T)
 	before := mustCompactJSON(reading.Parts)
 	facts := []prepareTurnPriorityMemoryCandidate{{CanonicalFactID: "promise-fact", SourceRef: "memories:8841", SourceTable: "memories", SourceTurn: 4, Lane: "unresolved_goal", PerspectiveOwner: "Mira", Visibility: "owner_private", AllowedViewers: []string{"Mira", "Rowan"}, CompleteText: "Mira has not accepted the offer.", Reading: reading}}
 	prepareTurnBuildReadingForms(facts, func(string) float64 { return 1 }, nil)
-	if before != mustCompactJSON(reading.Parts) || facts[0].SourceRef != "memories:8841" || !strings.Contains(facts[0].Minimum.Meaning, "internal-rev") {
+	if before != mustCompactJSON(reading.Parts) || facts[0].SourceRef != "memories:8841" || !strings.Contains(prepareTurnMeaningText(facts[0].Minimum.Meaning), "internal-rev") {
 		t.Fatal("display erased internal source material")
 	}
 	input := prepareTurnMemoryModelCandidate(facts[0], map[string]string{"promise-fact": "F1"})
@@ -106,7 +106,7 @@ func Test47PresentationKeepsConditionalMemoryAndDiagnosticIdentity(t *testing.T)
 			t.Fatal("selected reference disappeared")
 		}
 	}
-	if facts[0].Minimum.Chars != utf8.RuneCountInString(facts[0].Minimum.Text) {
+	if facts[0].Minimum.Chars != utf8.RuneCountInString(facts[0].Minimum.text()) {
 		t.Fatal("incorrect displayed budget")
 	}
 }
@@ -164,13 +164,13 @@ func Test47SessionIDStaysInProvenanceOutsideModelReading(t *testing.T) {
 						internal = true
 					}
 				}
-				if !internal || !strings.Contains(fact.Minimum.Meaning, sid) {
+				if !internal || !strings.Contains(prepareTurnMeaningText(fact.Minimum.Meaning), sid) {
 					t.Fatal("internal provenance or relevance material was erased")
 				}
 				if strings.Contains(prepareTurnMemoryReadingText(fact), "source_session_id:") {
 					t.Error("session metadata reached the model reading")
 				}
-				if fact.Minimum.Chars != utf8.RuneCountInString(fact.Minimum.Text) {
+				if fact.Minimum.Chars != utf8.RuneCountInString(fact.Minimum.text()) {
 					t.Error("reading budget does not measure rendered text")
 				}
 			}
