@@ -1582,13 +1582,44 @@
       "sessionNormalize.failed": "콜드 스타트 실패",
       "sessionNormalize.description": "현재 대화 목록과 DB를 대조해 삭제된 끝부분의 기억을 정리하고, 남아 있는 대화의 누락 원문·기억·관계·장기 요약·벡터 색인을 복구합니다.",
       "sessionNormalize.execute": "세션 정상화 실행",
+      "sessionDiagnose.button": "진단만 하기",
+      "sessionDiagnose.running": "진단 중…",
+      "sessionDiagnose.failed": "진단하지 못했습니다",
+      "sessionDiagnose.clean": "세션 정상화로 고칠 문제가 없습니다.",
+      "sessionDiagnose.rollback": "Risu에서 지운 턴의 기억이 남아 있습니다: {turn}턴부터",
+      "sessionDiagnose.missing": "DB에 저장되지 않은 턴",
+      "sessionDiagnose.edited": "Risu에서 고쳐진 턴",
+      "sessionDiagnose.review": "원문이 달라 확인이 필요한 턴",
+      "sessionDiagnose.vectorReembed": "검색용 벡터 전체를 다시 만들어야 합니다",
+      "sessionDiagnose.vectorMissing": "검색용 벡터가 없는 항목",
+      "sessionDiagnose.vectorOrphans": "더 이상 쓰지 않는 벡터",
+      "sessionDiagnose.notLive": "지금 열린 채팅이 아니어서 Risu 채팅과의 비교는 건너뛰었습니다.",
+      "sessionDiagnose.vectorUnchecked": "검색용 벡터는 확인하지 못했습니다.",
+      "sessionDiagnose.hint": "진단은 아무것도 바꾸지 않습니다. 세션 정상화를 실행하면 위 항목을 고칩니다.",
       "sessionNormalize.normalizing": "정상화 중…",
       "sessionNormalize.stageLabel": "현재 단계",
+      "sessionNormalize.currentTurn": "처리 중인 턴: {turn}턴",
+      "sessionNormalize.runningTurns": "재처리 중인 턴: {turns}",
+      "sessionNormalize.waitingTurns": "재처리를 기다리는 턴: {turns}",
       "sessionNormalize.stage.inspect_before": "저장 상태 확인",
       "sessionNormalize.stage.raw_repair_replay": "원문 검사·복구",
       "sessionNormalize.stage.critic_rescan_backfill": "기억·근거 생성",
       "sessionNormalize.stage.vector_reindex": "벡터 색인 확인",
       "sessionNormalize.stage.vector_delivery": "검색용 벡터 저장",
+      "sessionNormalize.stage.reprocessing_wait": "기억 재처리 대기",
+      "sessionQueue.title": "대기열",
+      "sessionQueue.vector": "검색용 벡터",
+      "sessionQueue.reprocessing": "기억 재처리",
+      "sessionQueue.counts": "대기 {waiting} · 처리 중 {running} · 재시도 대기 {retrying}",
+      "sessionQueue.empty": "비어 있음",
+      "sessionQueue.loading": "확인 중…",
+      "sessionQueue.disconnected": "실시간 갱신이 끊겼습니다.",
+      "sessionQueue.reconnect": "다시 연결",
+      "sessionQueue.cancelAll": "대기열 전체 취소",
+      "sessionQueue.cancelling": "취소 중…",
+      "sessionQueue.confirmDesc": "이 세션에서 아직 시작되지 않은 검색용 벡터 작업과 기억 재처리 작업을 모두 취소합니다. 실행 중인 세션 정상화·재색인·재스캔도 함께 취소됩니다. 이미 처리 중인 작업은 끝까지 진행됩니다.\n\n취소된 작업의 기억은 검색용 벡터나 재처리 결과 없이 남습니다. 세션 진단에 표시되며, 세션 정상화로 다시 채울 수 있습니다.",
+      "sessionQueue.cancelled": "취소했습니다: 검색용 벡터 {vector}개, 기억 재처리 {reprocessing}개",
+      "sessionQueue.cancelFailed": "대기열을 취소하지 못했습니다.",
       "sessionNormalize.stage.completed": "마무리",
       "sessionNormalize.progress": "진행",
       "sessionNormalize.succeeded": "성공",
@@ -2991,13 +3022,44 @@
       "sessionNormalize.failed": "Cold start failed",
       "sessionNormalize.description": "Reconciles deleted turns at the end of the current chat, then restores missing sources, memories, relationships, long-range summaries, and vector indexes for the remaining conversation.",
       "sessionNormalize.execute": "Run session normalize",
+      "sessionDiagnose.button": "Diagnose only",
+      "sessionDiagnose.running": "Diagnosing…",
+      "sessionDiagnose.failed": "Diagnosis failed",
+      "sessionDiagnose.clean": "Nothing for session normalize to fix.",
+      "sessionDiagnose.rollback": "Memories of turns deleted in Risu remain: from turn {turn}",
+      "sessionDiagnose.missing": "Turns not saved in the DB",
+      "sessionDiagnose.edited": "Turns edited in Risu",
+      "sessionDiagnose.review": "Turns whose text differs and needs review",
+      "sessionDiagnose.vectorReembed": "All search vectors need rebuilding",
+      "sessionDiagnose.vectorMissing": "Items without a search vector",
+      "sessionDiagnose.vectorOrphans": "Search vectors no longer used",
+      "sessionDiagnose.notLive": "Not the open chat, so the comparison with the Risu chat was skipped.",
+      "sessionDiagnose.vectorUnchecked": "Search vectors could not be checked.",
+      "sessionDiagnose.hint": "Diagnosis changes nothing. Run session normalize to fix the items above.",
       "sessionNormalize.normalizing": "Normalizing…",
       "sessionNormalize.stageLabel": "Current stage",
+      "sessionNormalize.currentTurn": "Working on turn {turn}",
+      "sessionNormalize.runningTurns": "Reprocessing turns: {turns}",
+      "sessionNormalize.waitingTurns": "Turns waiting for reprocessing: {turns}",
       "sessionNormalize.stage.inspect_before": "Inspecting stored data",
       "sessionNormalize.stage.raw_repair_replay": "Checking and repairing source turns",
       "sessionNormalize.stage.critic_rescan_backfill": "Building memories and evidence",
       "sessionNormalize.stage.vector_reindex": "Checking the vector index",
       "sessionNormalize.stage.vector_delivery": "Writing search vectors",
+      "sessionNormalize.stage.reprocessing_wait": "Waiting for memory reprocessing",
+      "sessionQueue.title": "Queues",
+      "sessionQueue.vector": "Search vectors",
+      "sessionQueue.reprocessing": "Memory reprocessing",
+      "sessionQueue.counts": "waiting {waiting} · running {running} · retrying {retrying}",
+      "sessionQueue.empty": "empty",
+      "sessionQueue.loading": "Checking…",
+      "sessionQueue.disconnected": "Live updates stopped.",
+      "sessionQueue.reconnect": "Reconnect",
+      "sessionQueue.cancelAll": "Cancel all queued work",
+      "sessionQueue.cancelling": "Cancelling…",
+      "sessionQueue.confirmDesc": "Cancels all search-vector and memory-reprocessing work of this session that has not started yet, along with any running session normalize, reindex or rescan. Work already in progress finishes.\n\nMemories of cancelled work stay without their search vectors or reprocessing. Session diagnosis lists them, and session normalize fills them in again.",
+      "sessionQueue.cancelled": "Cancelled: {vector} search-vector and {reprocessing} reprocessing items",
+      "sessionQueue.cancelFailed": "Could not cancel the queued work.",
       "sessionNormalize.stage.completed": "Finishing",
       "sessionNormalize.progress": "Progress",
       "sessionNormalize.succeeded": "Succeeded",
@@ -4398,13 +4460,44 @@
       "sessionNormalize.failed": "コールドスタート失敗",
       "sessionNormalize.description": "現在のチャットとDBを確認し、不足している原文・記憶・関係・長期要約・Vector索引を復旧します。削除やロールバックは行いません。",
       "sessionNormalize.execute": "セッション正規化を実行",
+      "sessionDiagnose.button": "診断のみ",
+      "sessionDiagnose.running": "診断中…",
+      "sessionDiagnose.failed": "診断できませんでした",
+      "sessionDiagnose.clean": "セッション正規化で直す問題はありません。",
+      "sessionDiagnose.rollback": "Risuで削除したターンの記憶が残っています: {turn}ターン以降",
+      "sessionDiagnose.missing": "DBに保存されていないターン",
+      "sessionDiagnose.edited": "Risuで編集されたターン",
+      "sessionDiagnose.review": "原文が異なり確認が必要なターン",
+      "sessionDiagnose.vectorReembed": "検索用ベクトルをすべて作り直す必要があります",
+      "sessionDiagnose.vectorMissing": "検索用ベクトルがない項目",
+      "sessionDiagnose.vectorOrphans": "使われなくなったベクトル",
+      "sessionDiagnose.notLive": "現在開いているチャットではないため、Risuチャットとの比較は省略しました。",
+      "sessionDiagnose.vectorUnchecked": "検索用ベクトルは確認できませんでした。",
+      "sessionDiagnose.hint": "診断は何も変更しません。セッション正規化を実行すると上の項目を直します。",
       "sessionNormalize.normalizing": "正規化中…",
       "sessionNormalize.stageLabel": "現在の段階",
+      "sessionNormalize.currentTurn": "処理中のターン: {turn}ターン",
+      "sessionNormalize.runningTurns": "再処理中のターン: {turns}",
+      "sessionNormalize.waitingTurns": "再処理を待つターン: {turns}",
       "sessionNormalize.stage.inspect_before": "保存状態を確認中",
       "sessionNormalize.stage.raw_repair_replay": "原文の確認・修復",
       "sessionNormalize.stage.critic_rescan_backfill": "記憶・根拠を生成中",
       "sessionNormalize.stage.vector_reindex": "Vector索引を確認中",
       "sessionNormalize.stage.vector_delivery": "検索用ベクトルを保存中",
+      "sessionNormalize.stage.reprocessing_wait": "記憶の再処理を待機中",
+      "sessionQueue.title": "キュー",
+      "sessionQueue.vector": "検索用ベクトル",
+      "sessionQueue.reprocessing": "記憶の再処理",
+      "sessionQueue.counts": "待機 {waiting} · 処理中 {running} · 再試行待ち {retrying}",
+      "sessionQueue.empty": "空",
+      "sessionQueue.loading": "確認中…",
+      "sessionQueue.disconnected": "リアルタイム更新が途切れました。",
+      "sessionQueue.reconnect": "再接続",
+      "sessionQueue.cancelAll": "キューをすべて取り消す",
+      "sessionQueue.cancelling": "取り消し中…",
+      "sessionQueue.confirmDesc": "このセッションでまだ始まっていない検索用ベクトルの作業と記憶の再処理をすべて取り消します。実行中のセッション正規化・再インデックス・再スキャンも取り消されます。処理中の作業は最後まで進みます。\n\n取り消した作業の記憶は検索用ベクトルや再処理の結果なしで残ります。セッション診断に表示され、セッション正規化で再び補えます。",
+      "sessionQueue.cancelled": "取り消しました: 検索用ベクトル {vector}件、記憶の再処理 {reprocessing}件",
+      "sessionQueue.cancelFailed": "キューを取り消せませんでした。",
       "sessionNormalize.stage.completed": "完了処理",
       "sessionNormalize.progress": "進行",
       "sessionNormalize.succeeded": "成功",
@@ -5005,7 +5098,6 @@
     error: "",
   };
   let _setActiveSettingsTabForTimeline = null;
-  let _presentationViewModelRequestId = 0;
   const _timelineState = {
     sessionId: "",
     selectedSessionId: "",
@@ -5021,6 +5113,9 @@
     nextBeforeTurn: 0,
     hasMore: false,
     pendingItems: [],
+    groups: [],
+    currentTurn: 0,
+    worldlineTopology: null,
     detailItem: null,
     detailLoading: false,
     detailError: "",
@@ -5618,7 +5713,9 @@
     try {
       recordRisuHookLifecycle("input", "callback_observed");
       terminalizeActiveFinalConfirmationRequestContext("new_host_input_observed");
-      const sessionId = await getCurrentChatSessionId();
+      // Risu waits for this hook before showing the message, so take the id-only
+      // check; beforeRequest runs the full one.
+      const sessionId = await getCurrentChatSessionIdForView();
       cacheRawInputForSession(sessionId, rawInput);
       if (isRisuHistoryTrimCommandText(rawInput)) {
         recordRisuHistoryTrimGuard(sessionId, "risu_slash_command", {
@@ -5743,7 +5840,9 @@
     try {
       if (typeof R.addRisuChatListener === "function") {
         recordRisuHookLifecycle("output", "registration_requested_unconfirmed");
-        await R.addRisuChatListener("output", onRisuOutput);
+        // Ids only: the chat is read through readHostChatFromIndex instead of
+        // Risu copying the whole character (every chat) for each output.
+        await R.addRisuChatListener("output", onRisuOutput, { snapshot: false });
         console.log(LOG_PREFIX, "addRisuChatListener output requested (host acceptance unconfirmed)");
       } else {
         recordRisuHookLifecycle("output", "capability_unavailable");
@@ -7374,6 +7473,95 @@
     return !expectedHostChatId || (!!observedHostChatId && observedHostChatId === expectedHostChatId);
   }
 
+  // Copies of Host chats kept in this frame. A read asks Risu only for the
+  // messages and keys whose versions are not in the kept copy
+  // (getChatChangesFromIndex), so a long chat is not copied whole on Risu's UI
+  // thread every time. Callers get their own copy, as getChatFromIndex gives.
+  function copyHostChatValue(value) {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(copyHostChatValue);
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return value;
+    const out = {};
+    for (const key of Object.keys(value)) out[key] = copyHostChatValue(value[key]);
+    return out;
+  }
+
+  const _hostChatCopies = new Map();
+  const HOST_CHAT_COPY_MAX = 4;
+
+  async function readHostChatFromIndex(charIdx, chatIdx) {
+    if (!R) return null;
+    if (typeof R.getChatChangesFromIndex !== "function") {
+      return typeof R.getChatFromIndex === "function" ? await R.getChatFromIndex(charIdx, chatIdx) : null;
+    }
+    const slot = String(charIdx) + ":" + String(chatIdx);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const base = attempt === 0 ? _hostChatCopies.get(slot) || null : null;
+      const changes = await R.getChatChangesFromIndex(charIdx, chatIdx, base ? {
+        epoch: base.epoch,
+        chatId: base.chatId,
+        messages: base.messageVersions,
+        fields: base.fieldVersions,
+      } : undefined);
+      if (!changes || typeof changes !== "object" || !Array.isArray(changes.keys)) {
+        _hostChatCopies.delete(slot);
+        return null;
+      }
+      const own = Object.prototype.hasOwnProperty;
+      const reuse = !!base && base.epoch === changes.epoch && base.chatId === changes.chatId;
+      const keptMessages = new Map();
+      if (reuse) {
+        base.messageVersions.forEach(function(version, index) { keptMessages.set(version, base.messages[index]); });
+      }
+      let complete = true;
+      const messageVersions = changes.messageArray && Array.isArray(changes.messageVersions) ? changes.messageVersions.slice() : [];
+      const messages = messageVersions.map(function(version, index) {
+        if (own.call(changes.messages || {}, index)) return changes.messages[index];
+        if (keptMessages.has(version)) return keptMessages.get(version);
+        complete = false;
+        return undefined;
+      });
+      const fields = {};
+      const fieldVersions = Object.assign({}, changes.fieldVersions || {});
+      for (const key of changes.keys) {
+        if (key === "message" && changes.messageArray) continue;
+        if (own.call(changes.fields || {}, key)) {
+          fields[key] = changes.fields[key];
+        } else if (reuse && own.call(base.fields, key) && base.fieldVersions[key] === fieldVersions[key]) {
+          fields[key] = base.fields[key];
+        } else {
+          complete = false;
+        }
+      }
+      if (!complete) continue;
+      const copy = {
+        epoch: changes.epoch,
+        chatId: changes.chatId,
+        keys: changes.keys.slice(),
+        messageArray: !!changes.messageArray,
+        messageVersions,
+        messages,
+        fieldVersions,
+        fields,
+      };
+      _hostChatCopies.delete(slot);
+      _hostChatCopies.set(slot, copy);
+      while (_hostChatCopies.size > HOST_CHAT_COPY_MAX) {
+        _hostChatCopies.delete(_hostChatCopies.keys().next().value);
+      }
+      const chat = {};
+      for (const key of copy.keys) {
+        chat[key] = key === "message" && copy.messageArray
+          ? copy.messages.map(copyHostChatValue)
+          : copyHostChatValue(copy.fields[key]);
+      }
+      return chat;
+    }
+    _hostChatCopies.delete(slot);
+    return typeof R.getChatFromIndex === "function" ? await R.getChatFromIndex(charIdx, chatIdx) : null;
+  }
+
   async function resolveCurrentActiveChatObject(sessionId, coordinates) {
     const out = { chat: null, source: "none", charIdx: null, chatIdx: null, reason: "unobserved" };
     try {
@@ -7392,9 +7580,9 @@
       out.chatIdx = Number.isInteger(chatIdx) ? chatIdx : null;
       const parsed = parseSessionDisplayIdentity(sessionId);
 
-      if (R && typeof R.getChatFromIndex === "function" && Number.isInteger(charIdx) && Number.isInteger(chatIdx)) {
+      if (R && (typeof R.getChatChangesFromIndex === "function" || typeof R.getChatFromIndex === "function") && Number.isInteger(charIdx) && Number.isInteger(chatIdx)) {
         try {
-          const chat = await R.getChatFromIndex(charIdx, chatIdx);
+          const chat = await readHostChatFromIndex(charIdx, chatIdx);
           if (chat && typeof chat === "object" && Array.isArray(chat.message)) {
             if (!activeChatMatchesCapturedSession(sessionId, captured, chat, charIdx)) {
               out.reason = "captured_chat_identity_mismatch";
@@ -9568,7 +9756,19 @@
       const activeChatResult = await resolveCurrentActiveChatObject("", { charIdx, chatIdx });
       const activeChat = activeChatResult && activeChatResult.chat;
       if (!activeChat) return identity;
-      if (typeof R.getCharacter === "function") {
+      if (typeof R.getChatIdentityFromIndex === "function" && typeof R.getChatSummaries === "function") {
+        // Ids and names only: getCharacter() copies every chat of the
+        // character on Risu's UI thread.
+        const ids = await R.getChatIdentityFromIndex(charIdx, chatIdx);
+        const summaries = await R.getChatSummaries();
+        const summary = Array.isArray(summaries) ? summaries[charIdx] : null;
+        identity.characterName = getNamedDisplayValue(summary, ["name"]);
+        const chaId = String(ids && ids.characterId || "").trim();
+        if (chaId) {
+          identity.stableCharacterId = chaId;
+          identity.stableCharacterIdState = "observed";
+        }
+      } else if (typeof R.getCharacter === "function") {
         const char = await R.getCharacter();
         identity.characterName = getNamedDisplayValue(char, ["name", "title", "label", "displayName"]);
         if (char && typeof char.chaId === "string" && char.chaId.trim()) {
@@ -9922,6 +10122,23 @@
         _runtimeChatSessionInventory.scope = "full";
         _runtimeChatSessionInventory.currentCharIdx = null;
         _runtimeChatSessionInventory.refreshedAt = Date.now();
+      }
+    } catch {}
+
+    // Names and ids only. Copying the current character for them also copies
+    // every message of every chat, so it is the fallback.
+    try {
+      if (R && typeof R.getChatSummaries === "function") {
+        const summaries = await R.getChatSummaries();
+        if (Array.isArray(summaries) && summaries.length > 0) {
+          clearRuntimeChatSessionInventory();
+          updated = primeSessionDisplayLookupFromCharacters(summaries) || updated;
+          _runtimeChatSessionInventory.loaded = true;
+          _runtimeChatSessionInventory.scope = "full";
+          _runtimeChatSessionInventory.currentCharIdx = null;
+          _runtimeChatSessionInventory.refreshedAt = Date.now();
+          return updated;
+        }
       }
     } catch {}
 
@@ -10402,6 +10619,38 @@
       if (isSessionRouteAcknowledgementFailure(err)) throw err;
       return SESSION_FALLBACK;
     }
+  }
+
+  // For screens. Makes the same cache check as getCurrentChatSessionId
+  // (indexes, chat id, character id) through Risu's id-only API instead of
+  // copying the chat and the whole character, and never rewrites the cache
+  // the turn flow reads. Without that API, or when the cache does not match,
+  // it runs the full check.
+  async function getCurrentChatSessionIdForView() {
+    const cached = _sessionCache && typeof _sessionCache === "object" ? _sessionCache : null;
+    if (R && typeof R.getChatIdentityFromIndex === "function" && cached && cached.sessionId) {
+      try {
+        const chatIdx = typeof R.getCurrentChatIndex === "function" ? await R.getCurrentChatIndex() : null;
+        const charIdx = typeof R.getCurrentCharacterIndex === "function" ? await R.getCurrentCharacterIndex() : null;
+        const identity = Number.isInteger(charIdx) && Number.isInteger(chatIdx)
+          ? await R.getChatIdentityFromIndex(charIdx, chatIdx)
+          : null;
+        const chatUniqueId = String(identity && identity.chatId || "").trim();
+        const stableCharacterId = String(identity && identity.characterId || "").trim();
+        // getCurrentChatSessionId reuses its cache only on these conditions.
+        if (chatUniqueId
+          && cached.charIdx === charIdx
+          && cached.chatIdx === chatIdx
+          && (!stableCharacterId || !cached.stableCharacterId || cached.stableCharacterId === stableCharacterId)
+          && (!cached.observedChatUniqueId || cached.observedChatUniqueId === chatUniqueId)
+          && cached.sessionId === `char_${charIdx}_cid_${chatUniqueId}`) {
+          return cached.sessionId;
+        }
+      } catch (err) {
+        debugLog("getCurrentChatSessionIdForView id read failed:", err && err.message);
+      }
+    }
+    return getCurrentChatSessionId();
   }
 
   async function getCurrentMigrationTargetSessionId() {
@@ -13484,7 +13733,7 @@
       || _timelineState.sessionId
       || ""
     ).trim();
-    const sessionId = selectedSessionId || String(await getCurrentChatSessionId() || "").trim();
+    const sessionId = selectedSessionId || String(await getCurrentChatSessionIdForView() || "").trim();
     if (state.bindingRequestId !== requestId) return false;
     if (String(state.sessionId || "") !== sessionId) {
       state.bindings = [];
@@ -14938,6 +15187,22 @@
   // risuai.nativeFetch()를 사용해 호스트를 통해 통신한다.
   // ──────────────────────────────────────────────────────────────
 
+  // Request bodies of this size or more go out gzip-compressed, matching the
+  // nginx threshold for responses; the backend unpacks them before reading.
+  const BRIDGE_GZIP_MIN_BYTES = 1024;
+
+  async function gzipBridgeRequestBody(text) {
+    if (typeof CompressionStream !== "function" || typeof TextEncoder !== "function") return null;
+    const bytes = new TextEncoder().encode(text);
+    if (bytes.length < BRIDGE_GZIP_MIN_BYTES) return null;
+    try {
+      const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
   async function bridgeFetch(path, options = {}) {
     const { method = "GET", body = null, timeoutMs, headers = null, rawBody = false, bridgeSettings = settings } = options;
     const timeout = resolveRequestTimeoutMs(timeoutMs, bridgeSettings.requestTimeoutMs);
@@ -15009,6 +15274,13 @@
 
       if (body !== null && method !== "GET") {
         fetchInit.body = rawBody ? body : ((typeof body === "string") ? body : JSON.stringify(body));
+        if (!rawBody && !webDirectBridge && typeof fetchInit.body === "string") {
+          const packed = await gzipBridgeRequestBody(fetchInit.body);
+          if (packed) {
+            fetchInit.body = packed;
+            mergedHeaders["Content-Encoding"] = "gzip";
+          }
+        }
       }
 
       const controller = typeof AbortController === "function" ? new AbortController() : null;
@@ -21664,14 +21936,26 @@
 
   function onRisuOutput(snapshot) {
     try {
-      const chat = snapshot && snapshot.chat && typeof snapshot.chat === "object" ? snapshot.chat : null;
-      const messages = chat && Array.isArray(chat.message) ? chat.message : null;
       const characterIndex = Number.isInteger(snapshot && snapshot.characterIndex)
         ? snapshot.characterIndex
         : -1;
       const chatIndex = Number.isInteger(snapshot && snapshot.chatIndex)
         ? snapshot.chatIndex
         : -1;
+      const chat = snapshot && snapshot.chat && typeof snapshot.chat === "object" ? snapshot.chat : null;
+      if (chat && !Array.isArray(chat.message) && characterIndex >= 0 && chatIndex >= 0) {
+        // Registered for ids only: read the chat through the kept copy without
+        // holding Risu, then observe it as a full snapshot.
+        readHostChatFromIndex(characterIndex, chatIndex).then(function observeReadOutputChat(read) {
+          if (read && Array.isArray(read.message) && String(read.id || "") === String(chat.id || "")) {
+            onRisuOutput(Object.assign({}, snapshot, { chat: read }));
+          }
+        }).catch(function reportOutputChatReadFailure(err) {
+          warnLog("onRisuOutput chat read failed:", err && err.message);
+        });
+        return;
+      }
+      const messages = chat && Array.isArray(chat.message) ? chat.message : null;
       const messageIndex = Number.isInteger(snapshot && snapshot.messageIndex)
         ? snapshot.messageIndex
         : -1;
@@ -22989,39 +23273,50 @@
     };
   }
 
+  // Asks the backend whether replies missing from the active chat mean a
+  // rollback; it only answers, and the caller decides whether to roll back.
+  async function askActiveChatTailDeletionDecision(sid, activeChat, options = {}) {
+    const rawMessages = extractActiveChatMessageList(activeChat);
+    if (!Array.isArray(rawMessages)) return null;
+    const currentMessages = extractActiveChatRollbackMessages(activeChat);
+    const currentAssistantObservations = buildRollbackAssistantObservations(rawMessages, await extractActiveChatOriginalMessages(activeChat));
+    const hostContext = options.hostContext && typeof options.hostContext === "object"
+      ? options.hostContext
+      : {};
+    const detail = {
+      reason: options.reason || "assistant_output_removed_from_active_chat",
+      hostContext,
+      deletionObserved: false,
+      pendingInputObservation: buildRollbackPendingInputObservation(sid, options.requestContext),
+      assistantObservationScope: "full_active_chat",
+      currentAssistantObservations,
+      hostLifecycleObservation: String(
+        options.hostLifecycleObservation
+        || ""
+      ),
+      lifecycleActionObservation: "deleted",
+    };
+    const decision = await requestBackendRollbackDecision(
+      sid,
+      0,
+      "assistant_output_removed_from_active_chat",
+      detail,
+      "auto"
+    );
+    return { currentMessages, detail, decision };
+  }
+
   async function reconcileActiveChatTailDeletionWithBackend(sessionId, activeChat, options = {}) {
     const sid = String(sessionId || "").trim();
     if (!settings.enabled || !settings.dbEnabled || !settings.rollbackAutoEnabled || !sid || sid === SESSION_FALLBACK || !activeChat) return false;
     if (_rollbackTailReconcileInFlightBySession.has(sid)) return false;
     _rollbackTailReconcileInFlightBySession.add(sid);
     try {
-      const rawMessages = extractActiveChatMessageList(activeChat);
-      if (!Array.isArray(rawMessages)) return false;
-      const currentMessages = extractActiveChatRollbackMessages(activeChat);
-      const currentAssistantObservations = buildRollbackAssistantObservations(rawMessages, await extractActiveChatOriginalMessages(activeChat));
-      const hostContext = options.hostContext && typeof options.hostContext === "object"
-        ? options.hostContext
-        : {};
-      const detail = {
-        reason: options.reason || "assistant_output_removed_from_active_chat",
-        hostContext,
-        deletionObserved: false,
-        pendingInputObservation: buildRollbackPendingInputObservation(sid, options.requestContext),
-        assistantObservationScope: "full_active_chat",
-        currentAssistantObservations,
-        hostLifecycleObservation: String(
-          options.hostLifecycleObservation
-          || ""
-        ),
-        lifecycleActionObservation: "deleted",
-      };
-      const decision = await requestBackendRollbackDecision(
-        sid,
-        0,
-        "assistant_output_removed_from_active_chat",
-        detail,
-        "auto"
-      );
+      const asked = await askActiveChatTailDeletionDecision(sid, activeChat, options);
+      if (!asked) return false;
+      const currentMessages = asked.currentMessages;
+      const detail = asked.detail;
+      const decision = asked.decision;
       if (!decision || decision.allowed !== true || Number(decision.from_turn || 0) < 1) {
         if (decision && decision.reason === "assistant_output_not_removed") updateSessionSnapshot(sid, currentMessages);
         return false;
@@ -37750,6 +38045,17 @@
       normalizeExplorerSelectedSessionForActiveTab();
     }
     _explorer.sessionsLoading = false;
+    _explorer.sessionsLoadedOnce = true;
+  }
+
+  // Until the first session list arrives an empty list means "loading",
+  // not "no sessions".
+  function explorerSessionsPending() {
+    return !!_explorer.sessionsLoading || !_explorer.sessionsLoadedOnce;
+  }
+
+  function timelineSessionsPending() {
+    return !!_timelineState.sessionsLoading || !_timelineState.sessionsLoadedOnce;
   }
 
   function explorerVisibleSessions() {
@@ -38009,6 +38315,11 @@
   }
 
   function explorerShowTabLoading(tab) {
+    const unpaged = { trust: _explorer.trust, world: _explorer.worldGraph, entities: _explorer.entities }[tab];
+    if (unpaged) {
+      unpaged.loading = true;
+      return;
+    }
     const state = explorerPagedStateForTab(tab);
     if (!state) return;
     state.items = [];
@@ -38046,10 +38357,7 @@
 
   async function explorerLoadTab(tab, reset = true) {
     _explorer.activeTab = tab;
-    if (reset) await reconcileRollbackFromHostSignal(explorerSessionId(), null, {
-      reason: "memory_refresh_full_active_chat_observed",
-      hostLifecycleObservation: "memory_refresh_observed",
-    });
+    // Viewing reads stored rows only. Turn requests and session normalize compare the whole Risu chat.
     if (tab === "chat_logs") await explorerFetchChatLogs(reset);
     else if (tab === "memories") {
       await explorerFetchMemories(reset);
@@ -38397,7 +38705,7 @@
   async function explorerFetchTrust() {
     const sid = explorerSessionId();
     const ts = _explorer.trust;
-    if (!sid) { ts.storylines = []; ts.worldRules = []; ts.hooks = []; ts.error = "세션 없음"; return; }
+    if (!sid) { ts.storylines = []; ts.worldRules = []; ts.hooks = []; ts.error = "세션 없음"; ts.loading = false; return; }
     ts.loading = true; ts.error = null;
     try {
       const [slRes, wrRes, hkRes] = await Promise.all([
@@ -38450,7 +38758,7 @@
   async function explorerFetchWorldGraph() {
     const sid = explorerSessionId();
     const wg = _explorer.worldGraph;
-    if (!sid) { wg.error = "세션 없음"; wg.rules = []; wg.allRules = []; return; }
+    if (!sid) { wg.error = "세션 없음"; wg.rules = []; wg.allRules = []; wg.loading = false; return; }
     wg.loading = true; wg.error = null;
     refreshExplorerUI();
     try {
@@ -38829,6 +39137,8 @@
     try {
       _timelineState.sessions = [];
       _timelineState.items = [];
+      _timelineState.groups = [];
+      _timelineState.worldlineTopology = null;
       _timelineState.pendingItems = [];
       _timelineState.meta = null;
       _timelineState.hasMore = false;
@@ -39114,6 +39424,44 @@
     return t("sessionNormalize.error.generic");
   }
 
+  // Which turns the running stage is on: the turn being rebuilt or replayed,
+  // or the turns memory reprocessing is on and still has to do.
+  function renderSessionNormalizeTurnsHtml(progress, job) {
+    if (!progress || (job && job.terminal === true)) return "";
+    const turnList = function(value) {
+      return Array.isArray(value) ? value.map(Number).filter(function(turn) { return turn > 0; }) : [];
+    };
+    const lines = [];
+    const current = Number(progress.current_turn || 0);
+    if (current > 0) lines.push(tf("sessionNormalize.currentTurn", { turn: current }));
+    const running = turnList(progress.running_turns);
+    const waiting = turnList(progress.waiting_turns);
+    if (running.length > 0) lines.push(tf("sessionNormalize.runningTurns", { turns: formatTurnIndexPreview(running, 12) }));
+    if (waiting.length > 0) lines.push(tf("sessionNormalize.waitingTurns", { turns: formatTurnIndexPreview(waiting, 12) }));
+    if (lines.length === 0) return "";
+    return '<div class="mo-session-normalize-stage mo-session-normalize-turns">' +
+      lines.map(function(line) { return '<span>' + escapeAttr(line) + '</span>'; }).join("") +
+      '</div>';
+  }
+
+  // Details the explorer re-renders keep the open state the user gave them.
+  function renderKeptOpenDetails(key, className, summaryHtml, bodyHtml) {
+    return '<details class="' + className + '" data-keep-open="' + escapeAttr(key) + '"' +
+      (_keptOpenDetails.has(key) ? ' open' : '') + '>' +
+      '<summary>' + summaryHtml + '</summary>' + bodyHtml + '</details>';
+  }
+
+  function bindKeptOpenDetails(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("details[data-keep-open]").forEach(function(details) {
+      details.addEventListener("toggle", function() {
+        const key = String(details.getAttribute("data-keep-open") || "");
+        if (details.open) _keptOpenDetails.add(key);
+        else _keptOpenDetails.delete(key);
+      });
+    });
+  }
+
   function renderSessionNormalizeJobProgressHtml(job) {
     const progress = job && job.progress && typeof job.progress === "object" ? job.progress : {};
     const status = String(job && (job.status || progress.status) || "running").trim().toLowerCase();
@@ -39152,6 +39500,7 @@
         escapeAttr(t("sessionNormalize.stageLabel")) + ': ' +
         '<strong>' + escapeAttr(sessionNormalizeStageLabel(stage)) + '</strong>' +
       '</div>' +
+      renderSessionNormalizeTurnsHtml(progress, job) +
       '<div class="mo-session-normalize-counts">' +
         '<span>' + escapeAttr(t("sessionNormalize.progress")) + ' <strong>' + processed + '/' + total + '</strong></span>' +
         '<span>' + escapeAttr(t("sessionNormalize.succeeded")) + ' <strong>' + succeeded + '</strong></span>' +
@@ -39201,10 +39550,9 @@
         (transportNotice.detail ? " / " + String(transportNotice.detail) : "")
       );
     }
-    html += '<details class="mo-session-normalize-technical">' +
-      '<summary>' + escapeAttr(t("sessionNormalize.technicalDetails")) + '</summary>' +
-      '<div>' + escapeAttr(technicalLines.join("\n")) + '</div>' +
-      '</details>';
+    html += renderKeptOpenDetails("session-normalize-job", "mo-session-normalize-technical",
+      escapeAttr(t("sessionNormalize.technicalDetails")),
+      '<div>' + escapeAttr(technicalLines.join("\n")) + '</div>');
     if (job && job.terminal !== true) {
       html += '<div class="mo-inline-actions">' +
         '<button type="button" class="mo-btn mo-btn-info" data-admin-job-refresh="session_normalize">' +
@@ -39614,6 +39962,12 @@
 
   let _rescanState = { loading: false, error: null, result: null, job: null };
   let _sessionNormalizeState = { loading: false, error: null, result: null, job: null, planWarning: "", panelOpen: false };
+  let _sessionDiagnoseState = { sessionId: "", loading: false, error: null, result: null };
+  // The selected session's open background work, streamed by the backend
+  // while the memory admin panel shows it.
+  let _sessionQueueState = { sessionId: "", counts: null, disconnected: false, cancelling: false, notice: "", stream: null };
+  // Keys of the kept-open details (renderKeptOpenDetails) the user opened.
+  const _keptOpenDetails = new Set();
   let _activeChatRescanDryRunState = { loading: false, error: null, result: null };
   let _activeChatRecentRebuildState = { loading: false, error: null, result: null };
   let _chatLogRepairState = { loading: false, error: null, progress: null, result: null };
@@ -40699,12 +41053,252 @@
     failures.forEach(function(failure) {
       technicalLines.push((failure.turn ? "#" + failure.turn + ": " : "") + failure.raw);
     });
-    html += '<details class="mo-session-normalize-technical">' +
-      '<summary>' + escapeAttr(t("sessionNormalize.technicalDetails")) + '</summary>' +
-      '<div>' + escapeAttr(technicalLines.join("\n")) + '</div>' +
-      '</details>' +
+    html += renderKeptOpenDetails("session-normalize-result", "mo-session-normalize-technical",
+      escapeAttr(t("sessionNormalize.technicalDetails")),
+      '<div>' + escapeAttr(technicalLines.join("\n")) + '</div>') +
       '</div>';
     return html;
+  }
+
+  // Runs the checks session normalize starts with and lists what it would
+  // fix. Nothing is written: the rollback, raw-log and vector checks are
+  // the read-only halves of what normalize does.
+  async function diagnoseSession(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid || _sessionDiagnoseState.loading) return false;
+    _sessionDiagnoseState = { sessionId: sid, loading: true, error: null, result: null };
+    _sessionNormalizeState.panelOpen = true;
+    refreshExplorerUI({ preserveScroll: true });
+    const result = {
+      live: false, rollbackFromTurn: 0, missingTurns: [], editedTurns: [], reviewTurns: [],
+      vectorChecked: false, vectorMissing: 0, vectorOrphans: 0, vectorReembed: false,
+    };
+    try {
+      const hostContext = captureSessionHostContextFromCache(sid);
+      const resolved = hostContext ? await resolveCurrentActiveChatObject(sid, hostContext) : null;
+      if (resolved && resolved.chat) {
+        result.live = true;
+        if (settings.enabled && settings.dbEnabled && settings.rollbackAutoEnabled) {
+          const asked = await askActiveChatTailDeletionDecision(sid, resolved.chat, {
+            hostContext,
+            reason: "session_diagnose_full_active_chat_observed",
+            hostLifecycleObservation: "session_diagnose_observed",
+          });
+          const decision = asked && asked.decision;
+          if (decision && decision.allowed === true && Number(decision.from_turn || 0) >= 1) {
+            result.rollbackFromTurn = Number(decision.from_turn);
+          }
+        }
+        const plan = await computeActiveChatRescanDryRunPlan(sid, hostContext);
+        if (plan && plan.ok) {
+          result.missingTurns = plan.rawMissingTurns;
+          result.editedTurns = buildSessionNormalizeEditedTurnsFromDryRunPlan(plan);
+          const edited = new Set(result.editedTurns);
+          result.reviewTurns = plan.rawMismatchTurns.filter(function(turn) { return !edited.has(turn); });
+        }
+      }
+      await loadSummaryFailures(sid);
+      const reindex = await safeCall(() => bridgeFetch("/admin/reindex", {
+        method: "POST",
+        timeoutMs: getRequestTimeoutSettingMs(),
+        body: {
+          chat_session_id: sid,
+          dry_run: true,
+          background: false,
+          client_meta: buildAdminRuntimeClientMeta({ source: "explorer_session_diagnose" }),
+        },
+      }), null, "diagnoseSession");
+      if (reindex && reindex.status === "ok") {
+        const gaps = reindex.vector_gaps && typeof reindex.vector_gaps === "object" ? reindex.vector_gaps : {};
+        const integrity = reindex.pre_reindex_integrity && typeof reindex.pre_reindex_integrity === "object" ? reindex.pre_reindex_integrity : {};
+        result.vectorChecked = true;
+        result.vectorMissing = Number(gaps.missing_count || 0);
+        result.vectorOrphans = Number(gaps.orphan_count || 0);
+        result.vectorReembed = Array.isArray(integrity.reembed_reasons) && integrity.reembed_reasons.length > 0;
+      }
+      _sessionDiagnoseState = { sessionId: sid, loading: false, error: null, result };
+    } catch (err) {
+      _sessionDiagnoseState = { sessionId: sid, loading: false, error: err && err.message ? err.message : String(err || "diagnose failed"), result: null };
+    }
+    refreshExplorerUI({ preserveScroll: true });
+    return !_sessionDiagnoseState.error;
+  }
+
+  function renderSessionQueueLaneHtml(label, lane) {
+    const counts = lane && Number(lane.total || 0) > 0
+      ? tf("sessionQueue.counts", {
+        waiting: Number(lane.waiting || 0).toLocaleString(),
+        running: Number(lane.running || 0).toLocaleString(),
+        retrying: Number(lane.retrying || 0).toLocaleString(),
+      })
+      : t("sessionQueue.empty");
+    return '<span class="mo-session-queue-lane"><strong>' + escapeAttr(label) + '</strong> ' + escapeAttr(counts) + '</span>';
+  }
+
+  function renderSessionQueueInnerHtml(sessionId) {
+    const state = _sessionQueueState;
+    const counts = state.sessionId === sessionId ? state.counts : null;
+    let html = '<span class="mo-session-queue-title">' + escapeAttr(t("sessionQueue.title")) + '</span>';
+    if (!counts) {
+      html += '<span class="mo-session-queue-lane">' + escapeAttr(t("sessionQueue.loading")) + '</span>';
+    } else {
+      html += renderSessionQueueLaneHtml(t("sessionQueue.vector"), counts.vector) +
+        renderSessionQueueLaneHtml(t("sessionQueue.reprocessing"), counts.reprocessing);
+      if (Number(counts.total || 0) > 0 || state.cancelling) {
+        html += '<button type="button" class="mo-btn mo-btn-danger" data-session-queue-cancel' + (state.cancelling ? ' disabled' : '') + '>' +
+          (state.cancelling ? '⏳ ' + escapeAttr(t("sessionQueue.cancelling")) : '⏹ ' + escapeAttr(t("sessionQueue.cancelAll"))) +
+          '</button>';
+      }
+    }
+    if (state.sessionId === sessionId && state.disconnected) {
+      html += '<span class="mo-session-queue-note">' + escapeAttr(t("sessionQueue.disconnected")) +
+        ' <button type="button" class="mo-btn-toggle" data-session-queue-reconnect>' + escapeAttr(t("sessionQueue.reconnect")) + '</button></span>';
+    }
+    if (state.sessionId === sessionId && state.notice) {
+      html += '<span class="mo-session-queue-note">' + escapeAttr(state.notice) + '</span>';
+    }
+    return html;
+  }
+
+  function renderSessionQueueHtml(sessionId) {
+    return '<div class="mo-reindex-row mo-session-queue" data-session-queue-panel="' + escapeAttr(sessionId) + '">' +
+      renderSessionQueueInnerHtml(sessionId) + '</div>';
+  }
+
+  function sessionQueuePanel() {
+    return document.querySelector("[data-session-queue-panel]");
+  }
+
+  function paintSessionQueuePanel() {
+    const panel = sessionQueuePanel();
+    if (panel) panel.innerHTML = renderSessionQueueInnerHtml(String(panel.getAttribute("data-session-queue-panel") || ""));
+  }
+
+  function stopSessionQueueStream() {
+    const active = _sessionQueueState.stream;
+    _sessionQueueState.stream = null;
+    if (!active) return;
+    try { active.controller.abort(); } catch { /* no-op */ }
+    if (active.reader) active.reader.cancel().catch(function() {});
+  }
+
+  // ensureSessionQueueStream keeps one stream open for the session the panel
+  // shows; the backend sends the counts when they change, so the panel needs
+  // no timer. The stream ends once the panel is gone.
+  function ensureSessionQueueStream(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid) return;
+    if (_sessionQueueState.stream && _sessionQueueState.sessionId === sid) return;
+    stopSessionQueueStream();
+    if (_sessionQueueState.sessionId !== sid) {
+      _sessionQueueState = { sessionId: sid, counts: null, disconnected: false, cancelling: false, notice: "", stream: null };
+    }
+    _sessionQueueState.disconnected = false;
+    const bridgeRoute = resolveBridgeRuntimeRoute(settings.bridgeUrl);
+    if (!bridgeRoute.url || typeof AbortController !== "function" || typeof TextDecoder !== "function") {
+      _sessionQueueState.disconnected = true;
+      return;
+    }
+    const active = { controller: new AbortController(), reader: null };
+    _sessionQueueState.stream = active;
+    const current = function() { return _sessionQueueState.stream === active; };
+    (async function() {
+      const reader = await openTurnWorkflowHUDStream(
+        bridgeRoute.url + "/admin/queues/events?chat_session_id=" + encodeURIComponent(sid),
+        active.controller.signal
+      );
+      active.reader = reader;
+      const decoder = new TextDecoder();
+      let buffered = "";
+      while (current()) {
+        const chunk = await reader.read();
+        if (chunk && chunk.value) buffered += decoder.decode(chunk.value, { stream: chunk.done !== true });
+        let newlineIndex = buffered.indexOf("\n");
+        while (newlineIndex >= 0) {
+          const line = buffered.slice(0, newlineIndex).trim();
+          buffered = buffered.slice(newlineIndex + 1);
+          newlineIndex = buffered.indexOf("\n");
+          if (!line) continue;
+          const panel = sessionQueuePanel();
+          if (!panel || panel.getAttribute("data-session-queue-panel") !== sid) {
+            stopSessionQueueStream();
+            return;
+          }
+          let event = null;
+          try { event = JSON.parse(line); } catch { event = null; }
+          if (event && event.status === "ok" && current()) {
+            _sessionQueueState.counts = event;
+            paintSessionQueuePanel();
+          }
+        }
+        if (chunk && chunk.done === true) break;
+      }
+      if (current()) throw new Error("queue stream closed");
+    })().catch(function() {
+      if (!current()) return;
+      _sessionQueueState.stream = null;
+      _sessionQueueState.disconnected = true;
+      paintSessionQueuePanel();
+    });
+  }
+
+  async function cancelSessionQueues(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid || _sessionQueueState.cancelling) return;
+    const confirmed = await showConfirmModal(t("sessionQueue.cancelAll"), t("sessionQueue.confirmDesc") + "\n\n" + t("common.confirmContinue"));
+    if (!confirmed) return;
+    _sessionQueueState.cancelling = true;
+    _sessionQueueState.notice = "";
+    paintSessionQueuePanel();
+    const result = await safeCall(() => bridgeFetch("/admin/queues/cancel", {
+      method: "POST",
+      timeoutMs: getRequestTimeoutSettingMs(),
+      body: { chat_session_id: sid },
+    }), null, "cancelSessionQueues");
+    if (_sessionQueueState.sessionId !== sid) return;
+    _sessionQueueState.cancelling = false;
+    _sessionQueueState.notice = result && result.status === "ok"
+      ? tf("sessionQueue.cancelled", {
+        vector: Number(result.vector_withdrawn || 0).toLocaleString(),
+        reprocessing: Number(result.reprocessing_withdrawn || 0).toLocaleString(),
+      })
+      : t("sessionQueue.cancelFailed");
+    paintSessionQueuePanel();
+  }
+
+  function renderSessionDiagnoseHtml(state, sessionId) {
+    const current = state && typeof state === "object" ? state : {};
+    if (String(current.sessionId || "") !== String(sessionId || "")) return "";
+    if (current.error) {
+      return '<div class="mo-reindex-row" style="font-size:11px;color:#f87171">' +
+        escapeAttr(t("sessionDiagnose.failed") + ": " + current.error) + '</div>';
+    }
+    const r = current.result;
+    if (!r) return "";
+    const rows = [];
+    if (r.rollbackFromTurn > 0) rows.push(tf("sessionDiagnose.rollback", { turn: r.rollbackFromTurn }));
+    if (r.missingTurns.length > 0) rows.push(t("sessionDiagnose.missing") + " (" + r.missingTurns.length + "): " + formatTurnIndexPreview(r.missingTurns, 12));
+    if (r.editedTurns.length > 0) rows.push(t("sessionDiagnose.edited") + " (" + r.editedTurns.length + "): " + formatTurnIndexPreview(r.editedTurns, 12));
+    if (r.reviewTurns.length > 0) rows.push(t("sessionDiagnose.review") + " (" + r.reviewTurns.length + "): " + formatTurnIndexPreview(r.reviewTurns, 12));
+    if (r.vectorReembed) rows.push(t("sessionDiagnose.vectorReembed"));
+    if (r.vectorMissing > 0) rows.push(t("sessionDiagnose.vectorMissing") + ": " + r.vectorMissing);
+    if (r.vectorOrphans > 0) rows.push(t("sessionDiagnose.vectorOrphans") + ": " + r.vectorOrphans);
+    const summaryRows = _summaryFailureState && String(_summaryFailureState.sessionId || "") === String(sessionId || "")
+      ? summaryFailureRows(_summaryFailureState.report)
+      : [];
+    const notes = [];
+    if (!r.live) notes.push(t("sessionDiagnose.notLive"));
+    if (!r.vectorChecked) notes.push(t("sessionDiagnose.vectorUnchecked"));
+    const notesHtml = notes.map(function(note) {
+      return '<div class="mo-reindex-row" style="font-size:11px;color:#a0a0b0">' + escapeAttr(note) + '</div>';
+    }).join("");
+    if (rows.length === 0 && summaryRows.length === 0) {
+      return '<div class="mo-reindex-row" style="font-size:11px;color:#4ade80">✓ ' + escapeAttr(t("sessionDiagnose.clean")) + '</div>' + notesHtml;
+    }
+    return rows.map(function(row) {
+      return '<div class="mo-reindex-row" style="font-size:11px;color:#f59e0b">' + escapeAttr(row) + '</div>';
+    }).join("") + notesHtml +
+      '<div class="mo-reindex-row" style="font-size:11px;color:#a0a0b0">' + escapeAttr(t("sessionDiagnose.hint")) + '</div>';
   }
 
   async function normalizeSession(sessionId, maxItems, options = {}) {
@@ -42786,7 +43380,7 @@
     _step17Visibility.loading = true;
     _step17Visibility.error = "";
     try {
-      const sid = String(await getCurrentChatSessionId() || "").trim();
+      const sid = String(await getCurrentChatSessionIdForView() || "").trim();
       _step17Visibility.sessionId = sid;
       if (!sid || sid === SESSION_FALLBACK) {
         _step17Visibility.freshness = null;
@@ -42838,7 +43432,7 @@
     _step17ReleaseGate.loading = true;
     _step17ReleaseGate.error = "";
     try {
-      const sid = String(await getCurrentChatSessionId() || "").trim();
+      const sid = String(await getCurrentChatSessionIdForView() || "").trim();
       _step17ReleaseGate.sessionId = sid;
       const bundlePromise = safeCall(
         () => bridgeFetch("/metrics/lc1s/step17-bundle-closure", { method: "GET", timeoutMs: getRequestTimeoutSettingMs() }),
@@ -45414,7 +46008,7 @@
     const target = targetId ? String(targetId) : String(state.targetId || "");
     if (!target || sources.length === 0) return;
     state.loading = true; state.error = ""; state.status = "";
-    refreshExplorerUI({ reloadPresentation: false });
+    refreshExplorerUI();
     try {
       const suffix = mode === "preview" ? "/preview" : (mode === "unmerge" ? "/unmerge" : "");
       const result = await bridgeFetch("/" + (itemMode ? "items" : "characters") + "/" + encodeURIComponent(sid) + "/identity-merge" + suffix, {
@@ -45447,7 +46041,7 @@
       state.error = err && err.message ? err.message : String(err);
     }
     state.loading = false;
-    refreshExplorerUI({ reloadPresentation: false });
+    refreshExplorerUI();
   }
 
   async function explorerRunCharacterIdentityMerge(mode, sourceId, targetId) {
@@ -46212,7 +46806,7 @@
           escapeAttr(t("timeline.label.mem")) + ' ' + memories + ' · ' +
           escapeAttr(t("timeline.label.kg")) + ' ' + kg +
         '</span></button>';
-    }).join("") : '<div class="mo-note">' + escapeAttr(_explorer.sessionsLoading ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</div>';
+    }).join("") : '<div class="mo-note">' + escapeAttr(explorerSessionsPending() ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</div>';
     const attachBtn = selectedSession && selectedSession.can_attach
       ? '<button type="button" class="mo-tl-session-attach" data-timeline-session-attach-id="' + escapeAttr(selectedActionSessionId) + '" title="' + escapeAttr(t("timeline.session.attachTitle")) + '"' + (_sessionMigrationUi.running ? ' disabled' : '') + '>' + escapeAttr(t("timeline.button.attachCurrent")) + '</button>'
       : '';
@@ -46276,7 +46870,7 @@
           migrationStatusHtml + migrationOpsHtml +
           '<div class="mo-memory-management-stack">' + (maintenancePanels || '<div class="mo-note">' + escapeAttr(t('common.empty')) + '</div>') + '</div>' +
         '</section>'
-      : '<section class="mo-memory-admin-workspace"><div class="mo-note">' + escapeAttr(t("timeline.note.noSessions")) + '</div></section>';
+      : '<section class="mo-memory-admin-workspace"><div class="mo-note">' + escapeAttr(explorerSessionsPending() ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</div></section>';
     return '<div class="mo-memory-admin-layout" data-memory-session-management>' +
       '<aside class="mo-memory-admin-rail" aria-label="' + escapeAttr(t("timeline.label.sessions")) + '">' +
         '<div class="mo-memory-admin-rail-head"><strong>' + escapeAttr(t("timeline.label.sessions")) + '</strong><span>' + sessions.length + '</span></div>' +
@@ -46300,8 +46894,8 @@
 
   function renderExplorerSection(mode) {
     const managementMode = mode === "management";
+    if (!_explorer.viewModel) composePresentationViewModels();
     const viewModel = _explorer.viewModel;
-    if (!viewModel) return '<div class="mo-note">Presentation ViewModel unavailable</div>';
     const selectedSid = _explorer.selectedSessionId;
     const liveSid = _explorer.activeChatSessionId;
     const debugToolsVisible = managementMode && !!settings.debug;
@@ -46342,10 +46936,9 @@
           '<div class="mo-session-normalize-failure">' +
             '<span>' + escapeAttr(localizeSessionNormalizeFailure(normalizeError)) + '</span>' +
           '</div>' +
-          '<details class="mo-session-normalize-technical">' +
-            '<summary>' + escapeAttr(t("sessionNormalize.technicalDetails")) + '</summary>' +
-            '<div>' + escapeAttr(normalizeError.raw) + '</div>' +
-          '</details>' +
+          renderKeptOpenDetails("session-normalize-error", "mo-session-normalize-technical",
+            escapeAttr(t("sessionNormalize.technicalDetails")),
+            '<div>' + escapeAttr(normalizeError.raw) + '</div>') +
           '</div>';
       }
       const normalizeNeedsAttention = !!(_sessionNormalizeState.loading || _sessionNormalizeState.error || _sessionNormalizeState.result || _sessionNormalizeState.job || _sessionNormalizeState.planWarning);
@@ -46359,6 +46952,12 @@
           '<div class="mo-reindex-row">' +
             '<label>max_items (0=all): <input type="number" id="mo-session-normalize-max" value="0" min="0" style="width:80px"></label>' +
             ' <label><input type="checkbox" id="mo-session-normalize-skip-rescan"> skip_rescan</label>' +
+            '<button class="mo-btn" id="mo-session-diagnose-btn"' +
+              (_sessionDiagnoseState.loading || _sessionNormalizeState.loading ? ' disabled' : '') + '>' +
+              (_sessionDiagnoseState.loading
+                ? '⏳ ' + escapeAttr(t("sessionDiagnose.running"))
+                : '🔍 ' + escapeAttr(t("sessionDiagnose.button"))) +
+            '</button> ' +
             '<button class="mo-btn mo-btn-primary" id="mo-session-normalize-btn"' +
               (_sessionNormalizeState.loading ? ' disabled' : '') + '>' +
               (_sessionNormalizeState.loading
@@ -46366,6 +46965,7 @@
                 : '▶ ' + escapeAttr(t("sessionNormalize.execute"))) +
             '</button>' +
           '</div>' +
+          renderSessionDiagnoseHtml(_sessionDiagnoseState, selectedSid) +
           renderSummaryFailureListHtml(_summaryFailureState, selectedSid) +
           normalizeResultHtml +
         '</div></details>' +
@@ -46688,8 +47288,11 @@
     const tabItems = getExplorerTabItems();
     const activeTabItem = tabItems.find(function(item) { return item.key === _explorer.activeTab; }) || { label: _explorer.activeTab, count: 0 };
 
+    const sessionQueuePanelHtml = selectedSid && managementMode
+      ? '<div class="mo-reindex-panel mo-session-queue-box">' + renderSessionQueueHtml(selectedSid) + '</div>'
+      : '';
     const maintenancePanels = managementMode
-      ? sessionNormalizePanel + renderExplorerRuntimeTokenProfileBanner() + hypaImportPanel + reindexPanel + activeChatRescanDryRunPanel + rescanPanel
+      ? sessionQueuePanelHtml + sessionNormalizePanel + renderExplorerRuntimeTokenProfileBanner() + hypaImportPanel + reindexPanel + activeChatRescanDryRunPanel + rescanPanel
       : '';
     const contextHtml = '<div class="mo-memory-context">' +
       '<div class="mo-memory-context-main"><span>' + t('explorer.filter.current') + '</span><strong>' + escapeAttr(sidDisplay) + '</strong></div>' +
@@ -46736,7 +47339,7 @@
       const label = getSessionDisplayLabel(sid, false) || sid;
       return '<option value="' + escapeAttr(sid) + '"' + (sid === selectedSessionId ? ' selected' : '') + '>' +
         escapeAttr(label + (suffix ? ' · ' + suffix : '')) + '</option>';
-    }).join("") : '<option value="">' + escapeAttr(t("timeline.note.noSessions")) + '</option>';
+    }).join("") : '<option value="">' + escapeAttr(explorerSessionsPending() ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</option>';
     const refreshDisabled = !selectedSessionId || selectedSessionId !== activeSessionId;
     const runtimeSync = runtimeState.lastLorebookReferenceSync && typeof runtimeState.lastLorebookReferenceSync === "object"
       ? runtimeState.lastLorebookReferenceSync
@@ -46782,7 +47385,7 @@
   }
 
   async function loadLorebookReferenceManagementProjection() {
-    const activeSid = String(await getCurrentChatSessionId() || "").trim();
+    const activeSid = String(await getCurrentChatSessionIdForView() || "").trim();
     if (activeSid && activeSid !== SESSION_FALLBACK) _explorer.activeChatSessionId = activeSid;
 
     await explorerFetchSessions();
@@ -46875,9 +47478,8 @@
       const explorerRoot = document.getElementById("mo-explorer-root");
       if (!explorerRoot) return;
       const preserveScroll = options && options.preserveScroll !== false;
-      const reloadPresentation = !options || options.reloadPresentation !== false;
       const scrollState = preserveScroll ? captureExplorerScrollState() : null;
-      if (reloadPresentation) await loadPresentationViewModels();
+      composePresentationViewModels();
       if (document.getElementById("mo-explorer-root") !== explorerRoot) return;
       // Sprint 2-G: 전체 explorer 섹션 재렌더 (sync indicator 포함)
       explorerSyncBatchDeleteSelection(_explorer.activeTab);
@@ -46966,6 +47568,24 @@
           runMemorySessionAction(() => runTimelineSessionMigrationCleanup());
         });
       });
+      bindKeptOpenDetails(document.getElementById("mo-explorer-root"));
+      const queuePanel = sessionQueuePanel();
+      if (queuePanel) {
+        const queueSessionId = String(queuePanel.getAttribute("data-session-queue-panel") || "");
+        ensureSessionQueueStream(queueSessionId);
+        queuePanel.addEventListener("click", function(event) {
+          const target = event.target && event.target.closest ? event.target : null;
+          if (!target) return;
+          if (target.closest("[data-session-queue-cancel]")) {
+            cancelSessionQueues(queueSessionId);
+          } else if (target.closest("[data-session-queue-reconnect]")) {
+            ensureSessionQueueStream(queueSessionId);
+            paintSessionQueuePanel();
+          }
+        });
+      } else {
+        stopSessionQueueStream();
+      }
       const sessionNormalizePanel = document.querySelector("[data-session-normalize-panel]");
       if (sessionNormalizePanel) {
         sessionNormalizePanel.addEventListener("toggle", () => {
@@ -47122,7 +47742,7 @@
             const id = parseInt(el.dataset.expandId, 10);
             if (type && !isNaN(id)) {
               explorerToggleExpand(type, id);
-              refreshExplorerUI({ preserveScroll: true, reloadPresentation: false });
+              refreshExplorerUI({ preserveScroll: true });
             }
           });
         }
@@ -47496,7 +48116,7 @@
           state.targetId = String(e.target && e.target.value || "");
           state.sourceIds.delete(state.targetId);
           state.preview = null; state.error = ""; state.status = "";
-          refreshExplorerUI({ reloadPresentation: false });
+          refreshExplorerUI();
         });
       });
 
@@ -47508,7 +48128,7 @@
           if (!id || id === state.targetId) return;
           if (state.sourceIds.has(id)) state.sourceIds.delete(id); else state.sourceIds.add(id);
           state.preview = null; state.error = ""; state.status = "";
-          refreshExplorerUI({ reloadPresentation: false });
+          refreshExplorerUI();
         });
       });
 
@@ -47521,7 +48141,7 @@
           state.targetId = id;
           state.sourceIds.delete(id);
           state.preview = null; state.error = ""; state.status = "";
-          refreshExplorerUI({ reloadPresentation: false });
+          refreshExplorerUI();
         });
       });
 
@@ -47551,7 +48171,7 @@
           state.targetId = String(e.target && e.target.value || "");
           state.sourceIds.delete(state.targetId);
           state.preview = null; state.error = ""; state.status = "";
-          refreshExplorerUI({ reloadPresentation: false });
+          refreshExplorerUI();
         });
       });
 
@@ -47563,7 +48183,7 @@
           if (!id || id === state.targetId) return;
           if (state.sourceIds.has(id)) state.sourceIds.delete(id); else state.sourceIds.add(id);
           state.preview = null; state.error = ""; state.status = "";
-          refreshExplorerUI({ reloadPresentation: false });
+          refreshExplorerUI();
         });
       });
 
@@ -47830,6 +48450,15 @@
           e.stopPropagation();
           const sid = _explorer.selectedSessionId;
           if (sid) await resetSessionRoutingState(sid);
+        });
+      }
+
+      const sessionDiagnoseBtn = document.getElementById("mo-session-diagnose-btn");
+      if (sessionDiagnoseBtn) {
+        sessionDiagnoseBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sid = _explorer.selectedSessionId;
+          if (sid) await diagnoseSession(sid);
         });
       }
 
@@ -48527,6 +49156,12 @@ details.mo-it-block[open] .mo-it-expand{display:none}
 .mo-memory-admin-secondary{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-height:28px;flex-wrap:wrap}
 .mo-memory-admin-workspace .mo-memory-management-stack{grid-template-columns:1fr;gap:12px}
 .mo-session-normalize-panel.is-attention{border-color:rgba(199,168,105,.34)}
+.mo-session-queue{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;font-size:11px;color:#8B909A;font-variant-numeric:tabular-nums}
+.mo-session-queue-box .mo-session-queue{margin:0;padding:6px 10px;min-height:32px}
+.mo-session-normalize-turns{display:flex;flex-wrap:wrap;gap:2px 12px}
+.mo-session-queue-title{color:#5C626D;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.mo-session-queue-lane strong{color:#C9CDD4;font-weight:600}
+.mo-session-queue-note{color:#C7A869}
 @media(max-width:820px){.mo-memory-admin-layout{grid-template-columns:1fr;gap:20px}.mo-memory-admin-rail{padding:0 0 18px;border-right:0;border-bottom:1px solid rgba(255,255,255,.07)}.mo-memory-admin-session-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mo-hierarchy-subtabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 8px 0;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .mo-hierarchy-subtab{background:transparent;border:1px solid rgba(255,255,255,.07);color:#8B909A;padding:4px 10px;border-radius:12px;cursor:pointer;font-size:11px;font-weight:600}
@@ -49315,6 +49950,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     } finally {
       if (!requestOwnsLoading()) return;
       _timelineState.sessionsLoading = false;
+      _timelineState.sessionsLoadedOnce = true;
       refreshTimelineUI();
     }
   }
@@ -49341,6 +49977,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     _timelineState.selectedSessionId = sid;
     _timelineState.sessionId = sid;
     _timelineState.items = [];
+    _timelineState.groups = [];
+    _timelineState.worldlineTopology = null;
     _timelineState.meta = null;
     _timelineState.viewModel = null;
     _timelineState.hasMore = false;
@@ -49371,6 +50009,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     const skipRuntimeSessionResolve = !!(options.skipRuntimeSessionResolve && explicitSessionId);
     const skipSessionListRefresh = !!(options.skipSessionListRefresh && explicitSessionId && _timelineState.sessions.length > 0);
     const preserveExpandedTurnKey = !!options.preserveExpandedTurnKey;
+    // Comparing the whole Risu chat is slow on mobile; only the reload button asks for it.
+    const syncActiveChat = !!options.syncActiveChat;
     if (append) {
       if (_timelineState.loadingMore || !_timelineState.hasMore) return;
       _timelineState.loadingMore = true;
@@ -49386,14 +50026,14 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     const requestId = Number(_timelineState.requestId || 0) + 1;
     _timelineState.requestId = requestId;
     if (!append) _timelineState.error = "";
-    refreshTimelineUI({ reloadPresentation: false });
+    refreshTimelineUI();
     try {
       const sid = skipRuntimeSessionResolve
         ? String(_timelineState.currentSessionId || "")
-        : await getCurrentChatSessionId();
+        : syncActiveChat ? await getCurrentChatSessionId() : await getCurrentChatSessionIdForView();
       if (_timelineState.requestId !== requestId) return;
       const runtimeSid = timelineIsPlaceholderSessionId(sid) ? "" : sid;
-      if (!append && !skipRuntimeSessionResolve && runtimeSid) {
+      if (syncActiveChat && !append && !skipRuntimeSessionResolve && runtimeSid) {
         await reconcileRollbackFromHostSignal(runtimeSid, captureSessionHostContextFromCache(runtimeSid), {
           reason: "timeline_open_assistant_deletion_observation",
           hostLifecycleObservation: "timeline_open_observed",
@@ -49423,7 +50063,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         _timelineState.detailError = "";
         timelineResetEditState();
       }
-      if (!append && requestedSessionId && runtimeSid && requestedSessionId === runtimeSid) {
+      if (syncActiveChat && !append && requestedSessionId && runtimeSid && requestedSessionId === runtimeSid) {
         await ensureActiveChatCompletedTurnsBackfilled(requestedSessionId, { reason: "timeline_refresh" });
         if (_timelineState.requestId !== requestId) return;
       }
@@ -49434,11 +50074,14 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       if (append && _timelineState.nextBeforeTurn > 0) {
         params.set("beforeTurn", String(_timelineState.nextBeforeTurn));
       }
+      params.set("view", "1");
+      if (runtimeSid) params.set("currentSessionId", runtimeSid);
       const data = await bridgeFetch("/timeline?" + params.toString(), { method: "GET", timeoutMs: getRequestTimeoutSettingMs() });
       if (_timelineState.requestId !== requestId) return;
       if (!data || data.status !== "ok" || !Array.isArray(data.items)) {
         throw new Error(t("timeline.error.backendNoItems"));
       }
+      const pageGroups = Array.isArray(data.groups) ? data.groups : [];
       if (append) {
         const seen = new Set(_timelineState.items.map(timelineItemKey));
         data.items.forEach((item) => {
@@ -49448,8 +50091,16 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             seen.add(key);
           }
         });
+        const seenGroups = new Set(_timelineState.groups.map((group) => group.key));
+        _timelineState.groups = _timelineState.groups.concat(pageGroups.filter((group) => !seenGroups.has(group.key)));
       } else {
         _timelineState.items = data.items;
+        _timelineState.groups = pageGroups;
+        _timelineState.currentTurn = 0;
+      }
+      _timelineState.currentTurn = Math.max(Number(_timelineState.currentTurn || 0), Number(data.current_turn || 0));
+      if (data.worldline_topology && typeof data.worldline_topology === "object") {
+        _timelineState.worldlineTopology = data.worldline_topology;
       }
       pruneTimelinePendingArtifacts(requestedSessionId, _timelineState.items);
       _timelineState.meta = data.meta || null;
@@ -49460,6 +50111,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       if (_timelineState.requestId !== requestId) return;
       if (!append) {
         _timelineState.items = [];
+        _timelineState.groups = [];
+        _timelineState.worldlineTopology = null;
         _timelineState.meta = null;
         _timelineState.hasMore = false;
         _timelineState.nextBeforeTurn = 0;
@@ -49494,6 +50147,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       _timelineState.sessionId = nextSessionId;
       syncSessionScopedInspectionSelection(nextSessionId);
       _timelineState.items = [];
+      _timelineState.groups = [];
+      _timelineState.worldlineTopology = null;
       _timelineState.meta = null;
       _timelineState.hasMore = false;
       _timelineState.nextBeforeTurn = 0;
@@ -49612,7 +50267,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     if (meta.targetSessionId !== undefined) _sessionMigrationUi.targetSessionId = String(meta.targetSessionId || "");
     if (meta.migrationId !== undefined) _sessionMigrationUi.migrationId = Number(meta.migrationId || 0);
     if (meta.migrationMode !== undefined) _sessionMigrationUi.migrationMode = String(meta.migrationMode || "");
-    if (_settingsActiveTab === "memory_admin") refreshExplorerUI({ reloadPresentation: false });
+    if (_settingsActiveTab === "memory_admin") refreshExplorerUI();
     else refreshTimelineUI();
   }
 
@@ -49961,7 +50616,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       return true;
     } catch (err) {
       _timelineState.sessionsError = tf("timeline.worldline.repairFailed", { reason: err && err.message ? err.message : "unknown" });
-      refreshTimelineUI({ reloadPresentation: false });
+      refreshTimelineUI();
       return false;
     } finally {
       if (button && button.isConnected) {
@@ -50354,9 +51009,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     if (!timelinePanel) return;
     const preserveScroll = options && options.preserveScroll !== false;
     const scrollState = preserveScroll ? captureTimelineScrollState() : null;
-    if (options && options.reloadPresentation !== false) {
-      await loadPresentationViewModels();
-    }
+    composePresentationViewModels();
     if (document.querySelector('[data-tab-panel="timeline"]') !== timelinePanel) return;
     const priorCanvas = timelinePanel.querySelector("#mo-timeline-worldline-canvas");
     if (priorCanvas) unmountTimelineWorldlineCanvas(priorCanvas);
@@ -50490,7 +51143,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     _timelineState.detailLoading = true;
     _timelineState.detailError = "";
     timelinePopulateEditState(item);
-    refreshTimelineUI({ reloadPresentation: false });
+    refreshTimelineUI();
     try {
       const detail = await fetchTimelineItemDetail(item);
       if (requestSessionId !== String(_timelineState.selectedSessionId || _timelineState.sessionId || "")
@@ -50511,7 +51164,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         && _timelineSelectedDetail
         && timelineItemKey(_timelineSelectedDetail) === requestItemKey) {
         _timelineState.detailLoading = false;
-        refreshTimelineUI({ reloadPresentation: false });
+        refreshTimelineUI();
       }
     }
   }
@@ -50645,7 +51298,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     _timelineState.detailLoading = true;
     _timelineState.detailError = "";
     _timelineState.detailItem = null;
-    refreshTimelineUI({ reloadPresentation: false });
+    refreshTimelineUI();
     try {
       const detail = await fetchTimelineItemDetail(item);
       if (requestSessionId !== String(_timelineState.selectedSessionId || _timelineState.sessionId || "")
@@ -50663,7 +51316,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         && _timelineSelectedDetail
         && timelineItemKey(_timelineSelectedDetail) === requestItemKey) {
         _timelineState.detailLoading = false;
-        refreshTimelineUI({ reloadPresentation: false });
+        refreshTimelineUI();
       }
     }
   }
@@ -51158,6 +51811,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       _timelineState.selectedSessionId = sessionId;
       _timelineState.sessionId = sessionId;
       _timelineState.items = [];
+      _timelineState.groups = [];
+      _timelineState.worldlineTopology = null;
       _timelineState.meta = null;
       _timelineState.viewModel = null;
       _timelineState.hasMore = false;
@@ -51168,7 +51823,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     } else if (!inspectorWasOpen) {
       loadTimelineData(true, { sessionId, focusTurn: turnIndex, skipRuntimeSessionResolve: true, skipSessionListRefresh: true, preserveExpandedTurnKey: true });
     } else {
-      refreshTimelineUI({ reloadPresentation: false });
+      refreshTimelineUI();
     }
   }
 
@@ -51289,10 +51944,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
   }
 
   function renderTimelinePanel() {
+    if (!_timelineState.viewModel) composePresentationViewModels();
     const viewModel = _timelineState.viewModel;
-    if (!viewModel) {
-      return '<div class="mo-note">' + escapeAttr(_timelineState.loading ? t("timeline.button.loading") : "Presentation ViewModel unavailable") + '</div>';
-    }
     const items = Array.isArray(viewModel.items) ? viewModel.items : [];
     const turnGroups = Array.isArray(viewModel.groups) ? viewModel.groups : [];
     const summary = viewModel.summary || {};
@@ -51318,7 +51971,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       const lifecycle = String(session.label || session.status || "");
       const label = getSessionDisplayLabel(sid, false) || sid;
       return '<option value="' + escapeAttr(sid) + '"' + (sid === selectedSessionId ? ' selected' : '') + '>' + escapeAttr(label + (lifecycle ? ' · ' + lifecycle : '')) + '</option>';
-    }).join("") : '<option value="">' + escapeAttr(_timelineState.sessionsLoading ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</option>';
+    }).join("") : '<option value="">' + escapeAttr(timelineSessionsPending() ? t("timeline.note.loadingSessions") : t("timeline.note.noSessions")) + '</option>';
     const streamHtml = selectedTurnGroup ? renderTimelineTurnGroup(selectedTurnGroup)
       : _timelineState.loading || viewModel.empty_state === "loading" ? '<div class="mo-note">' + escapeAttr(t("timeline.button.loading")) + '</div>'
       : viewModel.empty_state === "error" ? '<div class="mo-status mo-status-fail">' + escapeAttr(_timelineState.error) + '</div>'
@@ -51331,11 +51984,17 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         : '<div class="mo-tl-load-note">' + escapeAttr(t("timeline.note.noMore")) + '</div>')
       : '';
     const suppliedTopologyState = String(topology && topology.state || "");
-    const topologySurfaceState = !topology || suppliedTopologyState === "unavailable"
+    // The graph arrives with the first /timeline page; until then it is
+    // loading, not unavailable.
+    const topologySurfaceState = !topology && (_timelineState.loading || _timelineState.sessionsLoading)
+      ? "loading"
+      : !topology || suppliedTopologyState === "unavailable"
       ? "unavailable"
       : topologyNodes.length === 0 ? "empty" : suppliedTopologyState === "partial" ? "partial" : "ready";
-    const topologyStatusHtml = topologySurfaceState !== "unavailable" && topologySurfaceState !== "empty" ? ''
-      : '<div class="mo-tl-canvas-empty"><strong>' + escapeAttr(t(topologySurfaceState === "unavailable" ? "timeline.canvas.unavailable" : "timeline.canvas.empty")) + '</strong>' +
+    const topologyStatusLabel = topologySurfaceState === "loading" ? "timeline.button.loading"
+      : topologySurfaceState === "unavailable" ? "timeline.canvas.unavailable" : "timeline.canvas.empty";
+    const topologyStatusHtml = topologySurfaceState !== "unavailable" && topologySurfaceState !== "empty" && topologySurfaceState !== "loading" ? ''
+      : '<div class="mo-tl-canvas-empty"><strong>' + escapeAttr(t(topologyStatusLabel)) + '</strong>' +
           (topology && topology.reason ? '<span>' + escapeAttr(String(topology.reason)) + '</span>' : '') +
         '</div>';
     const topologyPartialHtml = topologySurfaceState === "partial"
@@ -51599,95 +52258,163 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     }
   }
 
-  async function loadPresentationViewModels() {
-    const requestId = ++_presentationViewModelRequestId;
-    const timelineSessionId = String(_timelineState.selectedSessionId || _timelineState.sessionId || _timelineState.currentSessionId || "");
-    const explorerSelectedSessionId = String(_explorer.selectedSessionId || "");
-    const requestIsCurrent = function() {
-      return requestId === _presentationViewModelRequestId
-        && timelineSessionId === String(_timelineState.selectedSessionId || _timelineState.sessionId || _timelineState.currentSessionId || "")
-        && explorerSelectedSessionId === String(_explorer.selectedSessionId || "");
-    };
-    try {
-      const lifecycleById = {};
-      (Array.isArray(_timelineState.sessions) ? _timelineState.sessions : []).forEach(function(session) {
-        const sid = String((session || {}).chat_session_id || (session || {}).session_id || "");
-        if (sid) lifecycleById[sid] = resolveRuntimeSessionLifecycle(sid);
-      });
-      const result = await bridgeFetch("/presentation/view-model", {
-        method: "POST",
-        timeoutMs: getRequestTimeoutSettingMs(),
-        body: {
-          timeline: {
-            items: Array.isArray(_timelineState.items) ? _timelineState.items : [],
-            pending_items: Array.isArray(_timelineState.pendingItems) ? _timelineState.pendingItems : [],
-            sessions: Array.isArray(_timelineState.sessions) ? _timelineState.sessions : [],
-            selected_session_id: String(_timelineState.selectedSessionId || _timelineState.sessionId || _timelineState.currentSessionId || ""),
-            current_session_id: String(_timelineState.currentSessionId || ""),
-            meta: _timelineState.meta || {},
-            lifecycle_by_id: lifecycleById,
-            now_ms: Date.now(),
-            loading: !!_timelineState.loading,
-            loading_more: !!_timelineState.loadingMore,
-            has_more: !!_timelineState.hasMore,
-            error: String(_timelineState.error || ""),
-          },
-          explorer: {
-            sessions: Array.isArray(_explorer.sessions) ? _explorer.sessions : [],
-            selected_session_id: String(_explorer.selectedSessionId || ""),
-            active_chat_session_id: String(_explorer.activeChatSessionId || ""),
-            active_tab: String(_explorer.activeTab || "chat_logs"),
-            totals: {
-              chat_logs: Number(_explorer.chatLogs.total || 0),
-              memories: Number(_explorer.memories.total || 0),
-              direct_evidence: Number(_explorer.directEvidence.total || 0),
-              kg_triples: Number(_explorer.kgTriples.total || 0),
-              episodes: Number(_explorer.episodes.total || 0),
-              chapters: Number(_explorer.chapters.total || 0),
-              arcs: Number(_explorer.arcs.total || 0),
-              sagas: Number(_explorer.sagas.total || 0),
-            },
-            trust: {
-              storylines: Array.isArray(_explorer.trust.storylines) ? _explorer.trust.storylines : [],
-              world_rules: Array.isArray(_explorer.trust.worldRules) ? _explorer.trust.worldRules : [],
-              hooks: Array.isArray(_explorer.trust.hooks) ? _explorer.trust.hooks : [],
-            },
-            world_graph: {
-              rules: Array.isArray(_explorer.worldGraph.rules) ? _explorer.worldGraph.rules : [],
-              all_rules: Array.isArray(_explorer.worldGraph.allRules) ? _explorer.worldGraph.allRules : [],
-            },
-            entities: {
-              characters: Array.isArray(_explorer.entities.characters) ? _explorer.entities.characters : [],
-              locations: Array.isArray(_explorer.entities.locations) ? _explorer.entities.locations : [],
-              items: Array.isArray(_explorer.entities.items) ? _explorer.entities.items : [],
-            },
-            sessions_loading: !!_explorer.sessionsLoading,
-          },
-        },
-      });
-      if (!requestIsCurrent()) return null;
-      if (!result || result.status !== "ok" || result.contract_version !== "presentation.viewmodel.v1") {
-        _timelineState.viewModel = null;
-        _explorer.viewModel = null;
-        return null;
-      }
-      _timelineState.viewModel = result.timeline || null;
-      _explorer.viewModel = result.explorer || null;
-      if (_explorer.viewModel && _explorer.viewModel.active_tab) {
-        const presentedActiveTab = String(_explorer.viewModel.active_tab);
-        const visibleTabs = getExplorerTabItems();
-        _explorer.activeTab = visibleTabs.some(function(tab) { return tab.key === presentedActiveTab; })
-          ? presentedActiveTab
-          : String(visibleTabs[0] && visibleTabs[0].key || "chat_logs");
-      }
-      return result;
-    } catch (err) {
-      if (!requestIsCurrent()) return null;
-      _timelineState.viewModel = null;
-      _explorer.viewModel = null;
-      warnLog("presentation ViewModel unavailable:", err?.message || err);
-      return null;
+  // /timeline lays out each page (item views, turn groups, the worldline
+  // graph). What is composed here is screen state the backend never sees:
+  // loading flags, turns saved a moment ago, and which session is open.
+  function composePresentationViewModels() {
+    _timelineState.viewModel = composeTimelineViewModel();
+    _explorer.viewModel = composeExplorerViewModel();
+    const visibleTabs = getExplorerTabItems();
+    if (!visibleTabs.some(function(tab) { return tab.key === _explorer.activeTab; })) {
+      _explorer.activeTab = String(visibleTabs[0] && visibleTabs[0].key || "chat_logs");
     }
+  }
+
+  function presentationCompactText(value, limit) {
+    const clean = String(value || "").replace(/\*\*/g, "").replace(/#/g, " ").split(/\s+/).filter(Boolean).join(" ");
+    const chars = Array.from(clean);
+    return chars.length <= limit ? clean : chars.slice(0, limit - 1).join("").trim() + "…";
+  }
+
+  // Turns saved a moment ago are not in a /timeline page yet.
+  function timelinePendingItemView(item) {
+    const id = item.id != null && item.id !== "" ? item.id : item.source_id;
+    const turn = item.turn_index != null && item.turn_index !== "" ? String(item.turn_index) : "";
+    const key = "pending_artifacts:" + String(id == null ? "" : id);
+    return Object.assign({}, item, {
+      view: {
+        key, normalized_type: "pending", raw_type: "pending_artifacts",
+        title: String(item.title || ""), title_code: item.title ? "" : "pendingTitle",
+        preview: String(item.preview || item.summary || item.content || ""),
+        turn_text: turn, display_turn_key: turn ? "turn:" + turn : "item:" + key,
+        source_id: id, editable_type: "", can_edit: false,
+      },
+    });
+  }
+
+  function composeTimelineViewModel() {
+    const state = _timelineState;
+    const selectedId = String(state.selectedSessionId || state.sessionId || state.currentSessionId || "");
+    const now = Date.now();
+    const pending = (Array.isArray(state.pendingItems) ? state.pendingItems : []).filter(function(item) {
+      const expires = Number(item && item.expires_at_ms || 0);
+      if (expires > 0 && expires < now) return false;
+      const sid = String(item && (item.chat_session_id || item.session_id) || "");
+      return !sid || !selectedId || sid === selectedId;
+    }).map(timelinePendingItemView);
+    const stored = Array.isArray(state.items) ? state.items : [];
+    const storedByKey = new Map(stored.map(function(item) { return [String(item && item.view && item.view.key || ""), item]; }));
+    const groups = [];
+    const groupByKey = new Map();
+    pending.forEach(function(item) {
+      const key = item.view.display_turn_key;
+      let group = groupByKey.get(key);
+      if (!group) {
+        group = { key, turn_text: item.view.turn_text, created_text: String(item.created_at || ""), kind: key === "turn:-1" ? "starter" : "turn", preview: "", counts: {}, items: [] };
+        groupByKey.set(key, group);
+        groups.push(group);
+      }
+      group.counts.pending_artifacts = Number(group.counts.pending_artifacts || 0) + 1;
+      group.items.push(item);
+    });
+    (Array.isArray(state.groups) ? state.groups : []).forEach(function(source) {
+      const items = (Array.isArray(source.item_keys) ? source.item_keys : [])
+        .map(function(key) { return storedByKey.get(String(key)); })
+        .filter(Boolean);
+      if (items.length === 0) return;
+      let group = groupByKey.get(source.key);
+      if (!group) {
+        group = Object.assign({}, source, { counts: Object.assign({}, source.counts), items: [] });
+        delete group.item_keys;
+        groupByKey.set(source.key, group);
+        groups.push(group);
+      } else {
+        Object.keys(source.counts || {}).forEach(function(type) {
+          group.counts[type] = Number(group.counts[type] || 0) + Number(source.counts[type] || 0);
+        });
+        group.preview = source.preview || group.preview;
+        group.created_text = group.created_text || source.created_text;
+      }
+      group.items = group.items.concat(items);
+    });
+    groups.forEach(function(group) {
+      group.item_count = group.items.length;
+      if (!group.preview) {
+        const first = group.items.find(function(item) { return item.view && (item.view.preview || item.view.title); });
+        group.preview = first ? presentationCompactText(first.view.preview || first.view.title, 72) : "";
+      }
+    });
+    const visible = pending.concat(stored);
+    const meta = state.meta || {};
+    const total = Number(meta.total_unpaged || 0) > 0 ? Number(meta.total_unpaged) : visible.length;
+    const emptyState = visible.length > 0 ? "ready" : state.loading ? "loading" : String(state.error || "").trim() ? "error" : "empty";
+    const loadMoreState = visible.length === 0 ? "none" : state.loadingMore ? "loading" : state.hasMore ? "available" : "complete";
+    const lifecycleById = {};
+    (Array.isArray(state.sessions) ? state.sessions : []).forEach(function(session) {
+      const sid = String((session || {}).chat_session_id || (session || {}).session_id || "");
+      if (sid) lifecycleById[sid] = resolveRuntimeSessionLifecycle(sid);
+    });
+    return {
+      items: visible,
+      groups,
+      sessions: composeSessionRows(state.sessions, selectedId, String(state.currentSessionId || ""), lifecycleById),
+      selected_session_id: selectedId,
+      current_turn: Number(state.currentTurn || 0),
+      summary: { turns: groups.length, items: visible.length, total, source_counts: meta.source_counts },
+      worldline: meta.worldline && typeof meta.worldline === "object"
+        ? meta.worldline
+        : { contract_version: "worldline_view_model.v1", state: "not_applicable", current_session_id: selectedId, reason: "no_confirmed_fork_lineage" },
+      worldline_topology: state.worldlineTopology || null,
+      empty_state: emptyState,
+      load_more_state: loadMoreState,
+    };
+  }
+
+  function composeSessionRows(sessions, selectedId, currentId, lifecycleById) {
+    return (Array.isArray(sessions) ? sessions : []).map(function(session) {
+      const sid = String((session || {}).chat_session_id || (session || {}).session_id || "").trim();
+      if (!sid) return null;
+      const lifecycle = lifecycleById && lifecycleById[sid] && typeof lifecycleById[sid] === "object" ? lifecycleById[sid] : {};
+      const deleted = lifecycle.deleted === true;
+      const canMove = !!currentId && sid !== currentId && sid !== "char_-1" && !deleted;
+      return {
+        session_id: sid, selected: sid === selectedId, current: sid === currentId, deleted,
+        status: String(lifecycle.status || "active"), label: String(lifecycle.label || ""),
+        can_attach: canMove, can_copy: canMove, can_migrate: canMove,
+        counts: {
+          chat_logs: Number(session.chat_logs_count || 0),
+          memories: Number(session.memories_count || 0),
+          kg_triples: Number(session.kg_triples_count || 0),
+        },
+        last_activity: session.last_activity,
+      };
+    }).filter(Boolean);
+  }
+
+  function composeExplorerViewModel() {
+    const length = function(value) { return Array.isArray(value) ? value.length : 0; };
+    const total = function(state) { return Number(state && state.total || 0); };
+    const worldCount = length(_explorer.worldGraph.allRules) > 0 ? length(_explorer.worldGraph.allRules) : length(_explorer.worldGraph.rules);
+    const tabs = [
+      { key: "chat_logs", count: total(_explorer.chatLogs) },
+      { key: "memories", count: total(_explorer.memories) },
+      { key: "direct_evidence", count: total(_explorer.directEvidence) },
+      { key: "kg_triples", count: total(_explorer.kgTriples) },
+      { key: "episodes", count: total(_explorer.episodes) + total(_explorer.chapters) + total(_explorer.arcs) + total(_explorer.sagas) },
+      { key: "trust", count: length(_explorer.trust.storylines) + length(_explorer.trust.worldRules) + length(_explorer.trust.hooks) },
+      { key: "world", count: worldCount },
+      { key: "entities", count: length(_explorer.entities.characters) + length(_explorer.entities.locations) + length(_explorer.entities.items) },
+    ];
+    const selectedId = String(_explorer.selectedSessionId || "");
+    const activeId = String(_explorer.activeChatSessionId || "");
+    const requested = String(_explorer.activeTab || "chat_logs");
+    return {
+      sessions: composeSessionRows(_explorer.sessions, selectedId, activeId, null),
+      tabs,
+      active_tab: tabs.some(function(tab) { return tab.key === requested; }) ? requested : tabs[0].key,
+      sync_state: !activeId ? "unknown" : selectedId === activeId ? "current" : "different",
+      selected_session_id: selectedId,
+    };
   }
 
   function presentationTimelineItemView(item) {
@@ -52112,7 +52839,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
 
   async function personaCapsuleResolveSessionDefaults() {
     try {
-      const sid = await getCurrentChatSessionId();
+      const sid = await getCurrentChatSessionIdForView();
       const normalized = String(sid || "").trim();
       if (normalized) {
         if (!_personaCapsuleState.sourceSessionId) _personaCapsuleState.sourceSessionId = normalized;
@@ -53419,7 +54146,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     const root = document.getElementById('mo-body-tracking-root');
     if (!root) return;
     try {
-      const sid = String(sessionId || _timelineState.selectedSessionId || _timelineState.sessionId || await getCurrentChatSessionId() || '').trim();
+      const sid = String(sessionId || _timelineState.selectedSessionId || _timelineState.sessionId || await getCurrentChatSessionIdForView() || '').trim();
       if (!sid || sid === SESSION_FALLBACK) { root.textContent = '설정할 대화를 먼저 열어 주세요.'; return; }
       root.bodyTrackingSessionID = sid;
       const view = await bridgeFetch('/config/body-tracking/' + encodeURIComponent(sid));
@@ -53875,6 +54602,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         : "";
       const settingsTopActive = settingsFamilyActive;
       const activePrimaryTab = settingsTopActive ? "settings" : (extensionsFamilyActive ? "extensions" : _settingsActiveTab);
+      if (activePrimaryTab === "archive") explorerShowTabLoading(_explorer.activeTab);
 
       const html = `
 <div class="mo-panel mo-app-shell">
@@ -54771,7 +55499,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         loadDashboardViewModel(rs, s, guideModeDashboardState).then(vm => {
           if (renderRequestId !== _settingsPanelRenderRequestId) return null;
           overlay.querySelector('#mo-dashboard').innerHTML = renderDashboardViewModel(vm, dashLabel);
-          return getCurrentChatSessionId().then(loadSummaryFailures);
+          return getCurrentChatSessionIdForView().then(loadSummaryFailures);
         }).then(failureState => {
           if (!failureState || renderRequestId !== _settingsPanelRenderRequestId) return;
           const dashboardEl = overlay.querySelector('#mo-dashboard');
@@ -54792,16 +55520,23 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       // Sprint 2-E: Explorer 초기 데이터 로드 (비동기, 실패해도 패널 자체는 열림)
       if (activePrimaryTab === "archive" || activePrimaryTab === "memory_admin") (async () => {
         try {
-          const currentSid = await getCurrentChatSessionId();
+          const currentSid = await getCurrentChatSessionIdForView();
           const resolvedSid = currentSid !== SESSION_FALLBACK ? currentSid : null;
           _explorer.activeChatSessionId = resolvedSid; // Sprint 2-G: 현재 활성 채팅 세션 기록
           const inspectionSessionId = String(_timelineState.selectedSessionId || _timelineState.sessionId || resolvedSid || "");
           await explorerChangeSession(inspectionSessionId, false);
           await explorerFetchSessions();
-          await loadSummaryFailures(inspectionSessionId);
+          // Only the management panel lists summary failures.
+          if (activePrimaryTab === "memory_admin") await loadSummaryFailures(inspectionSessionId);
           if (activePrimaryTab === "archive") await explorerLoadTab(_explorer.activeTab, true);
           await refreshExplorerUI();
-        } catch { /* explorer init 실패는 무시 */ }
+        } catch {
+          // explorer init 실패는 무시하되, 미리 켜 둔 로딩 표시는 끈다
+          const unpaged = { trust: _explorer.trust, world: _explorer.worldGraph, entities: _explorer.entities }[_explorer.activeTab];
+          const pending = unpaged || explorerPagedStateForTab(_explorer.activeTab);
+          if (pending) pending.loading = false;
+          refreshExplorerUI().catch(() => {});
+        }
       })();
 
       if (activePrimaryTab === "extensions" && _settingsActiveTab === "lorebook") {
@@ -54891,7 +55626,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         _timelineState.detailLoading = false;
         _timelineState.detailError = "";
         timelineResetEditState();
-        refreshTimelineUI({ reloadPresentation: false });
+        refreshTimelineUI();
       });
     }
 
@@ -54903,7 +55638,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     const reloadBtn = document.getElementById("mo-timeline-reload-btn");
     if (reloadBtn) {
       reloadBtn.addEventListener("click", () => {
-        loadTimelineData(true, { sessionId: _timelineState.selectedSessionId || _timelineState.sessionId || _timelineState.currentSessionId || "" });
+        loadTimelineData(true, { sessionId: _timelineState.selectedSessionId || _timelineState.sessionId || _timelineState.currentSessionId || "", syncActiveChat: true });
       });
     }
 
@@ -54957,7 +55692,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         _timelineState.detailLoading = false;
         _timelineState.detailError = "";
         timelineResetEditState();
-        refreshTimelineUI({ reloadPresentation: false });
+        refreshTimelineUI();
         return;
       }
       _timelineState.expandedTurnKey = timelineDisplayTurnKey(item);
