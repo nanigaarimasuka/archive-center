@@ -137,3 +137,119 @@ process.stdout.write("ok");
 		t.Fatalf("session normalize review fixture failed: %v\n%s", err, out)
 	}
 }
+
+func TestRestartFromTurnDeletesThenNormalizesTheOpenChat(t *testing.T) {
+	nodePath := strings.TrimSpace(os.Getenv("ARCHIVE_CENTER_NODE_BINARY"))
+	if nodePath == "" {
+		var err error
+		nodePath, err = exec.LookPath("node")
+		if err != nil {
+			t.Skip("node is required for the restart fixture")
+		}
+	}
+	src := readArchiveCenterJS(t)
+	script := `
+function assert(condition, message) { if (!condition) throw new Error(message); }
+const calls = [];
+const alerts = [];
+let confirmAnswer = true;
+let hostContext = {hostChatId: "chat-1"};
+let rollbackOK = true;
+const _sessionNormalizeState = {loading: false};
+function t(key) { return key; }
+function tf(key, vars) { return key + " " + JSON.stringify(vars); }
+function alert(text) { alerts.push(text); }
+function captureSessionHostContextFromCache() { return hostContext; }
+async function computeActiveChatRescanDryRunPlan() { return {ok: true, pairs: [3, 4, 5, 6].map(n => ({turnIndex: n}))}; }
+async function showConfirmModal(title, text) { calls.push("confirm " + text); return confirmAnswer; }
+async function executeAutoRollback(sid, turn, reason, detail, options) { calls.push("rollback " + sid + " " + turn + " " + options.requestSource); return rollbackOK; }
+async function normalizeSession(sid, max, options) { calls.push("normalize " + sid + " " + options.skipConfirm + " " + options.source); return true; }
+` + extractJSFunctionBlockForTest(t, src, "async function restartSessionFromTurn(sessionId, turnValue)") + `
+(async () => {
+  assert(await restartSessionFromTurn("sess", "4") === true, "restart ran");
+  assert(calls.length === 3 && calls[0].includes('"from":4') && calls[0].includes('"last":6') && calls[0].includes('"count":3'), "confirm first: " + calls[0]);
+  assert(calls[1] === "rollback sess 4 manual" && calls[2] === "normalize sess true explorer_session_normalize_restart", "rollback then normalize: " + calls);
+
+  calls.length = 0;
+  for (const bad of ["", "0", "2.5", "-3"]) {
+    assert(await restartSessionFromTurn("sess", bad) === false, "bad turn " + bad);
+  }
+  assert(await restartSessionFromTurn("sess", "9") === false && alerts.at(-1).includes("missingTurn"), "turn past the Risu chat");
+  hostContext = null;
+  assert(await restartSessionFromTurn("sess", "4") === false && alerts.at(-1) === "sessionNormalize.restart.notActive", "not the open chat");
+  hostContext = {hostChatId: "chat-1"};
+  confirmAnswer = false;
+  assert(await restartSessionFromTurn("sess", "4") === false, "cancelled");
+  confirmAnswer = true;
+  rollbackOK = false;
+  assert(await restartSessionFromTurn("sess", "4") === false && alerts.at(-1).includes("restart.failed"), "rollback failed");
+  assert(!calls.some(c => c.startsWith("normalize")) && calls.filter(c => c.startsWith("rollback")).length === 1, "nothing rebuilt without a rollback: " + calls);
+  process.stdout.write("ok");
+})().catch(err => { console.error(err.message); process.exit(1); });
+`
+	cmd := exec.Command(nodePath, "-")
+	cmd.Stdin = strings.NewReader(script)
+	out, err := cmd.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "ok" {
+		t.Fatalf("restart fixture failed: %v\n%s", err, out)
+	}
+}
+
+func TestNormalizeShowsSummaryProgressAndWaitingApartFromBlocks(t *testing.T) {
+	nodePath := strings.TrimSpace(os.Getenv("ARCHIVE_CENTER_NODE_BINARY"))
+	if nodePath == "" {
+		var err error
+		nodePath, err = exec.LookPath("node")
+		if err != nil {
+			t.Skip("node is required for the summary progress fixture")
+		}
+	}
+	src := readArchiveCenterJS(t)
+	functions := strings.Join([]string{
+		extractArchiveCenterJSFunction(t, src, "hierarchyOpenTail"),
+		extractArchiveCenterJSFunction(t, src, "hierarchyBlockedOnly"),
+		extractArchiveCenterJSFunction(t, src, "formatHierarchyBlockedPreview"),
+		extractArchiveCenterJSFunction(t, src, "formatHierarchyBlockedSummary"),
+		extractArchiveCenterJSFunction(t, src, "formatHierarchyWaitingSummary"),
+		extractArchiveCenterJSFunction(t, src, "renderSessionNormalizeTurnsHtml"),
+	}, "\n")
+	script := `
+function assert(condition, message) { if (!condition) throw new Error(message); }
+function escapeAttr(value) { return String(value == null ? "" : value); }
+function formatTurnIndexPreview(turns) { return turns.join(","); }
+const labels = {
+  "explorer.hierarchy.layer.chapter": "chapter", "explorer.hierarchy.layer.arc": "arc", "explorer.hierarchy.layer.saga": "saga",
+  "sessionNormalize.count.episodes": "episodes", "sessionNormalize.count.arcs": "arcs",
+  "sessionNormalize.hierarchyWaiting": "waiting: {items}",
+  "sessionNormalize.hierarchyWaitingItem": "{layer} {from}-{to} {child} {have}/{need}",
+  "sessionNormalize.currentSummary": "making {layer} {from}-{to} #{count}",
+};
+function t(key) { return labels[key] || key; }
+function tf(key, vars) { let text = t(key); Object.keys(vars || {}).forEach(name => { text = text.split("{" + name + "}").join(String(vars[name])); }); return text; }
+` + functions + `
+const hb = {
+  chapter: {blocked: [
+    {from_turn: 241, to_turn: 255, reason: "open_tail_episode_count", have: 3, need: 12},
+    {from_turn: 61, to_turn: 120, reason: "blocked_missing_episode"},
+  ]},
+  saga: {blocked: [{from_turn: 1, to_turn: 240, reason: "open_tail_arc_count", have: 1, need: 4}]},
+};
+const blocked = formatHierarchyBlockedSummary(hb);
+assert(blocked === "chapter blocked 1 (#61-120:blocked_missing_episode)", "only real blocks count as blocked: " + blocked);
+const waiting = formatHierarchyWaitingSummary(hb);
+assert(waiting === "waiting: chapter 241-255 episodes 3/12 / saga 1-240 arcs 1/4", "open tails are waiting: " + waiting);
+assert(formatHierarchyBlockedSummary({saga: {blocked: [{from_turn: 1, to_turn: 240, reason: "open_tail_arc_count"}]}}) === "", "a lone open tail is not blocked");
+assert(formatHierarchyWaitingSummary({}) === "", "nothing waiting");
+
+const progress = renderSessionNormalizeTurnsHtml({current_summary: {layer: "chapter", from_turn: 181, to_turn: 240, count: 2}}, {terminal: false});
+assert(progress.includes("making chapter 181-240 #2"), "summary being made: " + progress);
+assert(renderSessionNormalizeTurnsHtml({current_summary: null}, {terminal: false}) === "", "no summary, no line");
+process.stdout.write("ok");
+`
+	cmd := exec.Command(nodePath, "-")
+	cmd.Stdin = strings.NewReader(script)
+	out, err := cmd.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "ok" {
+		t.Fatalf("summary progress fixture failed: %v\n%s", err, out)
+	}
+}

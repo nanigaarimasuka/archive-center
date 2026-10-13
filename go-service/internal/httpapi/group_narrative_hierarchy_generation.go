@@ -31,6 +31,7 @@ func deterministicChapterSummaryForRange(sid string, fromTurn, toTurn, chapterIn
 }
 
 func (s *Server) buildChapterSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, chapterIndex int, episodes []store.EpisodeSummary) (store.ChapterSummary, map[string]any, error) {
+	reportSummaryInProgress(ctx, "chapter", fromTurn, toTurn)
 	deterministic := deterministicChapterSummaryForRange(sid, fromTurn, toTurn, chapterIndex, episodes)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",
@@ -269,6 +270,7 @@ func deterministicArcSummaryForRange(sid string, fromTurn, toTurn, arcIndex int,
 }
 
 func (s *Server) buildArcSummaryForRange(ctx context.Context, sid string, fromTurn, toTurn, arcIndex int, chapters []store.ChapterSummary) (store.ArcSummary, map[string]any, error) {
+	reportSummaryInProgress(ctx, "arc", fromTurn, toTurn)
 	deterministic := deterministicArcSummaryForRange(sid, fromTurn, toTurn, arcIndex, chapters)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",
@@ -365,6 +367,7 @@ func deterministicSagaDigestForRange(sid string, fromTurn, toTurn int, arcs []st
 }
 
 func (s *Server) buildSagaDigestForRange(ctx context.Context, sid string, fromTurn, toTurn int, arcs []store.ArcSummary) (store.SagaDigest, map[string]any, error) {
+	reportSummaryInProgress(ctx, "saga", fromTurn, toTurn)
 	deterministic := deterministicSagaDigestForRange(sid, fromTurn, toTurn, arcs)
 	trace := map[string]any{
 		"generation_source": "deterministic_migration_stub",

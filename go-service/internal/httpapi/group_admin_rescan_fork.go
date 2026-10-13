@@ -86,3 +86,13 @@ func (o *adminRescanInOrder) settle(rescanResult map[string]any) {
 	}
 	o.StoppedAt = firstRetryableFailedTurn(adminSessionNormalizeMapItems(rescanResult["failed_turns"]))
 }
+
+// annotateHierarchyWaiting adds to the open-tail entry just recorded how many
+// lower summaries the tail has and how many one range needs. An open tail is
+// not a failure: the range is made once the story fills it.
+func annotateHierarchyWaiting(layer map[string]any, have, need int) {
+	if blocked, ok := layer["blocked"].([]map[string]any); ok && len(blocked) > 0 {
+		blocked[len(blocked)-1]["have"] = have
+		blocked[len(blocked)-1]["need"] = need
+	}
+}

@@ -268,6 +268,9 @@ func (s *Server) runAdminRescanWithProgress(ctx context.Context, sid string, req
 			if req.InOrder.stop(failedTurns) {
 				break
 			}
+			if progress != nil {
+				progress(map[string]any{"current_turn": turn})
+			}
 			roleMap := turnLogs[turn]
 			candidates := sourcesByTurn[turn]
 			if len(candidates) == 0 && req.CanonicalRawReplay {
@@ -1227,6 +1230,7 @@ func (s *Server) backfillChapterSummaries(ctx context.Context, sid string, minTu
 	}
 	if groupStart < len(closed) {
 		addHierarchyBlocked(layer, closed[groupStart].FromTurn, closed[len(closed)-1].ToTurn, "open_tail_episode_count")
+		annotateHierarchyWaiting(layer, len(closed)-groupStart, interval)
 	}
 	layer["status"] = "ok"
 	layer["reason"] = nil
@@ -1313,6 +1317,7 @@ func (s *Server) backfillArcSummaries(ctx context.Context, sid string, minTurn, 
 	}
 	if groupStart < len(closed) {
 		addHierarchyBlocked(layer, closed[groupStart].FromTurn, closed[len(closed)-1].ToTurn, "open_tail_chapter_count")
+		annotateHierarchyWaiting(layer, len(closed)-groupStart, interval)
 	}
 	layer["status"] = "ok"
 	layer["reason"] = nil
@@ -1399,6 +1404,7 @@ func (s *Server) backfillSagaDigests(ctx context.Context, sid string, minTurn, m
 	}
 	if groupStart < len(closed) {
 		addHierarchyBlocked(layer, closed[groupStart].FromTurn, closed[len(closed)-1].ToTurn, "open_tail_arc_count")
+		annotateHierarchyWaiting(layer, len(closed)-groupStart, interval)
 	}
 	layer["status"] = "ok"
 	layer["reason"] = nil

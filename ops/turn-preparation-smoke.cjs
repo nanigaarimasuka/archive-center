@@ -27,8 +27,9 @@ function bridgeContext(base) {
     getRequestTimeoutSettingMs:value=>Number(value||1000),
     recordHostDiagnostic:event=>failures.push(event),debugLog:()=>{},warnLog:()=>{},
     extractBridgeErrorDetail:(_,fallback)=>fallback,
+    BRIDGE_GZIP_MIN_BYTES:1024,
   };
-  vm.createContext(ctx);load(ctx,['resolveRequestTimeoutMs','bridgeFetch']);
+  vm.createContext(ctx);load(ctx,['resolveRequestTimeoutMs','gzipBridgeRequestBody','bridgeFetch']);
   return {ctx,failures};
 }
 function beforeContext(transport, inputCount) {

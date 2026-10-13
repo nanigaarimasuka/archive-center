@@ -767,6 +767,7 @@ function pruneTimelinePendingArtifacts() {}
 function t(key) { return key; }
 function getRequestTimeoutSettingMs() { return 19000; }
 async function getCurrentChatSessionId() { return "session-active"; }
+const getCurrentChatSessionIdForView = getCurrentChatSessionId; // the view check has its own test
 async function loadTimelineSessions() { throw new Error("existing session list was needlessly reloaded"); }
 async function ensureActiveChatCompletedTurnsBackfilled(sessionId) {
   if (sessionId !== "session-active") throw new Error("timeline backfill used another session");
@@ -789,12 +790,12 @@ async function bridgeFetch(path, options) {
 }
 ` + "\n" + loadTimeline + `
 (async function() {
-  const options = {sessionId:"session-selected",skipSessionListRefresh:true};
-  await loadTimelineData(true, options);
-  await loadTimelineData(true, options);
+  await loadTimelineData(true, {sessionId:"session-selected",skipSessionListRefresh:true});
+  assert(rollbackReconcileCalls === 0, "opening timeline compared the whole Risu chat");
+  await loadTimelineData(true, {sessionId:"session-selected",skipSessionListRefresh:true,syncActiveChat:true});
   assert(timelineReads === 2, "timeline UI did not perform exactly two reads");
   assert(backfillCalls === 0, "timeline backfilled the selected non-active session");
-  assert(rollbackReconcileCalls === 2, "opening or refreshing timeline did not reconcile a deleted assistant");
+  assert(rollbackReconcileCalls === 1, "the timeline reload button did not reconcile a deleted assistant");
   assert(rollbackReconcileOptions.every(function(item) { return item.reason === "timeline_open_assistant_deletion_observation"; }),
     "timeline rollback reconciliation lost its host observation reason");
   process.stdout.write("ok");
@@ -1004,7 +1005,7 @@ func TestTurnWorkflowHUDTransportFailureClassificationAndPersistenceRuntime(t *t
 		}
 	}
 	src := readArchiveCenterJS(t)
-	bridge := extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
+	bridge := "const BRIDGE_GZIP_MIN_BYTES = 1024;\n" + extractArchiveCenterJSAsyncFunction(t, src, "gzipBridgeRequestBody") + "\n" + extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
 	classify := extractArchiveCenterJSFunction(t, src, "classifyTurnWorkflowHUDTransportFailure")
 	remember := extractArchiveCenterJSFunction(t, src, "rememberTurnWorkflowHUDHostWarning")
 	hasWarning := extractArchiveCenterJSFunction(t, src, "turnWorkflowHUDHasHostWarning")
@@ -1137,7 +1138,7 @@ func TestBridgeFetchRecordsEffectiveTimeoutDiagnosticsRuntime(t *testing.T) {
 	}
 	src := readArchiveCenterJS(t)
 	resolver := extractArchiveCenterJSFunction(t, src, "resolveRequestTimeoutMs")
-	bridge := extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
+	bridge := "const BRIDGE_GZIP_MIN_BYTES = 1024;\n" + extractArchiveCenterJSAsyncFunction(t, src, "gzipBridgeRequestBody") + "\n" + extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
 	script := `
 const settings = {bridgeUrl:"http://100.64.0.10:28080",requestTimeoutMs:25};
 const _lastBridgeFailureByPath = new Map();
@@ -6572,7 +6573,7 @@ func TestRollbackHostSignalReconciliationIsSessionScopedRuntime(t *testing.T) {
 		extractArchiveCenterJSFunction(t, src, "computeCommonSnapshotPrefixLength"),
 		extractArchiveCenterJSFunction(t, src, "computeCommonSnapshotSuffixLength"),
 		extractArchiveCenterJSFunction(t, src, "buildAssistantOutputDeletionStateOr1f"),
-		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSAsyncFunction(t, src, "reconcileActiveChatTailDeletionWithBackend")),
+		(archiveTranslationOriginalReadJS(t, src) + extractArchiveCenterJSAsyncFunction(t, src, "askActiveChatTailDeletionDecision") + "\n" + extractArchiveCenterJSAsyncFunction(t, src, "reconcileActiveChatTailDeletionWithBackend")),
 		extractArchiveCenterJSFunction(t, src, "buildRollbackPendingInputObservation"),
 		extractArchiveCenterJSAsyncFunction(t, src, "reconcileRollbackFromHostSignal"),
 	}, "\n")
