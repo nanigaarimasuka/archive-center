@@ -129,7 +129,7 @@ func TestWebRisuDirectBridgeUsesOnlyRequestScopedPlainFetch(t *testing.T) {
 		}
 	}
 	src := readArchiveCenterJS(t)
-	bridgeFetchSource := extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
+	bridgeFetchSource := "const BRIDGE_GZIP_MIN_BYTES = 1024;\n" + extractArchiveCenterJSAsyncFunction(t, src, "gzipBridgeRequestBody") + "\n" + extractArchiveCenterJSAsyncFunction(t, src, "bridgeFetch")
 	script := `
 const settings = {
   bridgeUrl: "https://archive-test.example.ts.net",
@@ -939,7 +939,8 @@ func TestSessionNormalizeResultRenderingSeparatesCompletionErrorsAndDeferredWork
 	normalizeFailure := extractArchiveCenterJSFunction(t, src, "normalizeSessionNormalizeFailure")
 	localizeFailure := extractArchiveCenterJSFunction(t, src, "localizeSessionNormalizeFailure")
 	render := extractArchiveCenterJSFunction(t, src, "renderSessionNormalizeResultHtml")
-	script := normalizeFailure + "\n" + localizeFailure + "\n" + render + `
+	keptOpen := extractArchiveCenterJSFunction(t, src, "renderKeptOpenDetails")
+	script := "const _keptOpenDetails = new Set();\n" + keptOpen + "\n" + normalizeFailure + "\n" + localizeFailure + "\n" + render + `
 function escapeAttr(value){ return String(value || ""); }
 function formatHierarchyBlockedSummary(){ return ""; }
 function formatTurnIndexPreview(){ return ""; }
@@ -1142,6 +1143,8 @@ func TestAdminJobCancelAndColdStartProgressUseBackendSnapshot(t *testing.T) {
 	normalizeFailure := extractJSFunctionBlockForTest(t, src, "function normalizeSessionNormalizeFailure(item)")
 	localizeFailure := extractJSFunctionBlockForTest(t, src, "function localizeSessionNormalizeFailure(failure)")
 	renderNormalize := extractJSFunctionBlockForTest(t, src, "function renderSessionNormalizeJobProgressHtml(job)")
+	renderTurns := extractJSFunctionBlockForTest(t, src, "function renderSessionNormalizeTurnsHtml(progress, job)")
+	keptOpen := extractJSFunctionBlockForTest(t, src, "function renderKeptOpenDetails(key, className, summaryHtml, bodyHtml)")
 	render := extractJSFunctionBlockForTest(t, src, "function renderAdminJobProgressHtml(job, label, kind)")
 	applySnapshot := extractJSFunctionBlockForTest(t, src, "function applyAdminBackgroundJobSnapshot(kind, state, jobId, snapshot)")
 	cancel := extractJSFunctionBlockForTest(t, src, "async function cancelAdminBackgroundJob(kind, state, jobId)")
@@ -1184,7 +1187,7 @@ async function bridgeFetch(path,options){
   return {job_id:"job-1",status:"cancelled",terminal:true,progress:{stage:"cancelled"}};
 }
 async function safeCall(fn){ return await fn(); }
-` + value + "\n" + stageLabel + "\n" + normalizeFailure + "\n" + localizeFailure + "\n" + renderNormalize + "\n" + render + "\n" + applySnapshot + "\n" + cancel + `
+` + "const _keptOpenDetails = new Set();\n" + keptOpen + "\n" + renderTurns + "\n" + value + "\n" + stageLabel + "\n" + normalizeFailure + "\n" + localizeFailure + "\n" + renderNormalize + "\n" + render + "\n" + applySnapshot + "\n" + cancel + `
 (async()=>{
   const html = renderAdminJobProgressHtml({
     job_id:"job-1",
@@ -1558,6 +1561,8 @@ func TestCapturedSessionHostContextDoesNotFollowVisibleChat(t *testing.T) {
 		extractArchiveCenterJSFunction(t, src, "resolveIdentityVerifiedCurrentCharacterChat"),
 		extractArchiveCenterJSFunction(t, src, "captureSessionHostContextFromCache"),
 		extractArchiveCenterJSFunction(t, src, "activeChatMatchesCapturedSession"),
+		extractArchiveCenterJSFunction(t, src, "copyHostChatValue"),
+		extractArchiveCenterJSAsyncFunction(t, src, "readHostChatFromIndex"),
 		extractArchiveCenterJSAsyncFunction(t, src, "resolveCurrentActiveChatObject"),
 	}, "\n")
 	script := functions + `
@@ -2140,6 +2145,7 @@ const _rollbackHistoryTrimGuardBySession=new Map();
 function recordRisuHookLifecycle(){}
 function updateRuntimeState(name,status,value){updates.push({name,status,value});}
 async function getCurrentChatSessionId(){return "session-a";}
+async function getCurrentChatSessionIdForView(){return getCurrentChatSessionId();}
 function cacheRawInputForSession(sessionId,text){cached.push({sessionId,text});}
 function isRisuHistoryTrimCommandText(){return false;}
 function warnLog(...args){throw new Error("unexpected warning: "+args.join(" "));}

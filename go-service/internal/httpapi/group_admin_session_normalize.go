@@ -211,6 +211,17 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	// Turns the rescan queued for memory reprocessing are rebuilt by the
+	// memory worker; the repair waits for them so the vectors it then writes
+	// are of the rebuilt memories.
+	if !req.DryRun && intFromAny(rescanResult["deferred"], 0) > 0 {
+		waited, err := s.waitForQueuedReprocessing(ctx, sid, rescanResult, adminSessionNormalizeProgressAdapter(progress, "reprocessing_wait", 70, 2))
+		if err != nil {
+			return nil, err
+		}
+		rescanResult = waited
+	}
+
 	hierarchyEditResult := s.regenerateHierarchyForEditedTurns(ctx, sid, editedTurns, req.ClientMeta)
 	hierarchyRebuildResult := map[string]any{"status": "skipped", "reason": "not_requested"}
 	if req.RebuildHierarchy && !req.DryRun {
@@ -750,12 +761,23 @@ func adminSessionNormalizeProgressAdapter(progress adminJobProgressFunc, stage s
 		if out == nil {
 			out = map[string]any{}
 		}
-		subPct := intFromAny(out["progress_percent"], 0)
 		out["stage"] = stage
 		out["subprogress"] = cloneMapAny(sub)
-		out["progress_percent"] = base + (subPct*span)/100
-		if out["progress_percent"].(int) > base+span {
-			out["progress_percent"] = base + span
+		// An update without a percent (as "now on turn N") keeps the bar
+		// where it is.
+		if _, ok := sub["progress_percent"]; ok {
+			subPct := intFromAny(out["progress_percent"], 0)
+			out["progress_percent"] = base + (subPct*span)/100
+			if out["progress_percent"].(int) > base+span {
+				out["progress_percent"] = base + span
+			}
+		}
+		// Which turns a stage is on is its own: one that does not say clears
+		// the last stage's.
+		for _, key := range []string{"current_turn", "running_turns", "waiting_turns"} {
+			if _, ok := out[key]; !ok {
+				out[key] = nil
+			}
 		}
 		progress(out)
 	}

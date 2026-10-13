@@ -35,6 +35,9 @@ func (s *Server) registerAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/jobs/{job_id}/events", s.handleAdminJobEvents)
 	mux.HandleFunc("DELETE /admin/jobs/{job_id}", s.handleAdminJob)
 	mux.HandleFunc("POST /admin/session-migrate", s.handleAdminSessionMigrate)
+	mux.HandleFunc("GET /admin/queues", s.handleAdminQueues)
+	mux.HandleFunc("GET /admin/queues/events", s.handleAdminQueueEvents)
+	mux.HandleFunc("POST /admin/queues/cancel", s.handleAdminQueueCancel)
 }
 
 const adminDatabaseResetConfirm = "RESET_ARCHIVE_CENTER_DB"

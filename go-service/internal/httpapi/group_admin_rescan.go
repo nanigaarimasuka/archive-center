@@ -264,6 +264,9 @@ func (s *Server) runAdminRescanWithProgress(ctx context.Context, sid string, req
 		reopened := 0
 		now := time.Now().UTC()
 		for _, turn := range turns {
+			if progress != nil {
+				progress(map[string]any{"current_turn": turn})
+			}
 			roleMap := turnLogs[turn]
 			candidates := sourcesByTurn[turn]
 			if len(candidates) == 0 && req.CanonicalRawReplay {
