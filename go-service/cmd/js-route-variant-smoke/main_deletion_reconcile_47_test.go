@@ -44,7 +44,7 @@ function buildAdminRuntimeClientMeta(x){return x;}
 async function safeCall(fn){return fn();}
 async function bridgeFetch(path,options){assert.equal(path,'/admin/session-normalize');assert.equal(calls.at(-1),'rescan');calls.push('normalize');return {status:'ok'};}
 function acceptAdminBackgroundJob(){return false;}
-async function read(){assert.equal(calls.at(-1),'reconciled');calls.push('read');}
+async function read(){calls.push('read');}
 const explorerFetchChatLogs=read,explorerFetchMemories=read,explorerFetchDirectEvidence=read,explorerFetchKgTriples=read,
  explorerFetchHierarchySummaries=read,explorerFetchTrust=read,explorerFetchWorldGraph=read,explorerFetchEntities=read;
 ` + production + `
@@ -52,7 +52,7 @@ const explorerFetchChatLogs=read,explorerFetchMemories=read,explorerFetchDirectE
  assert.equal(await normalizeSession('fixture-session',5,{skipRescan:false}),true);
  assert.deepEqual(calls,['reconcile','reconciled','inherited_recovery','rescan','normalize']);
  for(const tab of ['chat_logs','memories','direct_evidence','kg_triples','episodes','trust','world','entities']){
-  calls=[];await explorerLoadTab(tab,true);assert.deepEqual(calls,['reconcile','reconciled','read'],tab);
+  calls=[];await explorerLoadTab(tab,true);assert.deepEqual(calls,['read'],tab); // viewing never compares the whole Risu chat
  }
 })().catch(e=>{console.error(e);process.exitCode=1});
 `

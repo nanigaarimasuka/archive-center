@@ -1027,6 +1027,7 @@ const feedbackKey = (kind, id) => kind + ':' + id;
 const settings = { debug: false };
 const _sessionRoutingResetState = { loading: false, error: "" };
 const _sessionNormalizeState = { panelOpen: false };
+const _sessionDiagnoseState = {};
 const _reindexState = {};
 const _activeChatRescanDryRunState = {};
 const _activeChatRecentRebuildState = {};
@@ -1039,6 +1040,8 @@ const _timelineState = { selectedSessionId: "sid-b", sessionId: "sid-b", viewMod
 const _sessionMigrationUi = { status: "idle", message: "", running: false, sourceSessionId: "", targetSessionId: "", migrationId: 0, migrationMode: "" };
 const _summaryFailureState = {sessionId: ""};
 function renderSummaryFailureListHtml() { return ""; } // The failed-summary list has its own tests.
+function renderSessionDiagnoseHtml() { return ""; } // Session diagnose has its own test.
+function renderSessionQueueHtml() { return ""; } // The queue panel has its own test.
 const _explorer = {
   viewModel: { sync_state: "current", tabs: [{ key: "memories", count: 1 }, { key: "kg_triples", count: 2 }] },
   activeTab: "memories",
@@ -1141,6 +1144,7 @@ func TestArchiveCenterJSTimelineWorldlineProductionPresentationRuntime(t *testin
 		"function timelineWorldlineResizeCanvas(canvas)",
 		"function drawTimelineWorldlineCanvas(canvas, topology)",
 		"function timelineWorldlineSelectedNode(topology)",
+		"function timelineSessionsPending()",
 	}
 	blocks := make([]string, 0, len(signatures))
 	for _, signature := range signatures {
@@ -1200,6 +1204,10 @@ const _timelineState = {
   worldlineViewport: { scale: 1, translationX: 0, translationY: 0, selectedNodeId: "" },
 };
 function timelineSelectedTurnKey() { return ""; }
+// Composition has its own test; a first render only needs an empty model.
+function composePresentationViewModels() {
+  _timelineState.viewModel = { items: [], groups: [], summary: {}, sessions: [], empty_state: _timelineState.loading ? "loading" : "empty", load_more_state: "none", worldline: {}, worldline_topology: null };
+}
 function timelineTurnBadgeHtml() { return ""; }
 function timelineItemKey(item) { return String(item && item.key || ""); }
 function presentationTimelineItemView(item) {
@@ -1250,6 +1258,16 @@ _timelineState.viewModel = {
     active_ancestor_path: [sessionA + ":turn:12"],
   },
 };
+
+const loadedTopology = _timelineState.viewModel.worldline_topology;
+_timelineState.viewModel.worldline_topology = null;
+_timelineState.loading = true;
+loadingHTML = renderTimelinePanel();
+assert(loadingHTML.includes('data-worldline-topology-state="loading"') && !loadingHTML.includes("Unavailable"),
+  "a graph that has not arrived yet must read as loading, not unavailable");
+_timelineState.loading = false;
+assert(renderTimelinePanel().includes("Unavailable"), "a graph missing after the load must read as unavailable");
+_timelineState.viewModel.worldline_topology = loadedTopology;
 
 _timelineState.expandedTurnKey = "";
 let html = renderTimelinePanel();
@@ -1324,7 +1342,7 @@ assert(JSON.stringify(topology) === topologyBefore, "production Canvas drawing m
 	}
 }
 
-func TestArchiveCenterJSTimelineLocalRefreshSkipsPresentationReload(t *testing.T) {
+func TestArchiveCenterJSTimelineRefreshComposesLocally(t *testing.T) {
 	nodePath := strings.TrimSpace(os.Getenv("ARCHIVE_CENTER_NODE_BINARY"))
 	if nodePath == "" {
 		var err error
@@ -1337,47 +1355,33 @@ func TestArchiveCenterJSTimelineLocalRefreshSkipsPresentationReload(t *testing.T
 	refresh := extractJSFunctionBlockForTest(t, src, "async function refreshTimelineUI(options)")
 	script := `
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
-let presentationLoads = 0;
+let composes = 0;
 let timelineBindings = 0;
 let restored = 0;
 const panel = {
   innerHTML: "old",
   querySelector() { return null; },
 };
-const replacementPanel = {
-  innerHTML: "replacement",
-  querySelector() { return null; },
-};
 let currentPanel = panel;
-let replaceDuringLoad = false;
 const document = {
   querySelector(selector) { return selector === '[data-tab-panel="timeline"]' ? currentPanel : null; },
 };
 function captureTimelineScrollState() { return { marker: "scroll" }; }
-async function loadPresentationViewModels() {
-  presentationLoads += 1;
-  if (replaceDuringLoad) currentPanel = replacementPanel;
-}
+function composePresentationViewModels() { composes += 1; }
 function renderTimelinePanel() { return "new"; }
 function attachTimelineEvents() { timelineBindings += 1; }
 function restoreTimelineScrollState() { restored += 1; }
 function unmountTimelineWorldlineCanvas() {}
 ` + refresh + `
 (async () => {
-  await refreshTimelineUI({ reloadPresentation: false });
-  assert(presentationLoads === 0, "local-only refresh must not request a new Presentation ViewModel");
-  assert(panel.innerHTML === "new", "local-only refresh must update the Timeline DOM immediately");
-  assert(timelineBindings === 1 && restored === 1, "local-only refresh must rebind Timeline events and restore scroll once");
-  await refreshTimelineUI({ preserveScroll: false });
-  assert(presentationLoads === 1, "normal refresh must retain the backend Presentation reload owner");
-  replaceDuringLoad = true;
   await refreshTimelineUI();
-  assert(replacementPanel.innerHTML === "replacement" && timelineBindings === 2,
-    "a detached Timeline root must not redraw or bind the newly mounted route after Presentation resolves");
+  assert(composes === 1, "refresh must compose the view model locally");
+  assert(panel.innerHTML === "new", "refresh must update the Timeline DOM immediately");
+  assert(timelineBindings === 1 && restored === 1, "refresh must rebind Timeline events and restore scroll once");
   currentPanel = null;
   await refreshTimelineUI();
-  assert(presentationLoads === 2 && timelineBindings === 2,
-    "inactive Timeline refresh must stop before backend Presentation work or DOM binding");
+  assert(composes === 1 && timelineBindings === 1,
+    "inactive Timeline refresh must stop before composing or binding");
 })().catch((error) => { console.error(error && error.stack || error); process.exit(1); });
 `
 	cmd := exec.Command(nodePath, "-")
@@ -1997,8 +2001,8 @@ func TestArchiveCenterJSCompleteTurnTimelineTargetedRefreshMarkers(t *testing.T)
 	required := []string{
 		`pendingItems: []`,
 		`type: "pending_artifacts"`,
-		`pending_items: Array.isArray(_timelineState.pendingItems) ? _timelineState.pendingItems : []`,
-		`_timelineState.viewModel = result.timeline || null`,
+		`(Array.isArray(state.pendingItems) ? state.pendingItems : [])`,
+		`_timelineState.viewModel = composeTimelineViewModel();`,
 		`function upsertTimelineCompleteTurnPendingArtifacts`,
 		`function scheduleTimelinePostCompleteTurnRefresh`,
 		`upsertTimelineCompleteTurnPendingArtifacts(chatSessionId, persistedTurnIdx`,
@@ -2319,50 +2323,6 @@ function bridgeFetch() { return new Promise((resolve) => pending.push(resolve));
 	}
 }
 
-func TestArchiveCenterJSPresentationViewModelRejectsStaleSessionResponse(t *testing.T) {
-	nodePath := strings.TrimSpace(os.Getenv("ARCHIVE_CENTER_NODE_BINARY"))
-	if nodePath == "" {
-		var err error
-		nodePath, err = exec.LookPath("node")
-		if err != nil {
-			t.Skip("ARCHIVE_CENTER_NODE_BINARY or node on PATH is required for presentation session fence smoke")
-		}
-	}
-	src := readArchiveCenterJS(t)
-	block := extractJSFunctionBlockForTest(t, src, "async function loadPresentationViewModels()")
-	script := `
-const assert = (condition, message) => { if (!condition) throw new Error(message); };
-let _presentationViewModelRequestId = 0;
-const _timelineState = { selectedSessionId: "session-a", sessionId: "session-a", currentSessionId: "runtime-session", sessions: [], items: [], pendingItems: [], meta: {}, loading: false, loadingMore: false, hasMore: false, error: "", viewModel: null };
-const _explorer = { selectedSessionId: "session-a", activeChatSessionId: "runtime-session", activeTab: "memories", sessions: [], chatLogs: {}, memories: {}, directEvidence: {}, kgTriples: {}, episodes: {}, chapters: {}, arcs: {}, sagas: {}, lorebook: {}, trust: { storylines: [], worldRules: [], hooks: [] }, worldGraph: { rules: [], allRules: [] }, entities: { characters: [], locations: [], items: [] }, sessionsLoading: false, viewModel: null };
-const pending = [];
-function bridgeFetch() { return new Promise((resolve) => pending.push(resolve)); }
-function resolveRuntimeSessionLifecycle() { return "active"; }
-function getRequestTimeoutSettingMs() { return 1000; }
-function warnLog() {}
-` + block + `
-(async () => {
-  const requestA = loadPresentationViewModels();
-  _timelineState.selectedSessionId = "session-b";
-  _timelineState.sessionId = "session-b";
-  _explorer.selectedSessionId = "session-b";
-  const requestB = loadPresentationViewModels();
-  pending[1]({ status: "ok", contract_version: "presentation.viewmodel.v1", timeline: { session: "b" }, explorer: { session: "b" } });
-  await requestB;
-  pending[0]({ status: "ok", contract_version: "presentation.viewmodel.v1", timeline: { session: "a" }, explorer: { session: "a" } });
-  await requestA;
-  assert(_timelineState.viewModel.session === "b", "late Timeline A response must not replace B");
-  assert(_explorer.viewModel.session === "b", "late Explorer A response must not replace B");
-})().catch((err) => { console.error(err); process.exit(1); });
-`
-	cmd := exec.Command(nodePath, "-")
-	cmd.Stdin = strings.NewReader(script)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("node presentation selected-session fence smoke failed: %v\n%s", err, out)
-	}
-}
-
 func TestArchiveCenterJSExplorerRejectsStaleSessionRowsAndUnscopedRead(t *testing.T) {
 	nodePath := strings.TrimSpace(os.Getenv("ARCHIVE_CENTER_NODE_BINARY"))
 	if nodePath == "" {
@@ -2463,7 +2423,7 @@ func TestArchiveCenterJSLorebookReferenceUsesBoundedBackendProjection(t *testing
 		`params.set("scope_mode", "latest_session")`,
 		`selectWorkspaceSession(sessionId, "lorebook")`,
 		`return String(tab && tab.key || "") !== "lorebook";`,
-		`visibleTabs.some(function(tab) { return tab.key === presentedActiveTab; })`,
+		`visibleTabs.some(function(tab) { return tab.key === _explorer.activeTab; })`,
 		`root.innerHTML = renderLorebookReferenceManagementSection();`,
 		`renderReferenceUsageSettingsPanel("lorebook")`,
 		`lorebookReferenceMode: root.querySelector('#mo-lorebookReferenceAssistEnabled').checked ? 'reference_assist' : 'search_only'`,

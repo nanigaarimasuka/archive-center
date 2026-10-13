@@ -211,6 +211,17 @@ func (s *Server) runAdminSessionNormalize(ctx context.Context, sid string, req a
 		}
 	}
 
+	// Turns the rescan queued for memory reprocessing are rebuilt by the
+	// memory worker; the repair waits for them so the vectors it then writes
+	// are of the rebuilt memories.
+	if !req.DryRun && intFromAny(rescanResult["deferred"], 0) > 0 {
+		waited, err := s.waitForQueuedReprocessing(ctx, sid, rescanResult, adminSessionNormalizeProgressAdapter(progress, "reprocessing_wait", 70, 2))
+		if err != nil {
+			return nil, err
+		}
+		rescanResult = waited
+	}
+
 	hierarchyEditResult := s.regenerateHierarchyForEditedTurns(ctx, sid, editedTurns, req.ClientMeta)
 	hierarchyRebuildResult := map[string]any{"status": "skipped", "reason": "not_requested"}
 	if req.RebuildHierarchy && !req.DryRun {
@@ -750,12 +761,23 @@ func adminSessionNormalizeProgressAdapter(progress adminJobProgressFunc, stage s
 		if out == nil {
 			out = map[string]any{}
 		}
-		subPct := intFromAny(out["progress_percent"], 0)
 		out["stage"] = stage
 		out["subprogress"] = cloneMapAny(sub)
-		out["progress_percent"] = base + (subPct*span)/100
-		if out["progress_percent"].(int) > base+span {
-			out["progress_percent"] = base + span
+		// An update without a percent (as "now on turn N") keeps the bar
+		// where it is.
+		if _, ok := sub["progress_percent"]; ok {
+			subPct := intFromAny(out["progress_percent"], 0)
+			out["progress_percent"] = base + (subPct*span)/100
+			if out["progress_percent"].(int) > base+span {
+				out["progress_percent"] = base + span
+			}
+		}
+		// Which turns a stage is on is its own: one that does not say clears
+		// the last stage's.
+		for _, key := range []string{"current_turn", "running_turns", "waiting_turns"} {
+			if _, ok := out[key]; !ok {
+				out[key] = nil
+			}
 		}
 		progress(out)
 	}
@@ -1270,7 +1292,7 @@ func (s *Server) waitForQueuedVectorWork(ctx context.Context, progress adminJobP
 		if waiting != lastWaiting {
 			lastWaiting, lastProgress = waiting, time.Now()
 			if progress != nil {
-				progress(map[string]any{"processed": len(keys) - waiting, "candidate_count": len(keys)})
+				progress(map[string]any{"processed": len(keys) - waiting, "candidate_count": len(keys), "progress_percent": adminJobProgressPercent(len(keys)-waiting, len(keys))})
 			}
 		}
 		if waiting == 0 || time.Since(lastProgress) > stallLimit {
@@ -1290,4 +1312,108 @@ func (s *Server) waitForQueuedVectorWork(ctx context.Context, progress adminJobP
 		"failed":    counts["permanent"] + counts["failed"],
 		"waiting":   waiting,
 	}, nil
+}
+
+// waitForQueuedReprocessing waits until the session has no memory
+// reprocessing work left, then returns rescanResult with each deferred turn
+// settled by its job: done turns leave the deferred list, rejected or failed
+// ones become failed turns, and ones still open stay deferred. It stops early
+// when the open count has not changed for longer than two worker leases.
+func (s *Server) waitForQueuedReprocessing(ctx context.Context, sid string, rescanResult map[string]any, progress adminJobProgressFunc) (map[string]any, error) {
+	queues, ok := s.Store.(store.SessionQueueStore)
+	if !ok {
+		return rescanResult, nil
+	}
+	stallLimit := 2*memoryWorkerLeaseDuration(s.runtimeConfigSnapshot()) + time.Minute
+	if stallLimit < 15*time.Minute {
+		stallLimit = 15 * time.Minute
+	}
+	deferredTurns := adminSessionNormalizeMapItems(rescanResult["deferred_turns"])
+	total := len(deferredTurns)
+	deferredTurnIndices := []int{}
+	for _, item := range deferredTurns {
+		deferredTurnIndices = append(deferredTurnIndices, intFromAny(item["turn_index"], 0))
+	}
+	open, lastOpen, lastRunning := 0, -1, -1
+	lastProgress := time.Now()
+	for {
+		counts, err := queues.CountSessionQueues(ctx, sid)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return rescanResult, nil
+		}
+		open = counts.Reprocessing["pending"] + counts.Reprocessing["leased"] + counts.Reprocessing["retryable"]
+		if open != lastOpen || counts.Reprocessing["leased"] != lastRunning {
+			if open != lastOpen {
+				lastProgress = time.Now()
+			}
+			lastOpen, lastRunning = open, counts.Reprocessing["leased"]
+			if progress != nil {
+				update := map[string]any{
+					"processed":        maxInt(total-open, 0),
+					"candidate_count":  total,
+					"progress_percent": adminJobProgressPercent(maxInt(total-open, 0), total),
+				}
+				if states, err := queues.MemoryReprocessingStatesForTurns(ctx, sid, deferredTurnIndices); err == nil {
+					running, waiting := []int{}, []int{}
+					for _, turn := range deferredTurnIndices {
+						switch states[turn] {
+						case "leased":
+							running = append(running, turn)
+						case "pending", "retryable":
+							waiting = append(waiting, turn)
+						}
+					}
+					update["running_turns"], update["waiting_turns"] = running, waiting
+				}
+				progress(update)
+			}
+		}
+		if open == 0 || time.Since(lastProgress) > stallLimit {
+			break
+		}
+		s.wakeMemoryWorkers()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(vectorDeliveryPollInterval):
+		}
+	}
+	states, err := queues.MemoryReprocessingStatesForTurns(ctx, sid, deferredTurnIndices)
+	if err != nil {
+		return rescanResult, nil
+	}
+	out := cloneMapAny(rescanResult)
+	stillDeferred := []map[string]any{}
+	failedTurns := adminSessionNormalizeMapItems(rescanResult["failed_turns"])
+	succeeded := intFromAny(rescanResult["succeeded"], 0)
+	for _, item := range deferredTurns {
+		turn := intFromAny(item["turn_index"], 0)
+		switch state := states[turn]; state {
+		case "completed":
+			succeeded++
+		case "pending", "leased", "retryable", "":
+			stillDeferred = append(stillDeferred, item)
+		default:
+			failedTurns = append(failedTurns, map[string]any{"turn_index": turn, "reason": "reprocessing_" + state, "state": state})
+		}
+	}
+	out["succeeded"] = succeeded
+	out["deferred"] = len(stillDeferred)
+	out["queued"] = len(stillDeferred)
+	out["deferred_turns"] = stillDeferred
+	out["failed"] = len(failedTurns)
+	out["failed_turns"] = failedTurns
+	out["reprocessing_waited"] = map[string]any{"turns": total, "still_open": open}
+	switch {
+	case len(failedTurns) > 0:
+		out["status"] = "partial_error"
+	case len(stillDeferred) > 0:
+		out["status"] = "deferred"
+	default:
+		out["status"] = "ok"
+	}
+	return out, nil
 }

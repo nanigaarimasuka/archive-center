@@ -35,7 +35,7 @@ const getRequestTimeoutSettingMs = () => 15000, buildDashboardQueueObservations 
 const _turnWorkflowHUDHostWarningsByRequestId = new Map();
 const renderDashboardViewModel = vm => vm ? vm.html : 'unavailable';
 // The failed-summary card has its own tests.
-const getCurrentChatSessionId = async () => 'default', loadSummaryFailures = async () => null, renderSummaryFailureCard = () => '';
+const getCurrentChatSessionId = async () => 'default', getCurrentChatSessionIdForView = getCurrentChatSessionId, loadSummaryFailures = async () => null, renderSummaryFailureCard = () => '';
 const renderBackupLlmRoleChecks = () => ''; // The backup role switches have their own tests.
 const renderEffectiveInputSection = () => '', renderPromptEditorSection = () => '', renderBridgeRuntimeNotice = () => '';
 const formatStateRow = () => '', renderStep17InspectionRolesSection = () => '', renderStep17VisibilitySection = () => '';

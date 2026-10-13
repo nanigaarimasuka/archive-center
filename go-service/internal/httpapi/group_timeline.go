@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
@@ -245,7 +246,7 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		nextBeforeTurn = paged[len(paged)-1].TurnIndex
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"status": "ok",
 		"items":  paged,
 		"meta": map[string]any{
@@ -260,7 +261,23 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 			"total_unpaged":    len(items),
 			"worldline":        currentWorldlineViewModel(r.Context(), s.Store, sid),
 		},
-	})
+	}
+	// view=1 adds what the plugin draws the page from, so it never sends the
+	// page back to be laid out. The worldline graph comes with the first page.
+	if r.URL.Query().Get("view") == "1" {
+		source := make([]map[string]any, 0, len(paged))
+		if encoded, err := json.Marshal(paged); err == nil {
+			_ = json.Unmarshal(encoded, &source)
+		}
+		view := buildTimelinePageView(source)
+		response["items"] = view.Items
+		response["groups"] = view.Groups
+		response["current_turn"] = view.CurrentTurn
+		if beforeTurn <= 0 {
+			response["worldline_topology"] = s.timelineWorldlineTopology(r.Context(), r.URL.Query().Get("currentSessionId"), sid)
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *Server) handleTimelineItem(w http.ResponseWriter, r *http.Request) {

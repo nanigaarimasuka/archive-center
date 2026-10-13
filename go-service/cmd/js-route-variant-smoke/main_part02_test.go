@@ -1006,7 +1006,7 @@ func TestArchiveCenterJSOutputListenerObservesOnlyBoundedWorldlineFacts(t *testi
 	}
 	src := readArchiveCenterJS(t)
 	for _, required := range []string{
-		`addRisuChatListener("output", onRisuOutput)`,
+		`addRisuChatListener("output", onRisuOutput, { snapshot: false })`,
 		`removeRisuChatListener("output", onRisuOutput)`,
 		`_risuHookLifecycle.output = "callback_observed"`,
 	} {

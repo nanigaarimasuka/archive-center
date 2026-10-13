@@ -237,11 +237,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	s.registerCanonicalRoutes(sub) // R1 store-backed canonical shadow
 	// Deprecated vector shadow/proof routes are intentionally not mounted in
 	// the active 2.0 runtime. ChromaDB is the selected vector accelerator.
-	s.registerProxyRoutes(sub)        // R2 write
-	s.registerAdminRoutes(sub)        // R2 write
-	s.registerTimelineRoutes(sub)     // R1 read
-	s.registerDashboardRoutes(sub)    // R1 presentation model
-	s.registerPresentationRoutes(sub) // R1 timeline/explorer presentation model
+	s.registerProxyRoutes(sub)     // R2 write
+	s.registerAdminRoutes(sub)     // R2 write
+	s.registerTimelineRoutes(sub)  // R1 read
+	s.registerDashboardRoutes(sub) // R1 presentation model
 	s.registerSessionMigrationRoutes(sub)
 	s.registerNarrativeRoutes(sub) // R1 read + R2 write
 	s.registerPersonaRoutes(sub)   // R1 read + R2 write
@@ -260,7 +259,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	s.registerUpdateRoutes(sub)
 	sub.HandleFunc("GET /diagnostics/report", s.handleDiagnosticReport)
 	sub.HandleFunc("POST /diagnostics/logging", s.handleDiagnosticLogging)
-	mux.Handle("/", s.diagnosticMiddleware(s.corsMiddleware(s.authMiddleware(s.reverseProxyBasePathMiddleware(sub)))))
+	mux.Handle("/", s.diagnosticMiddleware(s.corsMiddleware(s.authMiddleware(gzipRequestMiddleware(s.reverseProxyBasePathMiddleware(sub))))))
 }
 
 func (s *Server) reverseProxyBasePathMiddleware(next http.Handler) http.Handler {
@@ -371,7 +370,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", allowed)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Content-Encoding")
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

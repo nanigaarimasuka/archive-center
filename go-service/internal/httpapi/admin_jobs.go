@@ -295,6 +295,33 @@ func (m *adminJobManager) cancelJob(id string) (map[string]any, bool) {
 	return snapshot, true
 }
 
+// cancelSessionJobs cancels the session's running jobs of the given kinds
+// and returns their ids.
+func (m *adminJobManager) cancelSessionJobs(sid string, kinds []string) []string {
+	ids := []string{}
+	if m == nil {
+		return ids
+	}
+	m.mu.RLock()
+	for _, id := range m.order {
+		job := m.jobs[id]
+		if job == nil || job.SessionID != sid || adminJobTerminal(job.Status) {
+			continue
+		}
+		for _, kind := range kinds {
+			if strings.EqualFold(job.Kind, kind) {
+				ids = append(ids, id)
+				break
+			}
+		}
+	}
+	m.mu.RUnlock()
+	for _, id := range ids {
+		m.cancelJob(id)
+	}
+	return ids
+}
+
 func (j *adminBackgroundJob) publishChangeLocked() {
 	if j == nil {
 		return

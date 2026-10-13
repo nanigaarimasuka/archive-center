@@ -299,6 +299,9 @@ func (s *Server) replayAdminCanonicalMemories(
 			break
 		}
 		processed++
+		if progress != nil {
+			progress(map[string]any{"current_turn": candidate.Source.TurnIndex})
+		}
 		replayCtx := store.WithMemoryAdmissionVectorReplay(ctx, true, reconcileEligibility)
 		result := s.processAcceptedSourceRevisionWithOptions(
 			replayCtx,
