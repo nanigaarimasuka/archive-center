@@ -1042,6 +1042,7 @@ const _summaryFailureState = {sessionId: ""};
 function renderSummaryFailureListHtml() { return ""; } // The failed-summary list has its own tests.
 function renderSessionDiagnoseHtml() { return ""; } // Session diagnose has its own test.
 function renderSessionQueueHtml() { return ""; } // The queue panel has its own test.
+function renderFindReplacePendingHtml() { return ""; } // So has the find-and-replace notice.
 const _explorer = {
   viewModel: { sync_state: "current", tabs: [{ key: "memories", count: 1 }, { key: "kg_triples", count: 2 }] },
   activeTab: "memories",
