@@ -1620,6 +1620,49 @@
       "sessionQueue.confirmDesc": "이 세션에서 아직 시작되지 않은 검색용 벡터 작업과 기억 재처리 작업을 모두 취소합니다. 실행 중인 세션 정상화·재색인·재스캔도 함께 취소됩니다. 이미 처리 중인 작업은 끝까지 진행됩니다.\n\n취소된 작업의 기억은 검색용 벡터나 재처리 결과 없이 남습니다. 세션 진단에 표시되며, 세션 정상화로 다시 채울 수 있습니다.",
       "sessionQueue.cancelled": "취소했습니다: 검색용 벡터 {vector}개, 기억 재처리 {reprocessing}개",
       "sessionQueue.cancelFailed": "대기열을 취소하지 못했습니다.",
+      "findReplace.tab": "찾아 바꾸기",
+      "findReplace.desc": "열려 있는 대화의 모든 메시지(입력·출력)에서 찾아 바꿉니다. 바꾼 메시지는 기억 반영 대기에 쌓이고, ‘지금 기억에 반영’을 누르면 세션 정상화가 한 번에 기억·에피소드·요약에 반영합니다.",
+      "findReplace.find": "찾을 내용",
+      "findReplace.replace": "바꿀 내용",
+      "findReplace.regex": "정규식",
+      "findReplace.caseSensitive": "대소문자 구분",
+      "findReplace.target": "대상",
+      "findReplace.target.all": "입력과 출력",
+      "findReplace.target.user": "입력만",
+      "findReplace.target.char": "출력만",
+      "findReplace.regexHint": "정규식에서는 바꿀 내용에 $1, $<이름>, $& 를 쓸 수 있습니다. ^ 와 $ 는 줄마다 적용됩니다.",
+      "findReplace.preview": "미리 보기",
+      "findReplace.apply": "바꾸기",
+      "findReplace.undo": "방금 바꾼 것 되돌리기",
+      "findReplace.selectAll": "모두 선택",
+      "findReplace.selectNone": "모두 해제",
+      "findReplace.loading": "대화를 읽는 중…",
+      "findReplace.applying": "바꾸는 중…",
+      "findReplace.noSession": "찾아 바꿀 대화를 먼저 열어 주세요.",
+      "findReplace.emptyQuery": "찾을 내용을 입력하세요.",
+      "findReplace.invalidRegex": "정규식이 올바르지 않습니다: {error}",
+      "findReplace.noMatch": "일치하는 곳이 없습니다.",
+      "findReplace.summary": "{messages}개 메시지에서 {matches}곳 · 선택 {selected}개 메시지",
+      "findReplace.moreMatches": "외 {count}곳",
+      "findReplace.role.user": "입력",
+      "findReplace.role.char": "출력",
+      "findReplace.busy": "응답을 만드는 중에는 바꿀 수 없습니다. 응답이 끝난 뒤 다시 시도하세요.",
+      "findReplace.chatChanged": "미리 본 뒤 열린 대화가 바뀌었습니다. 다시 미리 보세요.",
+      "findReplace.confirm": "{messages}개 메시지의 {matches}곳을 바꿉니다.\n\n기억에는 바로 반영하지 않고 반영 대기에 쌓아 둡니다. 다 바꾼 뒤 ‘지금 기억에 반영’을 누르면 세션 정상화가 바뀐 턴의 기억, 에피소드, 요약을 한 번에 다시 만듭니다.\n\nRisuAI에는 실행 취소가 없습니다. 이 화면의 되돌리기는 플러그인을 다시 불러오기 전까지만 쓸 수 있습니다.",
+      "findReplace.applied": "{count}개 메시지를 바꿨습니다.",
+      "findReplace.skipped": "미리 본 뒤 내용이 바뀐 {count}개 메시지는 건너뛰었습니다.",
+      "findReplace.nothingApplied": "바꿀 메시지가 없습니다. 다시 미리 보세요.",
+      "findReplace.writeFailed": "대화에 저장하지 못했습니다: {error}",
+      "findReplace.normalizeStarted": "세션 정상화를 시작했습니다. 진행 상황은 기억 관리 탭에서 볼 수 있습니다.",
+      "findReplace.normalizeFailed": "세션 정상화를 시작하지 못했습니다. 기억 관리 탭에서 세션 정상화를 실행해 바뀐 턴을 반영하세요.",
+      "findReplace.undoConfirm": "방금 바꾼 {count}개 메시지를 되돌립니다. 그 뒤에 다시 고친 메시지는 건드리지 않습니다.\n\n되돌린 메시지도 기억 반영 대기에 쌓입니다.",
+      "findReplace.undone": "{count}개 메시지를 되돌렸습니다.",
+      "findReplace.failed": "작업하지 못했습니다: {error}",
+      "findReplace.pending": "기억 반영 대기: 이 대화에서 바꾼 메시지 {count}개. 반영하기 전까지는 응답 삭제 감지도 멈춥니다.",
+      "findReplace.reflect": "지금 기억에 반영",
+      "findReplace.reflectConfirm": "이 대화에서 바꾼 메시지 {count}개를 기억에 반영합니다.\n\n세션 정상화를 시작해 바뀐 턴의 기억, 에피소드, 요약을 다시 만듭니다. 바뀐 턴이 많을수록 LLM 호출도 늘어납니다.",
+      "findReplace.pendingAdded": "기억에는 아직 반영되지 않았습니다. 다 바꾼 뒤 ‘지금 기억에 반영’을 눌러 주세요.",
+      "findReplace.normalizeBusy": "세션 정상화가 이미 진행 중입니다. 끝난 뒤 다시 눌러 주세요.",
       "sessionNormalize.stage.completed": "마무리",
       "sessionNormalize.progress": "진행",
       "sessionNormalize.succeeded": "성공",
@@ -3060,6 +3103,49 @@
       "sessionQueue.confirmDesc": "Cancels all search-vector and memory-reprocessing work of this session that has not started yet, along with any running session normalize, reindex or rescan. Work already in progress finishes.\n\nMemories of cancelled work stay without their search vectors or reprocessing. Session diagnosis lists them, and session normalize fills them in again.",
       "sessionQueue.cancelled": "Cancelled: {vector} search-vector and {reprocessing} reprocessing items",
       "sessionQueue.cancelFailed": "Could not cancel the queued work.",
+      "findReplace.tab": "Find & replace",
+      "findReplace.desc": "Finds and replaces text in every message (inputs and outputs) of the open chat. Changed messages wait to be applied to memory; “Apply to memory now” runs session normalize once to rebuild their memories, episodes and summaries.",
+      "findReplace.find": "Find",
+      "findReplace.replace": "Replace with",
+      "findReplace.regex": "Regular expression",
+      "findReplace.caseSensitive": "Match case",
+      "findReplace.target": "Messages",
+      "findReplace.target.all": "Inputs and outputs",
+      "findReplace.target.user": "Inputs only",
+      "findReplace.target.char": "Outputs only",
+      "findReplace.regexHint": "With a regular expression, the replacement may use $1, $<name> and $&. ^ and $ apply to each line.",
+      "findReplace.preview": "Preview",
+      "findReplace.apply": "Replace",
+      "findReplace.undo": "Undo the last replace",
+      "findReplace.selectAll": "Select all",
+      "findReplace.selectNone": "Select none",
+      "findReplace.loading": "Reading the chat…",
+      "findReplace.applying": "Replacing…",
+      "findReplace.noSession": "Open the chat to search first.",
+      "findReplace.emptyQuery": "Enter the text to find.",
+      "findReplace.invalidRegex": "Invalid regular expression: {error}",
+      "findReplace.noMatch": "No matches.",
+      "findReplace.summary": "{matches} matches in {messages} messages · {selected} messages selected",
+      "findReplace.moreMatches": "{count} more",
+      "findReplace.role.user": "Input",
+      "findReplace.role.char": "Output",
+      "findReplace.busy": "A response is being generated. Try again when it is done.",
+      "findReplace.chatChanged": "The open chat changed after the preview. Preview again.",
+      "findReplace.confirm": "Replaces {matches} matches in {messages} messages.\n\nMemory is not updated right away: the changes wait until you press “Apply to memory now”, which runs session normalize once to rebuild the memories, episodes and summaries of every changed turn.\n\nRisuAI has no undo. Undo on this screen works only until the plugin is reloaded.",
+      "findReplace.applied": "Changed {count} messages.",
+      "findReplace.skipped": "Skipped {count} messages that changed after the preview.",
+      "findReplace.nothingApplied": "No message to change. Preview again.",
+      "findReplace.writeFailed": "Could not save the chat: {error}",
+      "findReplace.normalizeStarted": "Session normalize started. Follow it in the memory management tab.",
+      "findReplace.normalizeFailed": "Session normalize did not start. Run it from the memory management tab to apply the changed turns.",
+      "findReplace.undoConfirm": "Restores the {count} messages just changed. Messages edited again since are left alone.\n\nThe restored messages also wait to be applied to memory.",
+      "findReplace.undone": "Restored {count} messages.",
+      "findReplace.failed": "Could not finish: {error}",
+      "findReplace.pending": "Waiting to apply to memory: {count} changed messages in this chat. Until then, deleted responses are not detected either.",
+      "findReplace.reflect": "Apply to memory now",
+      "findReplace.reflectConfirm": "Applies the {count} changed messages of this chat to memory.\n\nSession normalize starts and rebuilds the memories, episodes and summaries of the changed turns. The more turns changed, the more LLM calls it makes.",
+      "findReplace.pendingAdded": "Memory is not updated yet. When you are done, press “Apply to memory now”.",
+      "findReplace.normalizeBusy": "Session normalize is already running. Press again once it finishes.",
       "sessionNormalize.stage.completed": "Finishing",
       "sessionNormalize.progress": "Progress",
       "sessionNormalize.succeeded": "Succeeded",
@@ -4498,6 +4584,49 @@
       "sessionQueue.confirmDesc": "このセッションでまだ始まっていない検索用ベクトルの作業と記憶の再処理をすべて取り消します。実行中のセッション正規化・再インデックス・再スキャンも取り消されます。処理中の作業は最後まで進みます。\n\n取り消した作業の記憶は検索用ベクトルや再処理の結果なしで残ります。セッション診断に表示され、セッション正規化で再び補えます。",
       "sessionQueue.cancelled": "取り消しました: 検索用ベクトル {vector}件、記憶の再処理 {reprocessing}件",
       "sessionQueue.cancelFailed": "キューを取り消せませんでした。",
+      "findReplace.tab": "検索と置換",
+      "findReplace.desc": "開いているチャットのすべてのメッセージ（入力・出力）で検索と置換を行います。変更したメッセージは記憶への反映待ちになり、「今すぐ記憶に反映」を押すとセッション正常化がまとめて記憶・エピソード・要約に反映します。",
+      "findReplace.find": "検索する文字列",
+      "findReplace.replace": "置換後の文字列",
+      "findReplace.regex": "正規表現",
+      "findReplace.caseSensitive": "大文字と小文字を区別",
+      "findReplace.target": "対象",
+      "findReplace.target.all": "入力と出力",
+      "findReplace.target.user": "入力のみ",
+      "findReplace.target.char": "出力のみ",
+      "findReplace.regexHint": "正規表現では置換後の文字列に $1、$<名前>、$& を使えます。^ と $ は行ごとに適用されます。",
+      "findReplace.preview": "プレビュー",
+      "findReplace.apply": "置換",
+      "findReplace.undo": "直前の置換を元に戻す",
+      "findReplace.selectAll": "すべて選択",
+      "findReplace.selectNone": "すべて解除",
+      "findReplace.loading": "チャットを読み込み中…",
+      "findReplace.applying": "置換中…",
+      "findReplace.noSession": "先に対象のチャットを開いてください。",
+      "findReplace.emptyQuery": "検索する文字列を入力してください。",
+      "findReplace.invalidRegex": "正規表現が正しくありません: {error}",
+      "findReplace.noMatch": "一致する箇所はありません。",
+      "findReplace.summary": "{messages}件のメッセージで{matches}箇所 · 選択 {selected}件",
+      "findReplace.moreMatches": "ほか{count}箇所",
+      "findReplace.role.user": "入力",
+      "findReplace.role.char": "出力",
+      "findReplace.busy": "応答の生成中は置換できません。応答が終わってから再度お試しください。",
+      "findReplace.chatChanged": "プレビュー後に開いているチャットが変わりました。もう一度プレビューしてください。",
+      "findReplace.confirm": "{messages}件のメッセージの{matches}箇所を置換します。\n\n記憶にはすぐ反映せず反映待ちにします。置換が終わったら「今すぐ記憶に反映」を押すと、セッション正常化が変更したターンの記憶・エピソード・要約をまとめて作り直します。\n\nRisuAIには元に戻す機能がありません。この画面の「元に戻す」はプラグインを再読み込みするまでしか使えません。",
+      "findReplace.applied": "{count}件のメッセージを置換しました。",
+      "findReplace.skipped": "プレビュー後に内容が変わった{count}件のメッセージはスキップしました。",
+      "findReplace.nothingApplied": "置換するメッセージがありません。もう一度プレビューしてください。",
+      "findReplace.writeFailed": "チャットに保存できませんでした: {error}",
+      "findReplace.normalizeStarted": "セッション正常化を開始しました。進行状況は記憶管理タブで確認できます。",
+      "findReplace.normalizeFailed": "セッション正常化を開始できませんでした。記憶管理タブでセッション正常化を実行して変更したターンを反映してください。",
+      "findReplace.undoConfirm": "直前に置換した{count}件のメッセージを元に戻します。その後に再編集したメッセージは変更しません。\n\n元に戻したメッセージも記憶への反映待ちになります。",
+      "findReplace.undone": "{count}件のメッセージを元に戻しました。",
+      "findReplace.failed": "完了できませんでした: {error}",
+      "findReplace.pending": "記憶への反映待ち: このチャットで変更したメッセージ {count}件。反映するまでは応答削除の検知も止まります。",
+      "findReplace.reflect": "今すぐ記憶に反映",
+      "findReplace.reflectConfirm": "このチャットで変更したメッセージ{count}件を記憶に反映します。\n\nセッション正常化を開始し、変更したターンの記憶・エピソード・要約を作り直します。変更したターンが多いほどLLM呼び出しも増えます。",
+      "findReplace.pendingAdded": "まだ記憶には反映されていません。置換が終わったら「今すぐ記憶に反映」を押してください。",
+      "findReplace.normalizeBusy": "セッション正常化はすでに実行中です。終わってから再度押してください。",
       "sessionNormalize.stage.completed": "完了処理",
       "sessionNormalize.progress": "進行",
       "sessionNormalize.succeeded": "成功",
@@ -40674,7 +40803,8 @@
     const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 0;
     const shortId = sid.length > 30 ? sid.slice(0, 15) + "…" + sid.slice(-10) : sid;
     const normalizeHostContext = captureSessionHostContextFromCache(sid);
-    const confirmed = await showConfirmModal(
+    // skipConfirm: the caller already asked (find and replace).
+    const confirmed = opts.skipConfirm === true || await showConfirmModal(
       "Session Normalize",
       "[Session Normalize]\n\n" +
       "대상 세션: " + shortId + "\n" +
@@ -40701,6 +40831,9 @@
     let applyTurnEdits = [];
     let rebuildHierarchy = false;
     let planMeta = {};
+    // Whether this run applies every edited turn it found (or found none), so
+    // the find-and-replace changes waiting for memory are covered.
+    let editsCovered = false;
     try {
       if (normalizeHostContext) {
         await reconcileRollbackFromHostSignal(sid, normalizeHostContext, {
@@ -40713,16 +40846,17 @@
           repairEntries = buildSessionNormalizeRepairEntriesFromDryRunPlan(plan);
           turnIndices = buildSessionNormalizeTargetTurnsFromDryRunPlan(plan);
           applyTurnEdits = buildSessionNormalizeEditedTurnsFromDryRunPlan(plan);
-          if (applyTurnEdits.length >= SESSION_NORMALIZE_EDIT_CONFIRM_TURNS) {
+          if (applyTurnEdits.length >= SESSION_NORMALIZE_EDIT_CONFIRM_TURNS && opts.acceptEdits !== true) {
             const takeEdits = await showConfirmModal("Session Normalize", tf("sessionNormalize.confirmEdits", {
               count: applyTurnEdits.length,
               turns: formatTurnIndexPreview(applyTurnEdits, 12),
             }));
             if (!takeEdits) applyTurnEdits = [];
           }
+          editsCovered = applyTurnEdits.length > 0 || !(Array.isArray(plan.rawMismatchTurns) && plan.rawMismatchTurns.length > 0);
           const health = await loadSummaryFailures(sid);
           const rebuild = health && health.report && Array.isArray(health.report.rebuild) ? health.report.rebuild : [];
-          if (rebuild.length > 0) {
+          if (rebuild.length > 0 && opts.askRebuild !== false) {
             rebuildHierarchy = await showConfirmModal("Session Normalize", tf("sessionNormalize.confirmRebuild", {
               items: formatHierarchyRebuildTargets(rebuild),
             }));
@@ -40764,12 +40898,13 @@
             resume_existing: true,
             dry_run: false,
             skip_rescan: !!opts.skipRescan,
-            client_meta: buildAdminRuntimeClientMeta(Object.assign({ source: "explorer_session_normalize" }, planMeta)),
+            client_meta: buildAdminRuntimeClientMeta(Object.assign({ source: String(opts.source || "explorer_session_normalize") }, planMeta)),
           },
         }),
         null, "normalizeSession"
       );
       if (acceptAdminBackgroundJob("session_normalize", _sessionNormalizeState, result)) {
+        if (editsCovered) await clearFindReplacePending(sid);
         refreshExplorerUI({ preserveScroll: true });
         return true;
       }
@@ -40779,6 +40914,7 @@
         refreshExplorerUI();
         return false;
       }
+      if (editsCovered) await clearFindReplacePending(sid);
       _sessionNormalizeState.result = result;
       refreshExplorerUI();
       return true;
@@ -46603,8 +46739,11 @@
     const sessionQueuePanelHtml = selectedSid && managementMode
       ? '<div class="mo-reindex-panel mo-session-queue-box">' + renderSessionQueueHtml(selectedSid) + '</div>'
       : '';
+    const findReplacePendingHtml = selectedSid && managementMode
+      ? renderFindReplacePendingHtml(selectedSid, function() { refreshExplorerUI({ preserveScroll: true }); })
+      : '';
     const maintenancePanels = managementMode
-      ? sessionQueuePanelHtml + sessionNormalizePanel + renderExplorerRuntimeTokenProfileBanner() + hypaImportPanel + reindexPanel + activeChatRescanDryRunPanel + rescanPanel
+      ? findReplacePendingHtml + sessionQueuePanelHtml + sessionNormalizePanel + renderExplorerRuntimeTokenProfileBanner() + hypaImportPanel + reindexPanel + activeChatRescanDryRunPanel + rescanPanel
       : '';
     const contextHtml = '<div class="mo-memory-context">' +
       '<div class="mo-memory-context-main"><span>' + t('explorer.filter.current') + '</span><strong>' + escapeAttr(sidDisplay) + '</strong></div>' +
@@ -46804,6 +46943,15 @@
   }
 
   function attachExplorerEvents() {
+    document.querySelectorAll("#mo-explorer-root [data-fr-reflect]").forEach(function(button) {
+      button.addEventListener("click", function(event) {
+        event.preventDefault();
+        reflectFindReplacePending(button.getAttribute("data-fr-reflect"), function(text, isError) {
+          if (isError) alert(text);
+        }).then(function() { refreshExplorerUI({ preserveScroll: true }); })
+          .catch(function(err) { warnLog("find replace reflect failed:", err && err.message); });
+      });
+    });
     document.querySelectorAll('[data-memory-source]').forEach(button => {
       button.addEventListener('click', async (event) => {
         event.stopPropagation();
@@ -48474,6 +48622,20 @@ details.mo-it-block[open] .mo-it-expand{display:none}
 .mo-session-queue-title{color:#5C626D;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .mo-session-queue-lane strong{color:#C9CDD4;font-weight:600}
 .mo-session-queue-note{color:#C7A869}
+#mo-find-replace-root .mo-row textarea{min-height:64px;line-height:1.5}
+.mo-fr-pending{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;font-size:12px;color:#C7A869;padding:8px 12px;margin:0 0 10px}
+#mo-find-replace-root .mo-fr-options{display:flex;gap:8px 18px;flex-wrap:wrap;align-items:center;margin:8px 0}
+#mo-find-replace-root .mo-fr-options label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mo-muted);cursor:pointer}
+#mo-find-replace-root .mo-fr-options select{width:auto;padding:6px 10px}
+#mo-find-replace-root .mo-fr-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+#mo-find-replace-root .mo-fr-status{font-size:12px;color:var(--mo-muted);margin:6px 0;white-space:pre-line}
+#mo-find-replace-root .mo-fr-status.is-error{color:#f87171}
+#mo-find-replace-root .mo-fr-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#mo-find-replace-root .mo-fr-item{border:1px solid var(--mo-line);border-radius:9px;padding:8px 10px;background:var(--mo-float)}
+#mo-find-replace-root .mo-fr-item-head{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--mo-muted);cursor:pointer}
+#mo-find-replace-root .mo-fr-snippet{font-size:12px;line-height:1.55;margin:4px 0 0 22px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mo-text)}
+#mo-find-replace-root .mo-fr-del{background:rgba(248,113,113,.18);color:#fca5a5;text-decoration:line-through}
+#mo-find-replace-root .mo-fr-ins{background:rgba(74,222,128,.16);color:#86efac}
 @media(max-width:820px){.mo-memory-admin-layout{grid-template-columns:1fr;gap:20px}.mo-memory-admin-rail{padding:0 0 18px;border-right:0;border-bottom:1px solid rgba(255,255,255,.07)}.mo-memory-admin-session-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mo-hierarchy-subtabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 8px 0;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .mo-hierarchy-subtab{background:transparent;border:1px solid rgba(255,255,255,.07);color:#8B909A;padding:4px 10px;border-radius:12px;cursor:pointer;font-size:11px;font-weight:600}
@@ -53295,6 +53457,29 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
 
 
   // Host UI only. Go owns model defaults, story-time calculation and persistence.
+  // ──────────────────────────────────────────────────────────────
+  // [FIND AND REPLACE] over every message of the open chat. Changed turns
+  // always go through session normalize (apply_turn_edits), which revises
+  // the stored turns and rebuilds what was derived from them.
+  // ──────────────────────────────────────────────────────────────
+  const FIND_REPLACE_SNIPPET_CONTEXT = 40;
+  const FIND_REPLACE_SNIPPETS_PER_MESSAGE = 5;
+  let _findReplaceState = {
+    query: "", replacement: "", regex: false, caseSensitive: false, target: "all",
+    loading: false, applying: false, status: "", error: false,
+    preview: null, undo: null, sessionId: "",
+  };
+  // Messages changed by find and replace that memory does not reflect yet,
+  // per session ({ messages, since }). Kept in plugin storage so a reload
+  // does not lose them; session normalize clears them once it applies the
+  // edited turns.
+  const _findReplacePending = new Map();
+  const _findReplacePendingLoading = new Set();
+
+  function findReplacePendingKey(sessionId) {
+    return PLUGIN_ID + "_findReplacePending_" + String(sessionId || "");
+  }
+
   async function loadBodyTrackingPanel(sessionId) {
     const root = document.getElementById('mo-body-tracking-root');
     if (!root) return;
@@ -53718,7 +53903,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         ? { status: "ok", detail: String(lastGuideSupervisor.guideMode) + (lastGuideSupervisor.guideModeBasis ? " / " + String(lastGuideSupervisor.guideModeBasis) : "") }
         : { status: "unknown", detail: t("dash.status.value.notYet") };
       const settingsFamilyActive = ["settings", "review", "prompt", "dashboard", "debug"].includes(_settingsActiveTab);
-      const extensionsFamilyActive = ["reference", "persona", "lorebook", "memory-preprocessing", "jev", "body-tracking"].includes(_settingsActiveTab);
+      const extensionsFamilyActive = ["reference", "persona", "lorebook", "memory-preprocessing", "jev", "body-tracking", "find-replace"].includes(_settingsActiveTab);
       if (_settingsActiveTab === "persona") {
         await personaCapsuleResolveSessionDefaults();
       }
@@ -53745,6 +53930,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           ["memory-preprocessing", "전처리 다중 에이전트"],
           ["jev", "Jev"],
           ["body-tracking", "주기·임신"],
+          ["find-replace", t('findReplace.tab')],
         ];
         return '<div class="mo-subtabs mo-settings-subtabs mo-extension-subtabs" role="tablist">' + tabs.map(([id, label]) =>
           '<button type="button" role="tab" aria-selected="' + (activeTab === id ? 'true' : 'false') + '" tabindex="' + (activeTab === id ? '0' : '-1') + '" class="mo-subtab-btn' + (activeTab === id ? ' is-active' : '') + '" data-tab-jump="' + id + '">' + escapeAttr(label) + '</button>'
@@ -53823,6 +54009,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         ? '<div id="mo-jev-root" class="mo-memory-feature">Jev 설정을 불러오는 중입니다…</div>'
         : _settingsActiveTab === "body-tracking"
         ? '<div id="mo-body-tracking-root">주기 설정을 불러오는 중입니다…</div>'
+        : _settingsActiveTab === "find-replace"
+        ? '<div id="mo-find-replace-root" class="mo-memory-feature"></div>'
         : _settingsActiveTab === "persona"
         ? '<div id="mo-persona-capsule-root">' + renderPersonaCapsuleSection() + '</div>'
         : (_settingsActiveTab === "lorebook"
@@ -54704,6 +54892,9 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       if (activePrimaryTab === "extensions" && _settingsActiveTab === "body-tracking") {
         loadBodyTrackingPanel().catch(() => {});
       }
+      if (activePrimaryTab === "extensions" && _settingsActiveTab === "find-replace") {
+        loadFindReplacePanel().catch(() => {});
+      }
 
       // iframe을 fullscreen으로 보이게 한다
       if (!recompose && R && typeof R.showContainer === "function") {
@@ -54938,7 +55129,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         const body = document.querySelector("#mo-settings-overlay .mo-workspace") || document.querySelector(".mo-workspace");
         const viewportScrollState = captureSettingsViewportScrollState();
         const settingsRoutes = ["settings", "review", "prompt", "dashboard", "debug"];
-        const extensionRoutes = ["reference", "persona", "lorebook", "memory-preprocessing", "jev", "body-tracking"];
+        const extensionRoutes = ["reference", "persona", "lorebook", "memory-preprocessing", "jev", "body-tracking", "find-replace"];
         const prevPrimaryTab = settingsRoutes.includes(prevTab) ? "settings" : (extensionRoutes.includes(prevTab) ? "reference" : prevTab);
         const nextPrimaryTab = settingsRoutes.includes(tab) ? "settings" : (extensionRoutes.includes(tab) ? "reference" : tab);
         if (body && prevTab && prevTab !== tab) {
@@ -57098,6 +57289,449 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       sync_state: !activeId ? "unknown" : selectedId === activeId ? "current" : "different",
       selected_session_id: selectedId,
     };
+  }
+
+  async function loadFindReplacePending(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid || _findReplacePending.has(sid)) return _findReplacePending.get(sid) || null;
+    let pending = null;
+    try {
+      const raw = await persistentGet(findReplacePendingKey(sid));
+      const parsed = raw ? JSON.parse(String(raw)) : null;
+      if (parsed && Number(parsed.messages) > 0) pending = { messages: Number(parsed.messages), since: Number(parsed.since) || 0 };
+    } catch { pending = null; }
+    _findReplacePending.set(sid, pending);
+    return pending;
+  }
+
+  async function addFindReplacePending(sessionId, messages) {
+    const sid = String(sessionId || "").trim();
+    if (!sid || !(messages > 0)) return;
+    const current = await loadFindReplacePending(sid);
+    const next = { messages: (current ? current.messages : 0) + messages, since: current ? current.since : Date.now() };
+    _findReplacePending.set(sid, next);
+    await persistentSet(findReplacePendingKey(sid), JSON.stringify(next)).catch(function() {});
+  }
+
+  async function clearFindReplacePending(sessionId) {
+    const sid = String(sessionId || "").trim();
+    if (!sid) return;
+    _findReplacePending.set(sid, null);
+    await persistentDelete(findReplacePendingKey(sid)).catch(function() {});
+  }
+
+  // The notice with the button that applies the pending changes, or "" when
+  // none wait. Loads the state first when it is not known yet.
+  function renderFindReplacePendingHtml(sessionId, onLoaded) {
+    const sid = String(sessionId || "").trim();
+    if (!sid) return "";
+    if (!_findReplacePending.has(sid)) {
+      if (!_findReplacePendingLoading.has(sid)) {
+        _findReplacePendingLoading.add(sid);
+        loadFindReplacePending(sid).then(function(pending) {
+          _findReplacePendingLoading.delete(sid);
+          if (pending && typeof onLoaded === "function") onLoaded();
+        }).catch(function() { _findReplacePendingLoading.delete(sid); });
+      }
+      return "";
+    }
+    const pending = _findReplacePending.get(sid);
+    if (!pending) return "";
+    return '<div class="mo-reindex-panel mo-fr-pending" role="status"><span>' +
+      escapeAttr(tf("findReplace.pending", { count: pending.messages })) + '</span>' +
+      '<button type="button" class="mo-btn mo-btn-primary" data-fr-reflect="' + escapeAttr(sid) + '"' +
+      (_sessionNormalizeState.loading ? " disabled" : "") + '>' + escapeAttr(t("findReplace.reflect")) + '</button></div>';
+  }
+
+  // Runs session normalize for the pending changes. The pending state stays
+  // until normalize takes the edited turns.
+  async function reflectFindReplacePending(sessionId, onStatus) {
+    const sid = String(sessionId || "").trim();
+    const pending = await loadFindReplacePending(sid);
+    if (!pending) return;
+    const report = typeof onStatus === "function" ? onStatus : function() {};
+    if (_sessionNormalizeState.loading) {
+      report(t("findReplace.normalizeBusy"), true);
+      return;
+    }
+    const confirmed = await showConfirmModal(t("findReplace.reflect"), tf("findReplace.reflectConfirm", { count: pending.messages }));
+    if (!confirmed) return;
+    const started = await normalizeSession(sid, 0, {
+      skipConfirm: true,
+      acceptEdits: true,
+      askRebuild: false,
+      source: "find_replace",
+    });
+    report(t(started ? "findReplace.normalizeStarted" : "findReplace.normalizeFailed"), !started);
+  }
+
+  // The pattern to search with: the query itself as a regular expression, or
+  // the query matched literally. ^ and $ apply to each line.
+  function buildFindReplaceMatcher(query, options) {
+    const text = String(query || "");
+    if (!text) return { error: "empty" };
+    const opts = options && typeof options === "object" ? options : {};
+    const source = opts.regex ? text : text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    try {
+      return { regex: new RegExp(source, "gm" + (opts.caseSensitive ? "" : "i")) };
+    } catch (err) {
+      return { error: "invalid", message: String(err && err.message || err) };
+    }
+  }
+
+  // The replacement for one match: the text as given, or with a regular
+  // expression its $1, $<name>, $&, $`, $' and $$ filled in as
+  // String.prototype.replace does.
+  function expandFindReplaceReplacement(template, match, useRegex) {
+    const text = String(template || "");
+    if (!useRegex) return text;
+    const groups = match.groups || null;
+    const input = String(match.input || "");
+    return text.replace(/\$(\$|&|`|'|<([^>]*)>|(\d{1,2}))/g, function(all, token, name, digits) {
+      if (token === "$") return "$";
+      if (token === "&") return match[0];
+      if (token === "`") return input.slice(0, match.index);
+      if (token === "'") return input.slice(match.index + match[0].length);
+      if (name !== undefined) return groups ? String(groups[name] == null ? "" : groups[name]) : all;
+      let index = parseInt(digits, 10);
+      if (digits.length === 2 && index >= match.length) {
+        index = parseInt(digits[0], 10);
+        if (index >= 1 && index < match.length) return String(match[index] == null ? "" : match[index]) + digits[1];
+        return all;
+      }
+      if (index >= 1 && index < match.length) return String(match[index] == null ? "" : match[index]);
+      return all;
+    });
+  }
+
+  // Every match in one message text, with what it becomes, and the text after
+  // replacing them all.
+  function findReplaceInText(text, regex, replacement, useRegex) {
+    const source = String(text == null ? "" : text);
+    const matches = [];
+    let output = "";
+    let last = 0;
+    regex.lastIndex = 0;
+    for (const match of source.matchAll(regex)) {
+      const insert = expandFindReplaceReplacement(replacement, match, useRegex);
+      matches.push({ start: match.index, end: match.index + match[0].length, removed: match[0], inserted: insert });
+      output += source.slice(last, match.index) + insert;
+      last = match.index + match[0].length;
+    }
+    output += source.slice(last);
+    return { matches, after: output };
+  }
+
+  // The messages of a chat that change, oldest first. role is "user" or
+  // "char"; target "user" or "char" keeps only that role.
+  function buildFindReplacePreview(messages, matcher, replacement, useRegex, target) {
+    const out = [];
+    const list = Array.isArray(messages) ? messages : [];
+    for (let index = 0; index < list.length; index++) {
+      const message = list[index];
+      if (!message || typeof message.data !== "string") continue;
+      const role = message.role === "user" ? "user" : "char";
+      if (target === "user" && role !== "user") continue;
+      if (target === "char" && role !== "char") continue;
+      const found = findReplaceInText(message.data, matcher, replacement, useRegex);
+      if (found.matches.length === 0 || found.after === message.data) continue;
+      out.push({
+        index,
+        messageChatId: String(message.chatId || ""),
+        role,
+        before: message.data,
+        after: found.after,
+        matches: found.matches,
+        selected: true,
+      });
+    }
+    return out;
+  }
+
+  // Applies the selected entries to a fresh copy of the chat. An entry whose
+  // message moved or changed since the preview is skipped.
+  function applyFindReplaceEntries(chat, entries, direction) {
+    const changed = [];
+    let skipped = 0;
+    const messages = chat && Array.isArray(chat.message) ? chat.message : [];
+    for (const entry of entries) {
+      const message = messages[entry.index];
+      const from = direction === "undo" ? entry.after : entry.before;
+      const to = direction === "undo" ? entry.before : entry.after;
+      if (!message || String(message.chatId || "") !== entry.messageChatId || message.data !== from) {
+        skipped++;
+        continue;
+      }
+      message.data = to;
+      changed.push(entry);
+    }
+    return { changed, skipped };
+  }
+
+  function renderFindReplaceSnippetHtml(text, match) {
+    const start = Math.max(0, match.start - FIND_REPLACE_SNIPPET_CONTEXT);
+    const end = Math.min(text.length, match.end + FIND_REPLACE_SNIPPET_CONTEXT);
+    return '<div class="mo-fr-snippet">' + (start > 0 ? "…" : "") +
+      escapeAttr(text.slice(start, match.start)) +
+      '<span class="mo-fr-del">' + escapeAttr(match.removed) + '</span>' +
+      '<span class="mo-fr-ins">' + escapeAttr(match.inserted) + '</span>' +
+      escapeAttr(text.slice(match.end, end)) + (end < text.length ? "…" : "") + '</div>';
+  }
+
+  function renderFindReplacePanelHtml() {
+    const st = _findReplaceState;
+    const option = function(value, label) {
+      return '<option value="' + value + '"' + (st.target === value ? " selected" : "") + '>' + escapeAttr(t(label)) + '</option>';
+    };
+    const preview = st.preview;
+    const selectedCount = preview ? preview.entries.filter(function(e) { return e.selected; }).length : 0;
+    const matchCount = preview ? preview.entries.reduce(function(sum, e) { return sum + e.matches.length; }, 0) : 0;
+    const busy = st.loading || st.applying;
+    let listHtml = "";
+    if (preview && preview.entries.length > 0) {
+      listHtml = '<div class="mo-fr-actions"><button type="button" class="mo-btn" data-fr-select="all">' + escapeAttr(t("findReplace.selectAll")) + '</button>' +
+        '<button type="button" class="mo-btn" data-fr-select="none">' + escapeAttr(t("findReplace.selectNone")) + '</button></div>' +
+        '<div class="mo-fr-list">' + preview.entries.map(function(entry, i) {
+          const shown = entry.matches.slice(0, FIND_REPLACE_SNIPPETS_PER_MESSAGE).map(function(match) {
+            return renderFindReplaceSnippetHtml(entry.before, match);
+          }).join("");
+          const more = entry.matches.length > FIND_REPLACE_SNIPPETS_PER_MESSAGE
+            ? '<div class="mo-fr-snippet mo-note">' + escapeAttr(tf("findReplace.moreMatches", { count: entry.matches.length - FIND_REPLACE_SNIPPETS_PER_MESSAGE })) + '</div>'
+            : "";
+          return '<div class="mo-fr-item"><label class="mo-fr-item-head"><input type="checkbox" data-fr-entry="' + i + '"' + (entry.selected ? " checked" : "") + '>' +
+            '#' + (entry.index + 1) + ' · ' + escapeAttr(t("findReplace.role." + entry.role)) + ' · ' + entry.matches.length + '</label>' + shown + more + '</div>';
+        }).join("") + '</div>';
+    }
+    const summary = preview
+      ? (preview.entries.length === 0
+        ? t("findReplace.noMatch")
+        : tf("findReplace.summary", { messages: preview.entries.length, matches: matchCount, selected: selectedCount }))
+      : "";
+    return '<div class="mo-section">' + escapeAttr(t("findReplace.tab")) + '</div>' +
+      '<div class="mo-section-desc">' + escapeAttr(t("findReplace.desc")) + '</div>' +
+      '<div class="mo-row"><label for="mo-fr-query">' + escapeAttr(t("findReplace.find")) + '</label><textarea id="mo-fr-query" rows="2">' + escapeAttr(st.query) + '</textarea></div>' +
+      '<div class="mo-row"><label for="mo-fr-replacement">' + escapeAttr(t("findReplace.replace")) + '</label><textarea id="mo-fr-replacement" rows="2">' + escapeAttr(st.replacement) + '</textarea></div>' +
+      '<div class="mo-fr-options">' +
+        '<label><input type="checkbox" id="mo-fr-regex"' + (st.regex ? " checked" : "") + '>' + escapeAttr(t("findReplace.regex")) + '</label>' +
+        '<label><input type="checkbox" id="mo-fr-case"' + (st.caseSensitive ? " checked" : "") + '>' + escapeAttr(t("findReplace.caseSensitive")) + '</label>' +
+        '<label for="mo-fr-target">' + escapeAttr(t("findReplace.target")) + ' <select id="mo-fr-target">' +
+          option("all", "findReplace.target.all") + option("user", "findReplace.target.user") + option("char", "findReplace.target.char") +
+        '</select></label>' +
+      '</div>' +
+      (st.regex ? '<div class="mo-note">' + escapeAttr(t("findReplace.regexHint")) + '</div>' : "") +
+      '<div class="mo-fr-actions">' +
+        '<button type="button" class="mo-btn" id="mo-fr-preview"' + (busy ? " disabled" : "") + '>' + escapeAttr(t("findReplace.preview")) + '</button>' +
+        '<button type="button" class="mo-btn mo-btn-primary" id="mo-fr-apply"' + (busy || selectedCount === 0 ? " disabled" : "") + '>' + escapeAttr(t("findReplace.apply")) + '</button>' +
+        (st.undo ? '<button type="button" class="mo-btn" id="mo-fr-undo"' + (busy ? " disabled" : "") + '>' + escapeAttr(t("findReplace.undo")) + '</button>' : "") +
+      '</div>' +
+      '<div class="mo-fr-status' + (st.error ? " is-error" : "") + '" role="status">' +
+        escapeAttr(st.loading ? t("findReplace.loading") : (st.applying ? t("findReplace.applying") : st.status)) + '</div>' +
+      (summary ? '<div class="mo-fr-status">' + escapeAttr(summary) + '</div>' : "") +
+      listHtml;
+  }
+
+  function renderFindReplacePanelWithPendingHtml() {
+    return renderFindReplacePendingHtml(_findReplaceState.sessionId, paintFindReplacePanel) + renderFindReplacePanelHtml();
+  }
+
+  function paintFindReplacePanel() {
+    const root = document.getElementById("mo-find-replace-root");
+    if (!root) return;
+    root.innerHTML = renderFindReplacePanelWithPendingHtml();
+    if (root.dataset.frBound === "1") return;
+    root.dataset.frBound = "1";
+    root.addEventListener("input", function(ev) {
+      const target = ev.target;
+      if (!target || !target.id) return;
+      if (target.id === "mo-fr-query") _findReplaceState.query = target.value;
+      if (target.id === "mo-fr-replacement") _findReplaceState.replacement = target.value;
+    });
+    root.addEventListener("change", function(ev) {
+      const target = ev.target;
+      if (!target) return;
+      if (target.id === "mo-fr-regex" || target.id === "mo-fr-case" || target.id === "mo-fr-target") {
+        if (target.id === "mo-fr-regex") _findReplaceState.regex = !!target.checked;
+        if (target.id === "mo-fr-case") _findReplaceState.caseSensitive = !!target.checked;
+        if (target.id === "mo-fr-target") _findReplaceState.target = String(target.value || "all");
+        // A preview made with other options would not match what is applied.
+        _findReplaceState.preview = null;
+        paintFindReplacePanel();
+        return;
+      }
+      const entryIndex = target.getAttribute && target.getAttribute("data-fr-entry");
+      if (entryIndex !== null && entryIndex !== undefined && _findReplaceState.preview) {
+        const entry = _findReplaceState.preview.entries[Number(entryIndex)];
+        if (entry) entry.selected = !!target.checked;
+        paintFindReplacePanel();
+      }
+    });
+    root.addEventListener("click", function(ev) {
+      const button = ev.target && ev.target.closest ? ev.target.closest("button") : null;
+      if (!button || button.disabled) return;
+      if (button.id === "mo-fr-preview") previewFindReplace().catch(function(err) { warnLog("find replace preview failed:", err && err.message); });
+      if (button.id === "mo-fr-apply") applyFindReplace().catch(function(err) { warnLog("find replace failed:", err && err.message); });
+      if (button.id === "mo-fr-undo") undoFindReplace().catch(function(err) { warnLog("find replace undo failed:", err && err.message); });
+      const reflectSid = button.getAttribute("data-fr-reflect");
+      if (reflectSid) {
+        reflectFindReplacePending(reflectSid, function(text, isError) {
+          setFindReplaceStatus(text, isError);
+          paintFindReplacePanel();
+        }).then(paintFindReplacePanel).catch(function(err) { warnLog("find replace reflect failed:", err && err.message); });
+      }
+      const select = button.getAttribute("data-fr-select");
+      if (select && _findReplaceState.preview) {
+        for (const entry of _findReplaceState.preview.entries) entry.selected = select === "all";
+        paintFindReplacePanel();
+      }
+    });
+  }
+
+  async function loadFindReplacePanel() {
+    const where = await resolveFindReplaceChat();
+    _findReplaceState.sessionId = where ? where.sessionId : "";
+    if (_findReplaceState.sessionId) await loadFindReplacePending(_findReplaceState.sessionId);
+    paintFindReplacePanel();
+  }
+
+  // The open chat: its session, Risu coordinates and id.
+  async function resolveFindReplaceChat() {
+    // With no chat open RisuAI throws for the chat index.
+    try {
+      const sessionId = await getCurrentChatSessionIdForView();
+      if (!sessionId || sessionId === SESSION_FALLBACK || !R) return null;
+      const charIdx = typeof R.getCurrentCharacterIndex === "function" ? await R.getCurrentCharacterIndex() : null;
+      const chatIdx = typeof R.getCurrentChatIndex === "function" ? await R.getCurrentChatIndex() : null;
+      if (!Number.isInteger(charIdx) || charIdx < 0 || !Number.isInteger(chatIdx) || chatIdx < 0) return null;
+      return { sessionId, charIdx, chatIdx };
+    } catch {
+      return null;
+    }
+  }
+
+  function setFindReplaceStatus(text, isError) {
+    _findReplaceState.status = String(text || "");
+    _findReplaceState.error = !!isError;
+  }
+
+  async function previewFindReplace() {
+    const st = _findReplaceState;
+    const matcher = buildFindReplaceMatcher(st.query, { regex: st.regex, caseSensitive: st.caseSensitive });
+    st.preview = null;
+    if (matcher.error) {
+      setFindReplaceStatus(matcher.error === "empty" ? t("findReplace.emptyQuery") : tf("findReplace.invalidRegex", { error: matcher.message }), true);
+      paintFindReplacePanel();
+      return;
+    }
+    st.loading = true;
+    setFindReplaceStatus("", false);
+    paintFindReplacePanel();
+    try {
+      const where = await resolveFindReplaceChat();
+      const chat = where ? await readHostChatFromIndex(where.charIdx, where.chatIdx) : null;
+      if (!where || !chat || !Array.isArray(chat.message)) {
+        setFindReplaceStatus(t("findReplace.noSession"), true);
+        return;
+      }
+      st.preview = Object.assign({}, where, {
+        chatId: String(chat.id || ""),
+        replacement: st.replacement,
+        entries: buildFindReplacePreview(chat.message, matcher.regex, st.replacement, st.regex, st.target),
+      });
+    } catch (err) {
+      setFindReplaceStatus(tf("findReplace.failed", { error: String(err && err.message || err) }), true);
+    } finally {
+      st.loading = false;
+      paintFindReplacePanel();
+    }
+  }
+
+  // Writes the entries (or undoes them) in the chat the preview was made from,
+  // then runs session normalize so the stored turns and what was derived from
+  // them follow.
+  async function writeFindReplaceEntries(target, entries, direction) {
+    if (finalConfirmationRequestContextOwnsPendingResponse(_activeFinalConfirmationRequestContext)) {
+      return { error: t("findReplace.busy") };
+    }
+    const where = await resolveFindReplaceChat();
+    if (!where || where.sessionId !== target.sessionId || where.charIdx !== target.charIdx || where.chatIdx !== target.chatIdx) {
+      return { error: t("findReplace.chatChanged") };
+    }
+    const chat = typeof R.getChatFromIndex === "function" ? await R.getChatFromIndex(target.charIdx, target.chatIdx) : null;
+    if (!chat || String(chat.id || "") !== target.chatId) return { error: t("findReplace.chatChanged") };
+    const result = applyFindReplaceEntries(chat, entries, direction);
+    if (result.changed.length === 0) return result;
+    try {
+      await R.setChatToIndex(target.charIdx, target.chatIdx, chat);
+    } catch (err) {
+      return { error: tf("findReplace.writeFailed", { error: String(err && err.message || err) }) };
+    }
+    return result;
+  }
+
+  async function applyFindReplace() {
+    const st = _findReplaceState;
+    const preview = st.preview;
+    if (!preview || st.applying) return;
+    const selected = preview.entries.filter(function(entry) { return entry.selected; });
+    if (selected.length === 0) return;
+    const matches = selected.reduce(function(sum, entry) { return sum + entry.matches.length; }, 0);
+    const confirmed = await showConfirmModal(t("findReplace.tab"), tf("findReplace.confirm", { messages: selected.length, matches }));
+    if (!confirmed) return;
+    st.applying = true;
+    setFindReplaceStatus("", false);
+    paintFindReplacePanel();
+    try {
+      const result = await writeFindReplaceEntries(preview, selected, "apply");
+      if (result.error) {
+        setFindReplaceStatus(result.error, true);
+        return;
+      }
+      if (result.changed.length === 0) {
+        setFindReplaceStatus(t("findReplace.nothingApplied"), true);
+        return;
+      }
+      st.undo = { sessionId: preview.sessionId, charIdx: preview.charIdx, chatIdx: preview.chatIdx, chatId: preview.chatId, entries: result.changed };
+      st.preview = null;
+      st.sessionId = preview.sessionId;
+      await addFindReplacePending(preview.sessionId, result.changed.length);
+      setFindReplaceStatus(tf("findReplace.applied", { count: result.changed.length }) +
+        (result.skipped > 0 ? " " + tf("findReplace.skipped", { count: result.skipped }) : "") +
+        "\n" + t("findReplace.pendingAdded"), false);
+    } catch (err) {
+      setFindReplaceStatus(tf("findReplace.failed", { error: String(err && err.message || err) }), true);
+    } finally {
+      st.applying = false;
+      paintFindReplacePanel();
+    }
+  }
+
+  async function undoFindReplace() {
+    const st = _findReplaceState;
+    const undo = st.undo;
+    if (!undo || st.applying) return;
+    const confirmed = await showConfirmModal(t("findReplace.undo"), tf("findReplace.undoConfirm", { count: undo.entries.length }));
+    if (!confirmed) return;
+    st.applying = true;
+    setFindReplaceStatus("", false);
+    paintFindReplacePanel();
+    try {
+      const result = await writeFindReplaceEntries(undo, undo.entries, "undo");
+      if (result.error) {
+        setFindReplaceStatus(result.error, true);
+        return;
+      }
+      st.undo = null;
+      st.preview = null;
+      await addFindReplacePending(undo.sessionId, result.changed.length);
+      setFindReplaceStatus(tf("findReplace.undone", { count: result.changed.length }) +
+        (result.skipped > 0 ? " " + tf("findReplace.skipped", { count: result.skipped }) : "") +
+        (result.changed.length > 0 ? "\n" + t("findReplace.pendingAdded") : ""), false);
+    } catch (err) {
+      setFindReplaceStatus(tf("findReplace.failed", { error: String(err && err.message || err) }), true);
+    } finally {
+      st.applying = false;
+      paintFindReplacePanel();
+    }
   }
 
   // ──────────────────────────────────────────────────────────────
