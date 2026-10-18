@@ -170,28 +170,70 @@ func (m *mariadbStore) ReviseHistoricalTurn(ctx context.Context, edit Historical
 	if err := restoreActiveStatusCurrentValuesTx(ctx, tx, sid); err != nil {
 		return nil, err
 	}
-	// Updating in place keeps each row's id and time, so the turn keeps its
-	// position in the timeline.
-	for _, role := range []struct{ name, content string }{{"user", edit.UserContent}, {"assistant", edit.AssistantContent}} {
-		res, err := tx.ExecContext(ctx, `UPDATE chat_logs SET content = ? WHERE chat_session_id = ? AND turn_index = ? AND role = ?`, role.content, sid, t, role.name)
-		if err != nil {
-			return nil, err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			var count int
-			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM chat_logs WHERE chat_session_id = ? AND turn_index = ? AND role = ?`, sid, t, role.name).Scan(&count); err != nil {
-				return nil, err
-			}
-			if count == 0 {
-				return nil, fmt.Errorf("turn %d has no %s message to edit: %w", t, role.name, ErrNotFound)
-			}
-		}
+	if _, err := replaceHistoricalTurnTextTx(ctx, tx, sid, t, edit); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	committed = true
 	return review, nil
+}
+
+// replaceHistoricalTurnTextTx writes the turn's two messages in place, which
+// keeps each row's id and time, so the turn keeps its position in the
+// timeline. It reports whether either message changed.
+func replaceHistoricalTurnTextTx(ctx context.Context, tx *sql.Tx, sid string, t int, edit HistoricalTurnEdit) (bool, error) {
+	changed := false
+	for _, role := range []struct{ name, content string }{{"user", edit.UserContent}, {"assistant", edit.AssistantContent}} {
+		res, err := tx.ExecContext(ctx, `UPDATE chat_logs SET content = ? WHERE chat_session_id = ? AND turn_index = ? AND role = ?`, role.content, sid, t, role.name)
+		if err != nil {
+			return false, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			changed = true
+			continue
+		}
+		var count int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM chat_logs WHERE chat_session_id = ? AND turn_index = ? AND role = ?`, sid, t, role.name).Scan(&count); err != nil {
+			return false, err
+		}
+		if count == 0 {
+			return false, fmt.Errorf("turn %d has no %s message to edit: %w", t, role.name, ErrNotFound)
+		}
+	}
+	return changed, nil
+}
+
+// HistoricalTurnTextStore replaces one past turn's raw text and nothing else:
+// for an edit that changes no memory (a renamed name, a fixed typo), what
+// was derived from the turn stays as it is.
+type HistoricalTurnTextStore interface {
+	ReplaceHistoricalTurnText(ctx context.Context, edit HistoricalTurnEdit) (bool, error)
+}
+
+var _ HistoricalTurnTextStore = (*mariadbStore)(nil)
+
+func (m *mariadbStore) ReplaceHistoricalTurnText(ctx context.Context, edit HistoricalTurnEdit) (bool, error) {
+	if err := m.ensureDB(); err != nil {
+		return false, err
+	}
+	sid := strings.TrimSpace(edit.ChatSessionID)
+	if sid == "" || edit.TurnIndex <= 0 || strings.TrimSpace(edit.UserContent) == "" || strings.TrimSpace(edit.AssistantContent) == "" {
+		return false, fmt.Errorf("invalid historical turn edit")
+	}
+	m.memoryDerivationWriteMu.Lock()
+	defer m.memoryDerivationWriteMu.Unlock()
+	tx, err := m.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	changed, err := replaceHistoricalTurnTextTx(ctx, tx, sid, edit.TurnIndex, edit)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	return changed, tx.Commit()
 }
 
 // HierarchySummaryRangeDeleter removes the chapter, arc, or saga stored for

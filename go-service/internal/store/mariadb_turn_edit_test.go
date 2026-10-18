@@ -180,3 +180,50 @@ func TestMariaDBClearDerivedFromTurnRunsInOneTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMariaDBReplaceHistoricalTurnTextTouchesOnlyTheMessages(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	m := &mariadbStore{db: db}
+	update := regexp.QuoteMeta(`UPDATE chat_logs SET content = ? WHERE chat_session_id = ? AND turn_index = ? AND role = ?`)
+	// Only the two messages are written: no source invalidation, no deletes.
+	mock.ExpectBegin()
+	mock.ExpectExec(update).WithArgs("renamed user", "session-1", 10, "user").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(update).WithArgs("renamed reply", "session-1", 10, "assistant").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM chat_logs`)).WithArgs("session-1", 10, "assistant").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectCommit()
+	changed, err := m.ReplaceHistoricalTurnText(context.Background(), HistoricalTurnEdit{
+		ChatSessionID: "session-1", TurnIndex: 10, UserContent: "renamed user", AssistantContent: "renamed reply",
+	})
+	if err != nil || !changed {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	// The same text again changes nothing.
+	mock.ExpectBegin()
+	for _, role := range []string{"user", "assistant"} {
+		mock.ExpectExec(update).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM chat_logs`)).WithArgs("session-1", 10, role).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	}
+	mock.ExpectCommit()
+	if changed, err := m.ReplaceHistoricalTurnText(context.Background(), HistoricalTurnEdit{
+		ChatSessionID: "session-1", TurnIndex: 10, UserContent: "renamed user", AssistantContent: "renamed reply",
+	}); err != nil || changed {
+		t.Fatalf("same text: changed=%v err=%v", changed, err)
+	}
+	// A missing message rolls back.
+	mock.ExpectBegin()
+	mock.ExpectExec(update).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM chat_logs`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectRollback()
+	if _, err := m.ReplaceHistoricalTurnText(context.Background(), HistoricalTurnEdit{
+		ChatSessionID: "session-1", TurnIndex: 4, UserContent: "u", AssistantContent: "a",
+	}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing message: err=%v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
