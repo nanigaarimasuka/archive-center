@@ -49,7 +49,7 @@ async function loadRuntime(options = {}) {
     uiLanguage: "en",
     turnWorkflowHUDEnabled: false,
   }, options.settingsRaw || {});
-  const settingsKey = "risu_memory_orchestrator_settings";
+  const settingsKey = "archive_center_fork_settings";
   const settingsJson = JSON.stringify(settingsRaw);
   const localPluginStorage = makeStorage({ [settingsKey]: settingsJson });
   const pluginStorage = makeStorage();
