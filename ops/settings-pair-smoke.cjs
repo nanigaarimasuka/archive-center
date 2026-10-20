@@ -34,7 +34,7 @@ const close = server => new Promise(resolve => server.close(resolve));
     assert.ok(health,'isolated backend ready');
     const seed={enabled:false,dbEnabled:false,turnWorkflowHUDEnabled:false,bridgeUrl:backendURL,uiLanguage:'ko',pluginMainProvider:'openai',pluginMainModel:'gpt-5.6-luna',pluginMainApiKey:'synthetic-publisher-key',pluginMainReasoningEffort:'max',pluginMainTemperature:0,pluginMainMaxCompletionTokens:4096,subLlmProvider:'claude',subLlmModel:'claude-sonnet-4-5',subLlmApiKey:'synthetic-critic-key',subLlmReasoningBudgetTokens:2048,subLlmMaxCompletionTokens:3072};
     const bootstrap=`
-      const key='risu_memory_orchestrator_settings';
+      const key='archive_center_fork_settings';
       if(!localStorage.getItem('host-local:'+key)) localStorage.setItem('host-local:'+key,JSON.stringify(${JSON.stringify(seed)}));
       window.transport=[]; window.hostStorageWrites=[]; window.registeredHooks=[];
       const storage=prefix=>({getItem:async k=>localStorage.getItem(prefix+k),setItem:async(k,v)=>{localStorage.setItem(prefix+k,v);window.hostStorageWrites.push(k);},removeItem:async k=>localStorage.removeItem(prefix+k)});
@@ -80,7 +80,7 @@ const close = server => new Promise(resolve => server.close(resolve));
     assert.equal(sync.body.criticReasoningBudgetTokens,4096);
     assert.equal(sync.body.criticApiKey,'synthetic-critic-key');
     assert.equal(sync.body.mainApiKey,'synthetic-publisher-key');
-    const saved=await page.evaluate(()=>localStorage.getItem('host-local:risu_memory_orchestrator_settings'));
+    const saved=await page.evaluate(()=>localStorage.getItem('host-local:archive_center_fork_settings'));
     const parsed=JSON.parse(saved);assert.equal(parsed.pluginMainModel,'gpt-5.2');assert.equal(parsed.subLlmReasoningBudgetTokens,4096);
     await page.reload(); await open();
     assert.equal(await page.locator('#mo-pluginMainModel').inputValue(),'gpt-5.2');
@@ -89,7 +89,7 @@ const close = server => new Promise(resolve => server.close(resolve));
     assert.equal(await page.locator('#mo-pluginMainEndpoint').inputValue(),'');
     assert.equal(await page.locator('#mo-pluginMainApiKey').inputValue(),'synthetic-publisher-key');
     assert.equal(await page.locator('#mo-subLlmApiKey').inputValue(),'synthetic-critic-key');
-    assert.equal(await page.evaluate(()=>localStorage.getItem('host-local:risu_memory_orchestrator_settings')),saved,'reopen changed persistence');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('host-local:archive_center_fork_settings')),saved,'reopen changed persistence');
     const views=await page.evaluate(()=>window.transport.filter(x=>x.path==='/config/view-model'));
     for(const view of views){assert.equal(view.status,200);assert.equal(view.result.contract_version,'llm_settings_view.v1');assert.ok(!JSON.stringify(view.body).includes('synthetic-'));}
     assert.deepEqual(errors,[]);
@@ -216,7 +216,7 @@ const close = server => new Promise(resolve => server.close(resolve));
     }
     if(process.argv.includes('--diagnostics')) {
       const missing=await fetch(backendURL+'/fixture-missing-route');assert.equal(missing.status,404);
-      const savedBeforeLogging=await page.evaluate(()=>localStorage.getItem('host-local:risu_memory_orchestrator_settings'));
+      const savedBeforeLogging=await page.evaluate(()=>localStorage.getItem('host-local:archive_center_fork_settings'));
       await page.locator('#mo-diagnostics-btn').click();
       const toggle=page.locator('#mo-diagnostics-modal [data-logging-toggle]');
       await page.waitForFunction(()=>document.querySelector('#mo-diagnostics-modal [data-logging-toggle]')?.disabled===false);
@@ -239,7 +239,7 @@ const close = server => new Promise(resolve => server.close(resolve));
       await toggle.click();
       await page.waitForFunction(()=>document.querySelector('#mo-diagnostics-modal [data-logging-toggle]').textContent.includes('켜기'));
       assert.equal((await (await fetch(backendURL+'/diagnostics/report')).json()).logging.level,'info');
-      assert.equal(await page.evaluate(()=>localStorage.getItem('host-local:risu_memory_orchestrator_settings')),savedBeforeLogging,'logging wrote saved model settings');
+      assert.equal(await page.evaluate(()=>localStorage.getItem('host-local:archive_center_fork_settings')),savedBeforeLogging,'logging wrote saved model settings');
       await page.locator('#mo-diagnostics-modal [data-close]').click();
       const downloadReport=async(name)=>{
         await page.locator('#mo-diagnostics-btn').click();

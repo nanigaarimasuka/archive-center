@@ -184,7 +184,7 @@ func Default() Config {
 		ReferenceChromaCollection: "archive_center_reference_vectors",
 		ChromaAPIPath:             "/api/v2",
 		PromptDir:                 "",
-		BuildVersion:              "4.9.0",
+		BuildVersion:              "4.9.0.14", // upstream 4.9.0, fork revision 14
 		BuildCommit:               "unknown",
 		BuildTime:                 time.Now().UTC().Format(time.RFC3339),
 		Readiness: ReadinessConfig{
@@ -257,7 +257,7 @@ func Load() Config {
 	}
 
 	if v := os.Getenv("AC_BUILD_VERSION"); v != "" {
-		cfg.BuildVersion = v
+		cfg.BuildVersion = forkBuildVersion(v, cfg.BuildVersion)
 	}
 
 	if v := os.Getenv("AC_BUILD_COMMIT"); v != "" {

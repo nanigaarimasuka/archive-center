@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -572,15 +573,20 @@ func TestArchiveCenterJSRG1jRisuLifecycleOutputBoundaryMarkers(t *testing.T) {
 
 func TestArchiveCenterJSPluginVersionMarkers(t *testing.T) {
 	src := readArchiveCenterJS(t)
+	// The fork's version is the upstream release it is based on followed by
+	// the fork revision (4.9.0.N), the same in the plugin and the backend.
 	version := config.Default().BuildVersion
 	channel := "stable"
 	if strings.Contains(version, "-") {
 		channel = "test"
 	}
+	if !regexp.MustCompile(`^\d+\.\d+\.\d+\.[1-9]\d*$`).MatchString(version) {
+		t.Fatalf("backend version %q is not <upstream release>.<fork revision>", version)
+	}
 	required := []string{
-		"//@name Archive Center",
-		"//@display-name Archive Center",
-		"//@version " + version,
+		"//@name Archive Center Fork",
+		"//@display-name Archive Center Fork " + version,
+		"//@version " + version + "\n",
 		`const VERSION = "` + version + `";`,
 		`const BUILD_ID = VERSION;`,
 		`const BUILD_CHANNEL = "` + channel + `";`,
