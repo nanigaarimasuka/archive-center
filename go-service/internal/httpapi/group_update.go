@@ -164,6 +164,9 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "update checks are disabled")
 		return
@@ -186,6 +189,9 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "update downloads are disabled")
 		return
@@ -241,6 +247,9 @@ func (s *Server) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "updates are disabled")
 		return

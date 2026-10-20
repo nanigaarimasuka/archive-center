@@ -617,6 +617,7 @@ func validateFiles(files []any, members []*zip.File, report *Report, signatureRe
 }
 
 func validateCompatibility(v map[string]any, current string, c *collector) {
+	current = upstreamVersion(current)
 	requireKeys(v, "$.compatibility", []string{"archive_center", "schema"}, c)
 	schema := obj(v["schema"])
 	if str(schema["name"]) != "canon-pack-manifest" || str(schema["version"]) != "1.0.0" {
