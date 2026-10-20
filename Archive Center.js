@@ -1,9 +1,9 @@
-//@name Archive Center
-//@display-name Archive Center 4.9.0
+//@name Archive Center Fork
+//@display-name Archive Center Fork 4.9.0.2
 //@author memory-scaffold
 //@api 3.0
-//@version 4.9.0
-//@update-url https://raw.githubusercontent.com/Flazer31/archive-center/main/Archive%20Center.js
+//@version 4.9.0.2
+//@update-url https://raw.githubusercontent.com/nanigaarimasuka/archive-center/custom/release/Archive%20Center.js
 
 // ════════════════════════════════════════════════════════════════
 // 이 플러그인은 RisuAI 환경에서 동작하는
@@ -34,14 +34,16 @@
   // ──────────────────────────────────────────────────────────────
   // [CONSTANTS]
   // ──────────────────────────────────────────────────────────────
-  const PLUGIN_ID = "risu_memory_orchestrator";
+  const PLUGIN_ID = "archive_center_fork";
   const SETTINGS_KEY = `${PLUGIN_ID}_settings`;
   const LOG_PREFIX = "[MemOrch]";
-  const VERSION = "4.9.0";
+  // The upstream release this fork is based on, then the fork revision.
+  // Risu offers an update when the @version above grows.
+  const VERSION = "4.9.0.2";
   const BUILD_ID = VERSION;
   const BUILD_CHANNEL = "stable";
   const BUILD_TIME = "2026-09-27 KST";
-  const BUILD_NOTES = "Archive Center 4.9.0";
+  const BUILD_NOTES = "Archive Center Fork " + VERSION;
   const BUILD_LABEL = VERSION;
   // Sprint 3-C-1: 실패 큐 영속화
   const FAILED_QUEUE_STORAGE_KEY = `${PLUGIN_ID}_failedQueue`;
@@ -278,6 +280,11 @@
       "settings.label.webDirectBridgeEnabled": "Web Risu 직접 연결 (실험)",
       "settings.webDirectBridgeEnabled.on": "이 백엔드 요청만 직접 전송",
       "settings.hint.webDirectBridgeEnabled": "HTTPS Bridge URL 전용 · localhost/127.0.0.1 및 실시간 진행 스트림은 지원하지 않습니다.",
+      "settings.btn.saveBackendAddress": "주소만 저장",
+      "settings.hint.saveBackendAddress": "백엔드 주소와 직접 연결 여부만 이 기기에 저장하고, 백엔드에 공유된 설정을 불러옵니다. 다른 설정은 바꾸지 않고 백엔드에 올리지도 않습니다.",
+      "settings.status.backendAddressSaved": "주소를 저장했습니다. 백엔드에서 불러올 더 최신 설정은 없었습니다(또는 백엔드에 연결되지 않았습니다).",
+      "settings.status.backendAddressRestored": "주소를 저장하고 백엔드에 공유된 설정을 불러왔습니다.",
+      "settings.status.backendAddressInvalid": "백엔드 주소가 올바르지 않습니다.",
       "settings.section.connectionTest": "연결 테스트",
       "settings.section.callTest": "호출 테스트",
       "settings.section.update": "업데이트",
@@ -420,6 +427,7 @@
       "settings.update.currentVersion": "현재 버전",
       "settings.update.targetVersion": "대상 버전",
       "settings.update.statusUnavailable": "업데이트 상태를 확인할 수 없습니다.",
+      "settings.update.webhookNote": "백엔드는 저장소에 푸시하면 웹훅으로 자동 배포되므로 여기서 업데이트하지 않습니다.",
       "settings.placeholder.sameAsMain": "비어 있으면 미설정",
       "settings.btn.save": "💾 저장",
       "settings.btn.resetDefaults": "↩ 기본값 복원",
@@ -1761,6 +1769,11 @@
       "settings.label.webDirectBridgeEnabled": "Web Risu direct bridge (experimental)",
       "settings.webDirectBridgeEnabled.on": "Send only these backend requests directly",
       "settings.hint.webDirectBridgeEnabled": "HTTPS Bridge URL only · localhost/127.0.0.1 and the live progress stream are not supported.",
+      "settings.btn.saveBackendAddress": "Save address only",
+      "settings.hint.saveBackendAddress": "Saves only the backend address and direct connection on this device, then loads the settings shared through the backend. Other settings are neither changed nor sent to the backend.",
+      "settings.status.backendAddressSaved": "Address saved. The backend had no newer settings to load (or could not be reached).",
+      "settings.status.backendAddressRestored": "Address saved and the settings shared through the backend loaded.",
+      "settings.status.backendAddressInvalid": "The backend address is not valid.",
       "settings.section.connectionTest": "Connection Test",
       "settings.section.callTest": "Call Test",
       "settings.section.update": "Update",
@@ -2122,6 +2135,7 @@
       "settings.update.currentVersion": "Current version",
       "settings.update.targetVersion": "Target version",
       "settings.update.statusUnavailable": "Update status is unavailable.",
+      "settings.update.webhookNote": "The backend is deployed by a webhook when the repository is pushed, so it is not updated from here.",
       "settings.placeholder.sameAsMain": "Empty = not configured",
       "settings.btn.save": "💾 Save",
       "settings.btn.resetDefaults": "↩ Restore Defaults",
@@ -3244,6 +3258,11 @@
       "settings.label.webDirectBridgeEnabled": "Web Risu 直接接続（実験）",
       "settings.webDirectBridgeEnabled.on": "このバックエンド要求のみ直接送信",
       "settings.hint.webDirectBridgeEnabled": "HTTPS Bridge URL 専用 · localhost/127.0.0.1 とリアルタイム進行ストリームは非対応です。",
+      "settings.btn.saveBackendAddress": "アドレスのみ保存",
+      "settings.hint.saveBackendAddress": "バックエンドのアドレスと直接接続の有無だけをこの端末に保存し、バックエンドで共有された設定を読み込みます。他の設定は変更せず、バックエンドにも送りません。",
+      "settings.status.backendAddressSaved": "アドレスを保存しました。バックエンドに読み込むべき新しい設定はありませんでした（またはバックエンドに接続できませんでした）。",
+      "settings.status.backendAddressRestored": "アドレスを保存し、バックエンドで共有された設定を読み込みました。",
+      "settings.status.backendAddressInvalid": "バックエンドのアドレスが正しくありません。",
       "settings.section.connectionTest": "接続テスト",
       "settings.section.callTest": "呼出テスト",
       "settings.section.update": "アップデート",
@@ -3562,6 +3581,7 @@
       "settings.update.currentVersion": "現在のバージョン",
       "settings.update.targetVersion": "対象バージョン",
       "settings.update.statusUnavailable": "アップデート状態を確認できません。",
+      "settings.update.webhookNote": "バックエンドはリポジトリへのプッシュでWebhookにより自動デプロイされるため、ここでは更新しません。",
       "settings.placeholder.sameAsMain": "空欄は未設定",
       "settings.btn.save": "💾 保存",
       "settings.btn.resetDefaults": "↩ デフォルトに戻す",
@@ -13084,6 +13104,23 @@
     }
     await pushSettingsToBackend(settings);
     return false;
+  }
+
+  // The backend address and direct connection belong to this device. Saving
+  // them alone keeps this device's save time, so a device that never saved
+  // takes the backend's shared settings right after, instead of pushing its
+  // own (defaults) over them as a full save would.
+  async function saveBackendAddressOnly(rawBridgeUrl, webDirectBridgeEnabled) {
+    if (!isValidBridgeUrlInput(rawBridgeUrl)) return { ok: false, reason: "bridge_url_invalid" };
+    settings = sanitizeSettings({ ...settings, bridgeUrl: rawBridgeUrl, webDirectBridgeEnabled: webDirectBridgeEnabled === true });
+    await persistentSet(SETTINGS_KEY, JSON.stringify(settings));
+    const restored = await restoreSettingsFromBackend();
+    if (restored) {
+      markBackendRuntimeConfigDirty("settings_changed");
+      const syncAck = await syncConfigToBackend(settings);
+      if (syncAck.ok) startRisuModelBridge();
+    }
+    return { ok: true, restored };
   }
 
   async function saveSettings() {
@@ -55366,9 +55403,10 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       <div>
         <div class="mo-section">${t('settings.section.update')}</div>
         <div class="mo-inline-actions">
-          <button class="mo-btn mo-btn-info" id="mo-update-check">${t('settings.btn.updateCheck')}</button>
-          <button class="mo-btn mo-btn-success" id="mo-update-download">${t('settings.btn.updateDownload')}</button>
+          <button class="mo-btn mo-btn-info" id="mo-update-check" disabled>${t('settings.btn.updateCheck')}</button>
+          <button class="mo-btn mo-btn-success" id="mo-update-download" disabled>${t('settings.btn.updateDownload')}</button>
         </div>
+        <div class="mo-note">${escapeAttr(t('settings.update.webhookNote'))}</div>
         <div id="mo-update-status" style="margin-top:6px"></div>
       </div>
     </div>
@@ -55806,6 +55844,10 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             <label for="mo-webDirectBridgeEnabled">${t('settings.webDirectBridgeEnabled.on')}</label>
           </div>
           <small>${t('settings.hint.webDirectBridgeEnabled')}</small>
+        </div>
+        <div class="mo-row">
+          <button type="button" class="mo-btn" id="mo-save-backend-address">${escapeAttr(t('settings.btn.saveBackendAddress'))}</button>
+          <small id="mo-save-backend-address-status" role="status">${escapeAttr(t('settings.hint.saveBackendAddress'))}</small>
         </div>
         ${renderBridgeRuntimeNotice(s.bridgeUrl, s.webDirectBridgeEnabled)}
         <div class="mo-row mo-range-row">
@@ -57175,6 +57217,40 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             statusEl.textContent = t('settings.status.saveFailed');
             statusEl.style.color = "#e74c3c";
           }
+        }
+      });
+
+      $("mo-save-backend-address")?.addEventListener("click", async () => {
+        const button = $("mo-save-backend-address");
+        const show = function(key, isError) {
+          // Looked up each time: a restore redraws the panel.
+          const statusEl = $("mo-save-backend-address-status");
+          if (!statusEl) return;
+          statusEl.textContent = t(key);
+          statusEl.style.color = isError ? "#e74c3c" : "";
+        };
+        if (button) button.disabled = true;
+        try {
+          const result = await saveBackendAddressOnly(
+            (($("mo-bridgeUrl") || {}).value || "").trim(),
+            !!(($("mo-webDirectBridgeEnabled") || {}).checked)
+          );
+          if (!result.ok) {
+            show("settings.status.backendAddressInvalid", true);
+            return;
+          }
+          if (result.restored) {
+            await renderSettingsPanel({ recompose: true });
+            show("settings.status.backendAddressRestored", false);
+            return;
+          }
+          show("settings.status.backendAddressSaved", false);
+        } catch (err) {
+          warnLog("Backend address save failed:", err && err.message);
+          show("settings.status.saveFailed", true);
+        } finally {
+          const current = $("mo-save-backend-address");
+          if (current) current.disabled = false;
         }
       });
 

@@ -92,6 +92,23 @@ type pendingPackageUpdate struct {
 	RequiredFiles   []string `json:"required_files,omitempty"`
 }
 
+// This backend is a fork deployed by a webhook when its repository is pushed.
+// The in-app update fetches upstream's releases, which would replace the fork
+// with upstream, so check, download and apply refuse. Tests of the update
+// itself turn this off.
+var inAppUpdateBlockedForFork = true
+
+const inAppUpdateBlockedMessage = "this backend is a fork, not the upstream release, and is deployed by a webhook when its repository is pushed; in-app updates from upstream are not available"
+
+// refuseForkUpdate answers an update request on the fork; true when it did.
+func refuseForkUpdate(w http.ResponseWriter) bool {
+	if !inAppUpdateBlockedForFork {
+		return false
+	}
+	writeError(w, http.StatusForbidden, "update_unavailable_on_fork", inAppUpdateBlockedMessage)
+	return true
+}
+
 func (s *Server) registerUpdateRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /update/check", s.handleUpdateCheck)
 	mux.HandleFunc("POST /update/download", s.handleUpdateDownload)
@@ -164,6 +181,9 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "update checks are disabled")
 		return
@@ -186,6 +206,9 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "update downloads are disabled")
 		return
@@ -241,6 +264,9 @@ func (s *Server) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	if refuseForkUpdate(w) {
+		return
+	}
 	if !s.Cfg.UpdateEnabled {
 		writeError(w, http.StatusServiceUnavailable, "update_disabled", "updates are disabled")
 		return

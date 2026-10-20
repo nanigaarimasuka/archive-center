@@ -616,7 +616,21 @@ func validateFiles(files []any, members []*zip.File, report *Report, signatureRe
 	}
 }
 
+// forkVersionRE is a fork build: the upstream release it is based on, then
+// the fork revision (4.9.0.1).
+var forkVersionRE = regexp.MustCompile(`^((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))\.(?:0|[1-9][0-9]*)$`)
+
+// upstreamVersion is the release a running version is compatible as: a fork
+// build counts as the upstream release it is based on.
+func upstreamVersion(current string) string {
+	if m := forkVersionRE.FindStringSubmatch(strings.TrimSpace(current)); m != nil {
+		return m[1]
+	}
+	return current
+}
+
 func validateCompatibility(v map[string]any, current string, c *collector) {
+	current = upstreamVersion(current)
 	requireKeys(v, "$.compatibility", []string{"archive_center", "schema"}, c)
 	schema := obj(v["schema"])
 	if str(schema["name"]) != "canon-pack-manifest" || str(schema["version"]) != "1.0.0" {
