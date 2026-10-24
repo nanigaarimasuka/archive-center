@@ -975,6 +975,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 		request.LorebookReferenceScope,
 	)
 	timing.addElapsed("lorebook_reference", lorebookReferenceStartedAt)
+	if s.prepareTurnClientGone(r, workflowRequestID, turnWorkflowStageRecall) {
+		return
+	}
 	if s.TurnWorkflows != nil && workflowRequestID != "" {
 		hostTurn, hostTurnObserved := prepareTurnWorkflowHostOrdinal(request, currentInputDecision)
 		s.TurnWorkflows.setHostTurn(workflowRequestID, hostTurn, hostTurnObserved)
@@ -1607,6 +1610,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 	supervisorEnabled := req.Settings.SupervisorEnabled == nil || *req.Settings.SupervisorEnabled
 	executionContractReady, _ := supervisorExecutionContractReady(supervisorInputPack)
 	executionContractReady = executionContractReady && guideEligible
+	if s.prepareTurnClientGone(r, workflowRequestID, turnWorkflowStageContext) {
+		return
+	}
 	if s.TurnWorkflows != nil && workflowRequestID != "" {
 		s.TurnWorkflows.finishStage(workflowRequestID, turnWorkflowStageContext, "succeeded", "")
 	}
@@ -1735,6 +1741,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 			Status:     "failed",
 			ReasonCode: supervisorCallReason,
 		})
+	}
+	if s.prepareTurnClientGone(r, workflowRequestID, turnWorkflowStagePublisherLLM) {
+		return
 	}
 	if s.TurnWorkflows != nil && workflowRequestID != "" {
 		s.TurnWorkflows.startStage(workflowRequestID, turnWorkflowStagePayload)
