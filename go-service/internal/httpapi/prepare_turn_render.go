@@ -796,6 +796,8 @@ type prepareTurnInjectionBlock struct {
 }
 
 type prepareTurnInjectionAssembly struct {
+	rawTurnsInRequestFrom      int
+	overflowMinRelevance       *float64
 	preparation                *prepareTurnRequestPreparation
 	supplementProjection       func(map[string]any, prepareTurnMemorySelectionContext) prepareTurnInjectionAssembly
 	attachSourceContext        func(*prepareTurnInjectionAssembly)

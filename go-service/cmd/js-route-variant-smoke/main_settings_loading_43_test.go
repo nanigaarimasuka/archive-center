@@ -15,6 +15,7 @@ func TestSettings43OpensBeforeBackendStatusAndPreservesEdits(t *testing.T) {
 		extractArchiveCenterJSFunction(t, src, "diagnosticText"),
 		extractArchiveCenterJSFunction(t, src, "endpointSummary"),
 		extractArchiveCenterJSAsyncFunction(t, src, "loadDashboardViewModel"),
+		extractArchiveCenterJSFunction(t, src, "sanitizeMemoryOverflowMinRelevance"),
 	}, "\n")
 	script := `
 const assert = require('node:assert/strict');

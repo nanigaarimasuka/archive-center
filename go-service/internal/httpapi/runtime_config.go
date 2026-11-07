@@ -78,6 +78,7 @@ type RuntimeConfig struct {
 	BackupTimeoutSec                   int64
 	BackupTemperature                  *float64
 	BackupTemperatureFromRole          bool
+	MemoryOverflowMinRelevance         *float64
 	BackupTimeoutFromRole              bool
 	BackupMaxTokens                    *int64
 	BackupReasoningPreset              string
@@ -325,6 +326,7 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setClampedInt("failedQueueMaxAttempts", &s.RuntimeConfig.FailedQueueMaxAttempts, 1, 11)
 	setClampedInt("criticReprocessingIntervalSec", &s.RuntimeConfig.CriticReprocessingIntervalSec, 1, 3600)
 	setInt("topK", &s.RuntimeConfig.TopK)
+	setFloatPtr("memoryOverflowMinRelevance", &s.RuntimeConfig.MemoryOverflowMinRelevance)
 
 	if s.runtimeConfigSaved == nil {
 		s.runtimeConfigSaved = map[string]any{}
