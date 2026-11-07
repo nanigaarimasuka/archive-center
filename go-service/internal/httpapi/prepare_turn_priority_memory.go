@@ -2361,6 +2361,7 @@ func prepareTurnResolvePrioritySourcePool(out *prepareTurnInjectionAssembly, que
 		currentQuery = append(currentQuery, scorer)
 	}
 	turnSummaries := prepareTurnBuildPriorityTurnSummaries(resolved, currentQuery...)
+	resolved, turnSummaries = prepareTurnDropRawTurnsInRequest(out, resolved, turnSummaries)
 	// Source snapshots precede both AI ordering and final delivery rendering.
 	out.priorityCandidates, out.priorityTurnSummaries = clonePrepareTurnPriorityCandidatePool(resolved, turnSummaries)
 	out.prioritySuperseded, _ = clonePrepareTurnPriorityCandidatePool(superseded, nil)
@@ -2415,7 +2416,7 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 		multiAgentOrderCandidates(out.Preprocessing, resolved, turnSummaries)
 	}
 	laneCaps, configuredLaneBudgets := prepareTurnPriorityDeliveryCaps(deliveryCap, budgetMode, budgets)
-	directItems := prepareTurnDeliveryItems(out.LatestDirectEvidenceText, out.DirectEvidenceText, out.ScopedVerbatimText, out.ContinuityCorrectionText)
+	directItems := prepareTurnDropRawTurnEvidence(out, prepareTurnDeliveryItems(out.LatestDirectEvidenceText, out.DirectEvidenceText, out.ScopedVerbatimText, out.ContinuityCorrectionText))
 	secretSeparatorReservation := 0
 	if len(resolved)+len(turnSummaries)+len(directItems) > 0 {
 		secretSeparatorReservation = 2
@@ -2939,6 +2940,23 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 			appendFact(item.index)
 		}
 	}
+	summaryRelevance := prepareTurnOverflowSummaryRelevance(resolved, turnSummaries)
+	overflowBelowFloor := func(item deliveryItem) bool {
+		if item.summary {
+			summary := &turnSummaries[item.index]
+			if summary.SelectionStatus != "" || !prepareTurnOverflowBelowFloor(out, "event_recent", "event_recent", "memories", summaryRelevance[item.index]) {
+				return false
+			}
+			summary.SelectionStatus, summary.SelectionReason = "deferred", "below_relevance_floor"
+			return true
+		}
+		candidate := &resolved[item.index]
+		if candidate.SelectionStatus != "" || !prepareTurnOverflowBelowFloor(out, candidate.Lane, budgetLane(*candidate), candidate.SourceTable, candidate.Relevance) {
+			return false
+		}
+		candidate.SelectionStatus, candidate.SelectionReason = "deferred", "below_relevance_floor"
+		return true
+	}
 	selectPriorityItems := func() {
 		coreRounds := 0
 		for _, key := range keys {
@@ -2968,8 +2986,12 @@ func renderPrepareTurnPriorityMemoryDeliveryPlan(out *prepareTurnInjectionAssemb
 			if nextKey == "" {
 				break
 			}
-			appendItem(groups[nextKey][positions[nextKey]])
+			item := groups[nextKey][positions[nextKey]]
 			positions[nextKey]++
+			if !borrowing && overflowBelowFloor(item) {
+				continue
+			}
+			appendItem(item)
 		}
 	}
 	selectPriorityItems()

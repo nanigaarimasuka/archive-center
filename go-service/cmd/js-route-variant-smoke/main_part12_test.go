@@ -1350,6 +1350,7 @@ function normalizeReasoningBudgetTokens(){ return 0; }
 function getPluginMainTimeoutSettingMs(value){ return value == null ? 60000 : Number(value); }
 function getSubLlmTimeoutSettingMs(value){ return value == null ? 90000 : Number(value); }
 function failedQueueMaxAttempts(){ return 3; }
+function sanitizeMemoryOverflowMinRelevance(value){ return value == null ? 0.3 : Number(value); }
 function getRequestTimeoutSettingMs(){ return 1000; }
 function getCriticTimeoutMs(value){ return getSubLlmTimeoutSettingMs(value == null ? settings.subLlmTimeoutMs : value); }
 function getEmbeddingTimeoutMs(){ return 1000; }

@@ -1151,6 +1151,9 @@ func (s *Server) handlePrepareTurn(w http.ResponseWriter, r *http.Request) {
 				Budgets:                    req.Settings.MemoryDeliveryBudgets,
 				ProtectedSecretBudgetChars: intPtrValue(req.Settings.ProtectedSecretBudgetChars, 0),
 				Perspective:                assemblyPerspectiveContext,
+				RawTurnsInRequestFrom:      prepareTurnRawTurnsInRequestFrom(chatLogs, req.Messages),
+				ResolvedThreads:            s.prepareTurnResolvedThreads(r.Context(), sid, currentTurnFence),
+				OverflowMinRelevance:       s.runtimeConfigSnapshot().MemoryOverflowMinRelevance,
 			}
 			assemblyInput.Measurement = measurement
 			assemblyInput.Common = prepareTurnCommonAssemblySources(assemblyInput)

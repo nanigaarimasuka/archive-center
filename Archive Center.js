@@ -1,8 +1,8 @@
 //@name Archive Center Fork
-//@display-name Archive Center Fork 4.9.0.6
+//@display-name Archive Center Fork 4.9.0.7
 //@author memory-scaffold
 //@api 3.0
-//@version 4.9.0.6
+//@version 4.9.0.7
 //@update-url https://raw.githubusercontent.com/nanigaarimasuka/archive-center/custom/release/Archive%20Center.js
 
 // ════════════════════════════════════════════════════════════════
@@ -39,7 +39,7 @@
   const LOG_PREFIX = "[MemOrch]";
   // The upstream release this fork is based on, then the fork revision.
   // Risu offers an update when the @version above grows.
-  const VERSION = "4.9.0.6";
+  const VERSION = "4.9.0.7";
   const BUILD_ID = VERSION;
   const BUILD_CHANNEL = "stable";
   const BUILD_TIME = "2026-09-27 KST";
@@ -122,6 +122,7 @@
     injectionBudgetExtraChars: 4000, // 자동 산정 예산 위에 허용할 추가 상한
     protectedSecretBudgetChars: 4000,
     memoryDeliveryBudgetMode: "auto",
+    memoryOverflowMinRelevance: 0.3, // 핵심 기억 뒤로 남는 예산을 채울 최소 관련도 (0이면 끝까지 채움)
     memoryTransportMode: "text",
     memoryDeliveryBudgets: Object.freeze({
       event_recent: 3500,
@@ -1135,6 +1136,8 @@
       "settings.hint.injectionBudgetExtraChars": "자동 주입 예산 위로 추가 허용할 문자 수입니다. 토큰이 아니라 chars 기준이며, 관련 기억이 없으면 높은 한도를 전부 채우지 않습니다.",
       "settings.hint.primaryCanonBaseMaxChars": "0이면 비활성화합니다. 단독(primary) 원작 모드의 원작 총예산 안에서 Canon Base가 사용할 수 있는 하위 상한입니다.",
       "settings.hint.maxInjectionChars": "일반 기억·세계·관계 블록의 길이를 제한합니다. 원작 DB와 로어북 예산은 포함하지 않습니다.",
+      "settings.label.memoryOverflowMinRelevance": "남는 예산을 채울 최소 관련도",
+      "settings.hint.memoryOverflowMinRelevance": "역할마다 핵심 기억을 넣은 뒤, 남는 예산은 관련도가 이 값 이상인 사건 기억만 채웁니다(0–1, 기본 0.3). 0이면 예전처럼 끝까지 채웁니다. 현재 상태와 전처리 AI가 고른 기억에는 적용하지 않습니다.",
       "settings.hint.referenceInjectionMaxChars": "원작 DB 참조만 사용하는 독립 상한입니다. 기억이나 로어북의 남은 예산을 빌리지 않습니다.",
       "settings.hint.lorebookReferenceMaxChars": "활성 로어북 참조만 사용하는 독립 상한입니다. 기억이나 원작 DB의 남은 예산을 빌리지 않습니다.",
       "settings.hint.reasoningEffort": "none이면 생략합니다. low/medium/high처럼 provider가 지원하는 값을 사용하세요.",
@@ -1856,6 +1859,8 @@
       "settings.label.llmRetryCount.hint": "0 = no retry (1 attempt only), 3 = 3 additional attempts on failure",
       "settings.label.maxInjectionChars": "Memory Context Budget (chars)",
       "settings.hint.maxInjectionChars": "Independent limit for memory, world, and relationship context. Original-work and lorebook budgets are excluded.",
+      "settings.label.memoryOverflowMinRelevance": "Minimum relevance for spare budget",
+      "settings.hint.memoryOverflowMinRelevance": "After each lane's core memories, spare budget only takes event memories at least this relevant (0-1, default 0.3). 0 fills it to the end as before. Current state and preprocessing choices are exempt.",
       "settings.label.memoryTransportMode": "Long-term Memory Transport",
       "settings.memoryTransportMode.text": "Existing Text",
       "settings.memoryTransportMode.google_pdf": "Google AI Studio / Vertex PDF",
@@ -3375,6 +3380,8 @@
       "settings.label.llmRetryCount.hint": "0 = リトライなし（1回のみ）、3 = 失敗時3回追加試行",
       "settings.label.maxInjectionChars": "一般記憶予算（chars）",
       "settings.hint.maxInjectionChars": "記憶・世界・関係コンテキスト専用の上限です。原作DBとロアブックの予算は含みません。",
+      "settings.label.memoryOverflowMinRelevance": "余り予算を埋める最低関連度",
+      "settings.hint.memoryOverflowMinRelevance": "各役割の中核記憶を入れた後、余った予算には関連度がこの値以上の出来事記憶だけを入れます（0〜1、既定0.3）。0なら従来どおり最後まで埋めます。現在の状態と前処理AIが選んだ記憶は対象外です。",
       "settings.label.memoryTransportMode": "長期記憶の転送方式",
       "settings.memoryTransportMode.text": "既存 Text",
       "settings.memoryTransportMode.google_pdf": "Google AI Studio・Vertex PDF",
@@ -12771,6 +12778,7 @@
     merged.requestTimeoutMs = getRequestTimeoutSettingMs(merged.requestTimeoutMs);
     // Sprint 3-B: injection budget
     merged.maxInjectionChars = Math.max(0, Math.floor(Number(merged.maxInjectionChars) || DEFAULT_SETTINGS.maxInjectionChars));
+    merged.memoryOverflowMinRelevance = sanitizeMemoryOverflowMinRelevance(merged.memoryOverflowMinRelevance);
     merged.referenceInjectionMaxChars = sanitizeNumber(merged.referenceInjectionMaxChars, DEFAULT_SETTINGS.referenceInjectionMaxChars, 0, 30000);
     merged.referenceInjectionEnabled = merged.referenceInjectionEnabled !== false;
     merged.lorebookReferenceMaxChars = sanitizeNumber(merged.lorebookReferenceMaxChars, DEFAULT_SETTINGS.lorebookReferenceMaxChars, 0, 30000);
@@ -13112,6 +13120,7 @@
       embeddingTimeout: s.embeddingTimeout,
       embeddingRetryCount: Math.trunc(sanitizeNumber(s.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10)),
       failedQueueMaxAttempts: failedQueueMaxAttempts(),
+      memoryOverflowMinRelevance: sanitizeMemoryOverflowMinRelevance(s.memoryOverflowMinRelevance),
       criticReprocessingIntervalSec: sanitizeNumber(s.criticReprocessingIntervalSec, DEFAULT_SETTINGS.criticReprocessingIntervalSec, 1, 3600),
       backupLlmEnabled: s.backupLlmEnabled === true,
       backupProvider: getSubLlmProviderSetting(s.backupProvider || DEFAULT_SETTINGS.backupProvider),
@@ -54782,6 +54791,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           <small style="color:#888;font-size:11px;">${t('settings.hint.maxInjectionChars')}</small>
         </div>
         <div class="mo-row">
+          <label>${t('settings.label.memoryOverflowMinRelevance')}</label>
+          <input type="number" id="mo-memoryOverflowMinRelevance" value="${sanitizeMemoryOverflowMinRelevance(s.memoryOverflowMinRelevance)}" min="0" max="1" step="0.05">
+          <small style="color:#888;font-size:11px;">${t('settings.hint.memoryOverflowMinRelevance')}</small>
+        </div>
+        <div class="mo-row">
           <label>${t('settings.label.maxInputContextChars')}</label>
           <input type="number" id="mo-maxInputContextChars" value="${s.maxInputContextChars}" min="1" step="100">
           <small style="color:#888;font-size:11px;">${t('settings.hint.maxInputContextChars')}</small>
@@ -55900,6 +55914,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             arcIntervalChapters: $("mo-arcIntervalChapters").value,
             sagaIntervalArcs: $("mo-sagaIntervalArcs").value,
             maxInjectionChars: $("mo-maxInjectionChars").value,
+            memoryOverflowMinRelevance: $("mo-memoryOverflowMinRelevance") ? $("mo-memoryOverflowMinRelevance").value : settings.memoryOverflowMinRelevance,
             maxInputContextChars: $("mo-maxInputContextChars").value,
             failedQueueMaxSize: $("mo-failedQueueMaxSize").value,
             failedQueueMaxAgeDays: $("mo-failedQueueMaxAgeDays").value,
@@ -55980,6 +55995,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           setValueIfPresent("mo-memoryDeliveryBudgetMode", settings.memoryDeliveryBudgetMode || "auto");
           setValueIfPresent("mo-memoryTransportMode", settings.memoryTransportMode || "text");
           setValueIfPresent("mo-turnFinalizationMode", settings.turnFinalizationMode || "immediate_after_response");
+          setValueIfPresent("mo-memoryOverflowMinRelevance", sanitizeMemoryOverflowMinRelevance(settings.memoryOverflowMinRelevance));
           const refreshedMemoryBudgets = settings.memoryDeliveryBudgets || DEFAULT_SETTINGS.memoryDeliveryBudgets;
           setValueIfPresent("mo-memoryBudgetEventRecent", refreshedMemoryBudgets.event_recent);
           setValueIfPresent("mo-memoryBudgetCharacterObjective", refreshedMemoryBudgets.character_objective);
@@ -56612,6 +56628,12 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
   // Functions this fork adds. They are declarations, so they are hoisted
   // and their place in the file does not matter.
   // ──────────────────────────────────────────────────────────────
+
+  // The floor the backend uses for spare memory budget: a number from 0 to 1.
+  function sanitizeMemoryOverflowMinRelevance(value) {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 && number <= 1 ? number : DEFAULT_SETTINGS.memoryOverflowMinRelevance;
+  }
 
   // For screens. Makes the same cache check as getCurrentChatSessionId
   // (indexes, chat id, character id) through Risu's id-only API instead of

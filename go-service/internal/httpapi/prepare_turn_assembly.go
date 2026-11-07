@@ -79,6 +79,9 @@ type prepareTurnAssemblyInput struct {
 	Budgets                      map[string]int
 	Perspective                  *prepareTurnAssemblyPerspective
 	Common                       *prepareTurnAssemblyCommon
+	RawTurnsInRequestFrom        int
+	ResolvedThreads              []store.PendingThread
+	OverflowMinRelevance         *float64
 }
 
 // Immutable source projections shared only by the initial assembly and searches
@@ -217,6 +220,8 @@ func buildPrepareTurnAssembly(input prepareTurnAssemblyInput, assembleDelivery b
 
 	out := prepareTurnInjectionAssembly{
 		ProtectedSecretBudgetChars: input.ProtectedSecretBudgetChars,
+		rawTurnsInRequestFrom:      input.RawTurnsInRequestFrom,
+		overflowMinRelevance:       input.OverflowMinRelevance,
 		preparation:                preparation,
 		LanguageContext:            languageContext,
 		PerspectiveContext:         perspectiveContext,
@@ -1341,6 +1346,8 @@ func buildPrepareTurnAssembly(input prepareTurnAssemblyInput, assembleDelivery b
 	prepareTurnAttachLastConfirmedClock(&out, fieldStoryClock)
 	out.attachSourceContext = func(target *prepareTurnInjectionAssembly) {
 		prepareTurnAttachLifecycleContext(target, narrativeCurrentValues, fieldStoryClock)
+		prepareTurnAttachResolvedThreadContext(target, input.ResolvedThreads)
+		prepareTurnAttachSupersededMemoryContext(target, input.Memories)
 		prepareTurnAttachCurrentStateContext(target, narrativeCurrentValues, fieldStoryClock)
 		prepareTurnAttachTemporalContext(target, fieldStoryClock)
 		prepareTurnCarryKnowledgeBoundaries(target, input)
