@@ -122,6 +122,8 @@ func (s *Server) processMemoryVectorOutboxGroupPreferred(
 	embeddingCfg := s.completeTurnExtractionConfig(nil).Embedder
 	if usesVoyageContextualizedEmbedding(embeddingCfg) {
 		prepared, preparationFailures = prepareVoyageMemoryVectorOperations(vectorCtx, embeddingCfg, items)
+	} else {
+		prepared, preparationFailures = prepareBatchedMemoryVectorOperations(vectorCtx, embeddingCfg, items)
 	}
 	results := make([]memoryVectorProcessResult, 0, len(items))
 	var firstErr error

@@ -208,6 +208,8 @@
     // ── 백엔드 임베딩 타임아웃 (초) ──
     embeddingTimeout: 30,
     embeddingRetryCount: 0,
+    embeddingConcurrency: 8,        // 임베딩 요청을 동시에 보내는 최대 수 (서버 전체)
+    embeddingBatchSize: 16,         // 요청 하나에 묶는 텍스트 수 (OpenAI 호환)
     // ── Phase 3-2: Episode auto-generation ──
     episodeIntervalTurns: 5,         // N턴마다 에피소드 요약 자동 생성
     episodeIntervalPolicyVersion: "closed5.v1",
@@ -1155,6 +1157,10 @@
       "settings.label.embeddingTimeout": "임베딩 Timeout (초)",
       "settings.label.embeddingRetryCount": "임베딩 재시도 횟수",
       "settings.label.embeddingRetryCount.hint": "0 = 재시도 없음(1회만 시도), 3 = 시간 초과·연결 오류·서버 오류 시 3회 추가 시도. 매 시도마다 위 Timeout이 적용됩니다.",
+      "settings.label.embeddingConcurrency": "임베딩 동시 요청 수",
+      "settings.label.embeddingConcurrency.hint": "백엔드 전체에서 임베딩 API에 동시에 보내는 요청의 최대 수입니다(1–32, 기본 8). 429 오류가 잦으면 낮추세요.",
+      "settings.label.embeddingBatchSize": "임베딩 배치 크기",
+      "settings.label.embeddingBatchSize.hint": "OpenAI 호환 엔드포인트에 요청 하나로 묶어 보내는 텍스트 수입니다(1–128, 기본 16). 엔드포인트가 묶음을 받지 않으면 동시에 하나씩 보냅니다. 요청이 Timeout을 넘기면 낮추세요.",
       "settings.label.injectionBudgetExtraChars": "추가 기억 예산 상한 (chars)",
       "settings.label.protectedSecretBudgetChars": "비밀 예산 (문자)",
       "settings.hint.protectedSecretBudgetChars": "일반 기억·신체 추적과 별도인 비밀 전달 상한입니다. 0 또는 빈값은 기본 4,000자를 사용하며 비밀을 끄지 않습니다. 관련 비밀만 선택하고 남은 공간을 채우지 않으며 자동 확장하지 않습니다.",
@@ -1862,6 +1868,10 @@
       "settings.label.embeddingTimeout": "Embedding Timeout (sec)",
       "settings.label.embeddingRetryCount": "Embedding Retry Count",
       "settings.label.embeddingRetryCount.hint": "0 = no retry (1 attempt only), 3 = up to 3 more attempts after a timeout, connection error or server error. Each attempt gets the timeout above.",
+      "settings.label.embeddingConcurrency": "Embedding Concurrency",
+      "settings.label.embeddingConcurrency.hint": "Most embedding requests the backend sends at once (1-32, default 8). Lower it if 429 errors are frequent.",
+      "settings.label.embeddingBatchSize": "Embedding Batch Size",
+      "settings.label.embeddingBatchSize.hint": "Texts sent together in one request to an OpenAI-compatible endpoint (1-128, default 16). An endpoint that refuses arrays gets them one by one, concurrently. Lower it if requests exceed the timeout.",
       "settings.label.publisherTemp": "Publisher Temperature",
       "settings.label.publisherMaxCompletionTokens": "Publisher Max Completion Tokens",
       "settings.label.publisherProvider": "Publisher Provider",
@@ -3408,6 +3418,10 @@
       "settings.label.embeddingTimeout": "Embeddingタイムアウト（秒）",
       "settings.label.embeddingRetryCount": "Embeddingリトライ回数",
       "settings.label.embeddingRetryCount.hint": "0 = リトライなし（1回のみ）、3 = タイムアウト・接続エラー・サーバーエラー時に最大3回追加試行。各試行に上のタイムアウトが適用されます。",
+      "settings.label.embeddingConcurrency": "Embedding同時リクエスト数",
+      "settings.label.embeddingConcurrency.hint": "バックエンド全体でEmbedding APIに同時に送るリクエストの最大数です（1〜32、既定8）。429エラーが多い場合は下げてください。",
+      "settings.label.embeddingBatchSize": "Embeddingバッチサイズ",
+      "settings.label.embeddingBatchSize.hint": "OpenAI互換エンドポイントに1リクエストでまとめて送るテキスト数です（1〜128、既定16）。まとめて受け付けないエンドポイントには1件ずつ同時に送ります。タイムアウトを超える場合は下げてください。",
       "settings.label.publisherTemp": "出版社 Temperature",
       "settings.label.publisherMaxCompletionTokens": "出版社 Max Completion Tokens",
       "settings.label.publisherProvider": "出版社 Provider",
@@ -12917,6 +12931,8 @@
     merged.embeddingProvider = normalizeEmbeddingProvider(merged.embeddingProvider, DEFAULT_SETTINGS.embeddingProvider);
     merged.embeddingTimeout = sanitizeNumber(merged.embeddingTimeout, DEFAULT_SETTINGS.embeddingTimeout, 5, 3000);
     merged.embeddingRetryCount = Math.trunc(sanitizeNumber(merged.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10));
+    merged.embeddingConcurrency = Math.trunc(sanitizeNumber(merged.embeddingConcurrency, DEFAULT_SETTINGS.embeddingConcurrency, 1, 32));
+    merged.embeddingBatchSize = Math.trunc(sanitizeNumber(merged.embeddingBatchSize, DEFAULT_SETTINGS.embeddingBatchSize, 1, 128));
     merged.sourceSearchPlannerProvider = normalizeSourceSearchLlmProvider(merged.sourceSearchPlannerProvider);
     merged.sourceSearchPlannerTimeoutMs = sanitizeNumber(merged.sourceSearchPlannerTimeoutMs, DEFAULT_SETTINGS.sourceSearchPlannerTimeoutMs, 5000, 300000);
     merged.sourceSearchPlannerTemperature = sanitizeNumber(merged.sourceSearchPlannerTemperature, DEFAULT_SETTINGS.sourceSearchPlannerTemperature, 0, 2);
@@ -13194,6 +13210,8 @@
       criticTimeout: Math.ceil(getSubLlmTimeoutSettingMs(s.subLlmTimeoutMs) / 1000),
       embeddingTimeout: s.embeddingTimeout,
       embeddingRetryCount: Math.trunc(sanitizeNumber(s.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10)),
+      embeddingConcurrency: Math.trunc(sanitizeNumber(s.embeddingConcurrency, DEFAULT_SETTINGS.embeddingConcurrency, 1, 32)),
+      embeddingBatchSize: Math.trunc(sanitizeNumber(s.embeddingBatchSize, DEFAULT_SETTINGS.embeddingBatchSize, 1, 128)),
       failedQueueMaxAttempts: failedQueueMaxAttempts(),
       memoryOverflowMinRelevance: sanitizeMemoryOverflowMinRelevance(s.memoryOverflowMinRelevance),
       criticReprocessingIntervalSec: sanitizeNumber(s.criticReprocessingIntervalSec, DEFAULT_SETTINGS.criticReprocessingIntervalSec, 1, 3600),
@@ -54753,6 +54771,18 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           <input class="mo-range" type="range" id="mo-embeddingRetryCountRange" data-sync-input="mo-embeddingRetryCount" value="${s.embeddingRetryCount ?? DEFAULT_SETTINGS.embeddingRetryCount}" min="0" max="10" step="1">
           <small>${t('settings.label.embeddingRetryCount.hint')}</small>
         </div>
+        <div class="mo-row mo-range-row">
+          <label>${t('settings.label.embeddingConcurrency')}</label>
+          <input type="number" id="mo-embeddingConcurrency" value="${s.embeddingConcurrency ?? DEFAULT_SETTINGS.embeddingConcurrency}" min="1" max="32" step="1">
+          <input class="mo-range" type="range" id="mo-embeddingConcurrencyRange" data-sync-input="mo-embeddingConcurrency" value="${s.embeddingConcurrency ?? DEFAULT_SETTINGS.embeddingConcurrency}" min="1" max="32" step="1">
+          <small>${t('settings.label.embeddingConcurrency.hint')}</small>
+        </div>
+        <div class="mo-row mo-range-row">
+          <label>${t('settings.label.embeddingBatchSize')}</label>
+          <input type="number" id="mo-embeddingBatchSize" value="${s.embeddingBatchSize ?? DEFAULT_SETTINGS.embeddingBatchSize}" min="1" max="128" step="1">
+          <input class="mo-range" type="range" id="mo-embeddingBatchSizeRange" data-sync-input="mo-embeddingBatchSize" value="${s.embeddingBatchSize ?? DEFAULT_SETTINGS.embeddingBatchSize}" min="1" max="128" step="1">
+          <small>${t('settings.label.embeddingBatchSize.hint')}</small>
+        </div>
         <div class="mo-row">
           <label>${t('settings.label.memoryTransportMode')}</label>
           <select id="mo-memoryTransportMode">
@@ -55906,6 +55936,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             requestTimeoutMs: $("mo-requestTimeoutMs").value,
             embeddingTimeout: $("mo-embeddingTimeout").value,
             embeddingRetryCount: $("mo-embeddingRetryCount").value,
+            embeddingConcurrency: $("mo-embeddingConcurrency") ? $("mo-embeddingConcurrency").value : settings.embeddingConcurrency,
+            embeddingBatchSize: $("mo-embeddingBatchSize") ? $("mo-embeddingBatchSize").value : settings.embeddingBatchSize,
             coreObjectiveMemoryMaxItems: $("mo-coreObjectiveMemoryMaxItems").value,
             recentConversationReferenceCount: $("mo-recentConversationReferenceCount").value,
             llmRetryCount: $("mo-llmRetryCount").value,
@@ -56027,6 +56059,8 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           $("mo-requestTimeoutMs").value = settings.requestTimeoutMs;
           $("mo-embeddingTimeout").value = settings.embeddingTimeout;
           $("mo-embeddingRetryCount").value = settings.embeddingRetryCount;
+          if ($("mo-embeddingConcurrency")) $("mo-embeddingConcurrency").value = settings.embeddingConcurrency;
+          if ($("mo-embeddingBatchSize")) $("mo-embeddingBatchSize").value = settings.embeddingBatchSize;
           $("mo-embeddingProvider").value = settings.embeddingProvider || "openai";
           $("mo-pluginMainTimeoutMs").value = settings.pluginMainTimeoutMs;
           $("mo-pluginMainTemperature").value = settings.pluginMainTemperature;

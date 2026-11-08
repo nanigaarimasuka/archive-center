@@ -244,11 +244,6 @@ func callEmbeddingInputs(ctx context.Context, cfg completeTurnEmbeddingConfig, i
 }
 
 func callEmbeddingInputsOnce(ctx context.Context, cfg completeTurnEmbeddingConfig, timeout time.Duration, inputs []string, inputType string) ([]string, string, error) {
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
 	if len(inputs) == 0 {
 		return nil, "", errors.New("embedding input is required")
 	}
@@ -259,21 +254,16 @@ func callEmbeddingInputsOnce(ctx context.Context, cfg completeTurnEmbeddingConfi
 	}
 	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
 	if provider == "voyageai" && isVoyageContextualizedModel(cfg.Model) {
-		return callVoyageContextualizedEmbeddings(ctx, cfg, inputs, inputType)
-	}
-	results := make([]string, 0, len(inputs))
-	model := strings.TrimSpace(cfg.Model)
-	for _, input := range inputs {
-		embedding, resolvedModel, err := callSingleEmbedding(ctx, cfg, input)
+		ctx, cancel := embeddingRequestContext(ctx, timeout)
+		defer cancel()
+		release, err := embeddingRequests.acquire(ctx)
 		if err != nil {
 			return nil, "", err
 		}
-		results = append(results, embedding)
-		if strings.TrimSpace(resolvedModel) != "" {
-			model = resolvedModel
-		}
+		defer release()
+		return callVoyageContextualizedEmbeddings(ctx, cfg, inputs, inputType)
 	}
-	return results, model, nil
+	return embedEachInput(ctx, cfg, timeout, inputs)
 }
 
 func callSingleEmbedding(ctx context.Context, cfg completeTurnEmbeddingConfig, input string) (string, string, error) {

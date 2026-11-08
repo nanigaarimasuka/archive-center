@@ -277,6 +277,13 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 		// requests keep their configured per-call timeout and original ordering.
 		embed(0)
 		if embeddings[0].err == nil && len(embeddings[0].vector) > 0 {
+			historyTexts := make([]string, 0, len(retrievalQueries)-1)
+			for _, query := range retrievalQueries[1:] {
+				historyTexts = append(historyTexts, query.Text)
+			}
+			for offset, batched := range prepareTurnBatchQueryEmbeddings(ctx, embeddingCfg, historyTexts, nil, nil) {
+				embeddings[offset+1] = queryEmbeddingResult{parseFloat32JSONList(batched.embedding), batched.model, nil, true}
+			}
 			const historyEmbeddingConcurrency = 3 // transport bound, not a recall limit
 			var workers sync.WaitGroup
 			for worker := 0; worker < minInt(historyEmbeddingConcurrency, len(retrievalQueries)-1); worker++ {
@@ -284,7 +291,9 @@ func (s *Server) prepareTurnVectorShadowWithPreciseCandidateLimits(ctx context.C
 				go func(worker int) {
 					defer workers.Done()
 					for index := worker + 1; index < len(retrievalQueries); index += historyEmbeddingConcurrency {
-						embed(index)
+						if !embeddings[index].attempted {
+							embed(index)
+						}
 					}
 				}(worker)
 			}

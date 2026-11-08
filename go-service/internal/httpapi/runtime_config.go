@@ -60,6 +60,8 @@ type RuntimeConfig struct {
 	EmbeddingModel                     string
 	EmbeddingTimeoutSec                int64
 	EmbeddingRetryCount                int
+	EmbeddingConcurrency               int
+	EmbeddingBatchSize                 int
 	SourceSearchPlannerProvider        string
 	SourceSearchPlannerAPIKey          string
 	SourceSearchPlannerEndpoint        string
@@ -289,6 +291,9 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setString("embeddingModel", &s.RuntimeConfig.EmbeddingModel)
 	setInt("embeddingTimeout", &s.RuntimeConfig.EmbeddingTimeoutSec)
 	setClampedInt("embeddingRetryCount", &s.RuntimeConfig.EmbeddingRetryCount, 0, 10)
+	setClampedInt("embeddingConcurrency", &s.RuntimeConfig.EmbeddingConcurrency, 1, 32)
+	setClampedInt("embeddingBatchSize", &s.RuntimeConfig.EmbeddingBatchSize, 1, 128)
+	embeddingRequests.configure(s.RuntimeConfig.EmbeddingConcurrency, s.RuntimeConfig.EmbeddingBatchSize)
 	setString("sourceSearchPlannerProvider", &s.RuntimeConfig.SourceSearchPlannerProvider)
 	setString("sourceSearchPlannerApiKey", &s.RuntimeConfig.SourceSearchPlannerAPIKey)
 	setString("sourceSearchPlannerEndpoint", &s.RuntimeConfig.SourceSearchPlannerEndpoint)
