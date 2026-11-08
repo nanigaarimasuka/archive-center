@@ -1677,6 +1677,25 @@
       "findReplace.reflectConfirm": "이 대화에서 바꾼 메시지 {count}개를 반영합니다.\n\n· 기억까지 다시 만들기: 세션 정상화로 바뀐 턴의 기억, 에피소드, 요약을 다시 만듭니다. 바뀐 턴이 많을수록 LLM 호출도 늘어납니다.\n· 원문만 반영하기: 저장된 원문만 바뀐 글로 바꾸고 기억은 그대로 둡니다. 오타나 표기처럼 기억 내용이 달라지지 않는 바꾸기에 쓰세요. LLM을 부르지 않습니다.",
       "findReplace.reflectMemory": "기억까지 다시 만들기",
       "findReplace.reflectTextOnly": "원문만 반영하기",
+      "findReplace.reflectMemoryText": "기억에도 같은 바꾸기 적용",
+      "findReplace.reflectLater": "나중에 반영",
+      "findReplace.reflectMemoryTextLine": "· 기억에도 같은 바꾸기 적용: 원문을 반영하고, 저장된 기억(기억 요약, 직접 근거, 관계 지식, 계층 요약, 신뢰 제어, 세계 규칙, 개체 정보)의 글에도 같은 바꾸기를 적용합니다. 바뀐 캐릭터 이름은 이름을 바꾸거나 같은 이름의 캐릭터로 합칩니다. LLM은 부르지 않고 바뀐 항목만 다시 임베딩합니다.",
+      "findReplace.memoryPreviewTitle": "기억에도 같은 바꾸기 적용",
+      "findReplace.memoryPreviewIntro": "저장된 기억에서 {count}곳이 바뀝니다. 빼고 싶은 항목은 체크를 해제하세요. 적용하면 원문도 함께 반영합니다.",
+      "findReplace.memoryRename": "캐릭터 이름: {from} → {to}",
+      "findReplace.memoryRenameHint": "같은 이름의 캐릭터가 이미 있으면 그 캐릭터로 합칩니다.",
+      "findReplace.memoryApply": "적용",
+      "findReplace.memoryWorking": "기억에서 바꿀 곳을 찾는 중입니다…",
+      "findReplace.memoryNothing": "기억에서 바꿀 곳이 없어 원문만 반영했습니다.",
+      "findReplace.memoryDone": "기억 {applied}곳을 바꿨습니다.",
+      "findReplace.memoryStale": "그사이 바뀐 {count}곳은 건너뛰었습니다.",
+      "findReplace.memoryRenamed": "캐릭터 이름 {count}개를 바꾸거나 합쳤습니다.",
+      "findReplace.memoryRenameFailed": "캐릭터 이름 {count}개는 바꾸지 못했습니다.",
+      "findReplace.memoryVectorsQueued": "바뀐 항목의 벡터를 백그라운드에서 다시 만들고 있습니다.",
+      "findReplace.memoryVectorsSkipped": "임베딩 설정이 없어 벡터는 그대로입니다.",
+      "findReplace.memoryFailed": "기억에 반영하지 못했습니다: {detail}",
+      "findReplace.kind.source": "턴 원본(원문·평론가 결과)",
+      "findReplace.kind.precise": "정밀 기억",
       "findReplace.textOnlyDone": "원문 {count}턴을 바꿨습니다. 기억은 그대로입니다.",
       "findReplace.textOnlyNothing": "저장된 원문과 다른 턴이 없어 바꿀 것이 없습니다.",
       "findReplace.textOnlyNeedsOpenChat": "원문만 반영하기는 지금 열려 있는 대화에서만 할 수 있습니다.",
@@ -3204,6 +3223,25 @@
       "findReplace.reflectConfirm": "Applies the {count} changed messages of this chat.\n\n· Rebuild memory too: session normalize rebuilds the memories, episodes and summaries of the changed turns. The more turns changed, the more LLM calls it makes.\n· Stored text only: replaces the stored text with the changed text and keeps the memories as they are. Use it for changes that do not change what is remembered, like typos or spellings. No LLM calls.",
       "findReplace.reflectMemory": "Rebuild memory too",
       "findReplace.reflectTextOnly": "Stored text only",
+      "findReplace.reflectMemoryText": "Apply the same replace to memory",
+      "findReplace.reflectLater": "Later",
+      "findReplace.reflectMemoryTextLine": "· Apply the same replace to memory: stores the changed text and applies the same replace to the text of stored memory (memories, direct evidence, knowledge graph, hierarchy, trust, world rules, entities). A changed character name renames the character or merges it into one with that name. No LLM calls; only the changed items are embedded again.",
+      "findReplace.memoryPreviewTitle": "Apply the same replace to memory",
+      "findReplace.memoryPreviewIntro": "{count} places in stored memory change. Uncheck what to leave out. Applying also stores the changed chat text.",
+      "findReplace.memoryRename": "Character name: {from} → {to}",
+      "findReplace.memoryRenameHint": "If a character already has that name, the two are merged.",
+      "findReplace.memoryApply": "Apply",
+      "findReplace.memoryWorking": "Looking for places to change in memory…",
+      "findReplace.memoryNothing": "Nothing in memory changes, so only the chat text was stored.",
+      "findReplace.memoryDone": "Changed {applied} places in memory.",
+      "findReplace.memoryStale": "Skipped {count} places that changed meanwhile.",
+      "findReplace.memoryRenamed": "Renamed or merged {count} characters.",
+      "findReplace.memoryRenameFailed": "Could not rename {count} characters.",
+      "findReplace.memoryVectorsQueued": "The vectors of the changed items are being rebuilt in the background.",
+      "findReplace.memoryVectorsSkipped": "No embedding is set up, so the vectors stay as they are.",
+      "findReplace.memoryFailed": "Could not apply to memory: {detail}",
+      "findReplace.kind.source": "Turn sources (chat text, critic result)",
+      "findReplace.kind.precise": "Precise memory",
       "findReplace.textOnlyDone": "Replaced the stored text of {count} turns. Memories are unchanged.",
       "findReplace.textOnlyNothing": "No turn differs from the stored text, so nothing was replaced.",
       "findReplace.textOnlyNeedsOpenChat": "Stored text only works on the chat that is open now.",
@@ -4729,6 +4767,25 @@
       "findReplace.reflectConfirm": "このチャットで変更したメッセージ{count}件を反映します。\n\n· 記憶も作り直す: セッション正常化で変更したターンの記憶・エピソード・要約を作り直します。変更したターンが多いほどLLM呼び出しも増えます。\n· 原文のみ反映: 保存された原文だけを変更後の文に置き換え、記憶はそのままにします。誤字や表記のように記憶の内容が変わらない置換に使ってください。LLMは呼び出しません。",
       "findReplace.reflectMemory": "記憶も作り直す",
       "findReplace.reflectTextOnly": "原文のみ反映",
+      "findReplace.reflectMemoryText": "記憶にも同じ置換を適用",
+      "findReplace.reflectLater": "後で反映",
+      "findReplace.reflectMemoryTextLine": "· 記憶にも同じ置換を適用: 原文を反映し、保存された記憶（記憶要約・直接根拠・関係知識・階層要約・信頼制御・世界ルール・エンティティ）の文にも同じ置換を適用します。変わったキャラクター名は名前を変えるか、同じ名前のキャラクターに統合します。LLMは呼び出さず、変わった項目だけ埋め込み直します。",
+      "findReplace.memoryPreviewTitle": "記憶にも同じ置換を適用",
+      "findReplace.memoryPreviewIntro": "保存された記憶の{count}か所が変わります。除外したい項目はチェックを外してください。適用すると原文も一緒に反映します。",
+      "findReplace.memoryRename": "キャラクター名: {from} → {to}",
+      "findReplace.memoryRenameHint": "同じ名前のキャラクターがすでにあれば、そのキャラクターに統合します。",
+      "findReplace.memoryApply": "適用",
+      "findReplace.memoryWorking": "記憶で置換する箇所を探しています…",
+      "findReplace.memoryNothing": "記憶に置換する箇所がないため、原文だけを反映しました。",
+      "findReplace.memoryDone": "記憶の{applied}か所を置換しました。",
+      "findReplace.memoryStale": "その間に変わった{count}か所はスキップしました。",
+      "findReplace.memoryRenamed": "キャラクター名{count}件を変更または統合しました。",
+      "findReplace.memoryRenameFailed": "キャラクター名{count}件は変更できませんでした。",
+      "findReplace.memoryVectorsQueued": "変わった項目のベクトルをバックグラウンドで作り直しています。",
+      "findReplace.memoryVectorsSkipped": "埋め込み設定がないため、ベクトルはそのままです。",
+      "findReplace.memoryFailed": "記憶に反映できませんでした: {detail}",
+      "findReplace.kind.source": "ターン原本（原文・評論家結果）",
+      "findReplace.kind.precise": "精密記憶",
       "findReplace.textOnlyDone": "{count}ターンの原文を置き換えました。記憶はそのままです。",
       "findReplace.textOnlyNothing": "保存された原文と異なるターンがないため、置き換えるものはありません。",
       "findReplace.textOnlyNeedsOpenChat": "原文のみ反映は、いま開いているチャットでのみ使えます。",
@@ -56647,6 +56704,182 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
   // and their place in the file does not matter.
   // ──────────────────────────────────────────────────────────────
 
+  // Applies the replaces made in the chat to stored memory too: the plugin
+  // runs the same rules over the text the backend lists, shows what changes,
+  // then stores the chat text and writes the memory changes. The backend
+  // replays changed turns from their stored result and embeds them again.
+  async function reflectFindReplaceMemoryText(sessionId, rules, report) {
+    const sid = String(sessionId || "").trim();
+    const list = (Array.isArray(rules) ? rules : []).map(function(rule) {
+      const matcher = buildFindReplaceMatcher(rule && rule.query, { regex: !!(rule && rule.regex), caseSensitive: !!(rule && rule.caseSensitive) });
+      return matcher.regex ? { regex: matcher.regex, replacement: String(rule.replacement || ""), useRegex: !!rule.regex } : null;
+    });
+    if (list.length === 0 || list.some(function(item) { return !item; })) {
+      report(tf("findReplace.memoryFailed", { detail: "replace rule unavailable" }), true);
+      return;
+    }
+    report(t("findReplace.memoryWorking"), false);
+    const single = rules.length === 1 && !rules[0].regex;
+    const listed = await safeCall(() => bridgeFetch("/admin/memory-text/fields", {
+      method: "POST",
+      body: { chat_session_id: sid, contains: single ? String(rules[0].query || "") : "", case_sensitive: single && !!rules[0].caseSensitive },
+    }), null, "reflectFindReplaceMemoryText");
+    if (!listed || listed.status !== "ok") {
+      report(tf("findReplace.memoryFailed", { detail: (listed && listed.detail) || "request failed" }), true);
+      return;
+    }
+    const plan = buildMemoryTextReplacePlan(listed, list);
+    let selection = { kinds: new Set(), renames: new Set() };
+    if (plan.changes.length > 0 || plan.renames.length > 0) {
+      selection = await showMemoryTextReplacePreview(plan);
+      if (!selection) {
+        report("", false);
+        return;
+      }
+    }
+    const changes = plan.changes.filter(function(change) { return selection.kinds.has(change.kind); });
+    const renames = plan.renames.filter(function(rename) { return selection.renames.has(rename.stable_entity_id); });
+    let textReport = { text: "", isError: false };
+    await reflectFindReplaceTextOnly(sid, function(text, isError) { textReport = { text, isError }; });
+    if (textReport.isError) {
+      report(textReport.text, true);
+      return;
+    }
+    if (changes.length === 0 && renames.length === 0) {
+      report(t("findReplace.memoryNothing"), false);
+      return;
+    }
+    const result = await safeCall(() => bridgeFetch("/admin/memory-text/apply", {
+      method: "POST",
+      body: {
+        chat_session_id: sid,
+        changes: changes.map(function(change) { return { ref: change.ref, before: change.before, after: change.after }; }),
+        renames: renames.map(function(rename) { return { stable_entity_id: rename.stable_entity_id, to: rename.to }; }),
+      },
+    }), null, "reflectFindReplaceMemoryText");
+    if (!result || (result.status !== "ok" && result.status !== "partial_error")) {
+      report(tf("findReplace.memoryFailed", { detail: (result && result.detail) || "request failed" }), true);
+      return;
+    }
+    report(formatMemoryTextReplaceResult(result), result.status !== "ok");
+  }
+
+  // What the rules change: one entry per changed text field, and the
+  // characters whose shown name changes.
+  function buildMemoryTextReplacePlan(listed, rules) {
+    const applyRules = function(text) {
+      let out = String(text == null ? "" : text);
+      for (const rule of rules) out = findReplaceInText(out, rule.regex, rule.replacement, rule.useRegex).after;
+      return out;
+    };
+    const changes = [];
+    for (const field of Array.isArray(listed.fields) ? listed.fields : []) {
+      const after = applyRules(field.text);
+      if (after !== field.text) changes.push({ ref: field.ref, kind: field.kind, turn: field.turn, before: field.text, after: after });
+    }
+    const renames = [];
+    for (const character of Array.isArray(listed.characters) ? listed.characters : []) {
+      const label = String(character && character.label || "");
+      const to = applyRules(label).trim();
+      if (label && to && to !== label) renames.push({ stable_entity_id: String(character.stable_entity_id || ""), from: label, to: to });
+    }
+    return { changes, renames };
+  }
+
+  const MEMORY_TEXT_REPLACE_KINDS = ["source", "memories", "evidence", "precise", "kg", "hierarchy", "trust", "world", "entities"];
+
+  function memoryTextReplaceKindLabel(kind) {
+    const explorer = { memories: "memories", evidence: "direct_evidence", kg: "kg_triples", hierarchy: "episodes", trust: "trust", world: "world", entities: "entities" };
+    if (explorer[kind]) return t("explorer.tabs." + explorer[kind] + ".label");
+    return t("findReplace.kind." + kind);
+  }
+
+  // A short before → after excerpt around the first change.
+  function memoryTextReplaceSnippet(before, after) {
+    let start = 0;
+    while (start < before.length && start < after.length && before[start] === after[start]) start++;
+    let endBefore = before.length, endAfter = after.length;
+    while (endBefore > start && endAfter > start && before[endBefore - 1] === after[endAfter - 1]) { endBefore--; endAfter--; }
+    const from = Math.max(0, start - 24);
+    const cut = function(text, end) { return (from > 0 ? "…" : "") + text.slice(from, Math.min(text.length, end + 24)) + (end + 24 < text.length ? "…" : ""); };
+    return { before: cut(before, endBefore), after: cut(after, endAfter) };
+  }
+
+  // Asks which kinds and renames to apply; resolves to the selection, or
+  // null when cancelled.
+  function showMemoryTextReplacePreview(plan) {
+    const existing = document.getElementById("mo-confirm-modal");
+    if (existing) existing.remove();
+    const byKind = new Map();
+    for (const change of plan.changes) {
+      if (!byKind.has(change.kind)) byKind.set(change.kind, []);
+      byKind.get(change.kind).push(change);
+    }
+    const kinds = MEMORY_TEXT_REPLACE_KINDS.filter(function(kind) { return byKind.has(kind); });
+    const kindHtml = kinds.map(function(kind) {
+      const items = byKind.get(kind);
+      const samples = items.slice(0, 3).map(function(change) {
+        const snippet = memoryTextReplaceSnippet(change.before, change.after);
+        return '<div style="font-size:11px;opacity:.8;margin-left:22px"><s>' + escapeAttr(snippet.before) + '</s> → ' + escapeAttr(snippet.after) + '</div>';
+      }).join("");
+      return '<label style="display:block;margin:6px 0"><input type="checkbox" data-memory-kind="' + escapeAttr(kind) + '" checked> ' +
+        escapeAttr(memoryTextReplaceKindLabel(kind)) + ' (' + items.length + ')</label>' + samples;
+    }).join("");
+    const renameHtml = plan.renames.map(function(rename) {
+      return '<label style="display:block;margin:6px 0"><input type="checkbox" data-memory-rename="' + escapeAttr(rename.stable_entity_id) + '" checked> ' +
+        escapeAttr(tf("findReplace.memoryRename", { from: rename.from, to: rename.to })) + '</label>';
+    }).join("") + (plan.renames.length > 0 ? '<div style="font-size:11px;opacity:.8">' + escapeAttr(t("findReplace.memoryRenameHint")) + '</div>' : "");
+    return new Promise(function(resolve) {
+      let settled = false;
+      const modal = document.createElement("div");
+      modal.id = "mo-confirm-modal";
+      modal.className = "mo-export-overlay";
+      modal.innerHTML =
+        '<div class="mo-export-panel" style="width:min(92%,640px);max-height:85vh;display:flex;flex-direction:column">' +
+          '<div class="mo-export-hdr"><h3>' + escapeAttr(t("findReplace.memoryPreviewTitle")) + '</h3><button class="mo-close" data-memory-cancel>✕</button></div>' +
+          '<div class="mo-export-info" style="white-space:normal;line-height:1.6;overflow:auto">' +
+            escapeAttr(tf("findReplace.memoryPreviewIntro", { count: plan.changes.length })) + kindHtml + renameHtml +
+          '</div>' +
+          '<div class="mo-export-actions" style="justify-content:flex-end;flex-wrap:wrap">' +
+            '<button class="mo-btn mo-btn-ghost" data-memory-cancel>' + t('explorer.edit.cancelBtn') + '</button>' +
+            '<button class="mo-btn mo-btn-primary" data-memory-apply>' + escapeAttr(t("findReplace.memoryApply")) + '</button>' +
+          '</div>' +
+        '</div>';
+      const finish = function(value) {
+        if (settled) return;
+        settled = true;
+        modal.remove();
+        resolve(value);
+      };
+      document.body.appendChild(modal);
+      const panel = modal.querySelector(".mo-export-panel");
+      if (panel) panel.addEventListener("click", function(event) { event.stopPropagation(); });
+      modal.addEventListener("click", function() { finish(null); });
+      modal.querySelectorAll("[data-memory-cancel]").forEach(function(button) { button.addEventListener("click", function() { finish(null); }); });
+      const apply = modal.querySelector("[data-memory-apply]");
+      if (apply) apply.addEventListener("click", function() {
+        const selection = { kinds: new Set(), renames: new Set() };
+        modal.querySelectorAll("[data-memory-kind]").forEach(function(box) { if (box.checked) selection.kinds.add(box.getAttribute("data-memory-kind")); });
+        modal.querySelectorAll("[data-memory-rename]").forEach(function(box) { if (box.checked) selection.renames.add(box.getAttribute("data-memory-rename")); });
+        finish(selection);
+      });
+    });
+  }
+
+  function formatMemoryTextReplaceResult(result) {
+    const lines = [tf("findReplace.memoryDone", { applied: Number(result.applied || 0) })];
+    const stale = Array.isArray(result.stale) ? result.stale.length : 0;
+    if (stale > 0) lines.push(tf("findReplace.memoryStale", { count: stale }));
+    const renames = Array.isArray(result.renames) ? result.renames : [];
+    const renamed = renames.filter(function(item) { return item && (item.status === "renamed" || item.status === "merged" || item.status === "already_merged"); }).length;
+    if (renamed > 0) lines.push(tf("findReplace.memoryRenamed", { count: renamed }));
+    if (renames.length > renamed) lines.push(tf("findReplace.memoryRenameFailed", { count: renames.length - renamed }));
+    const vectors = result.vector_refresh && typeof result.vector_refresh === "object" ? result.vector_refresh : {};
+    if (vectors.status === "queued") lines.push(t("findReplace.memoryVectorsQueued"));
+    else if (vectors.reason === "embedder_not_configured") lines.push(t("findReplace.memoryVectorsSkipped"));
+    return lines.join(" ");
+  }
+
   // Stores the changed text of every edited turn of the open chat and keeps
   // its memories: for find and replace that changes nothing remembered.
   async function reflectFindReplaceTextOnly(sessionId, report) {
@@ -57584,17 +57817,28 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
     try {
       const raw = await persistentGet(findReplacePendingKey(sid));
       const parsed = raw ? JSON.parse(String(raw)) : null;
-      if (parsed && Number(parsed.messages) > 0) pending = { messages: Number(parsed.messages), since: Number(parsed.since) || 0 };
+      if (parsed && Number(parsed.messages) > 0) {
+        pending = {
+          messages: Number(parsed.messages), since: Number(parsed.since) || 0,
+          rules: Array.isArray(parsed.rules) ? parsed.rules : [], rulesComplete: parsed.rulesComplete === true,
+        };
+      }
     } catch { pending = null; }
     _findReplacePending.set(sid, pending);
     return pending;
   }
 
-  async function addFindReplacePending(sessionId, messages) {
+  // rule is the replace that changed the messages; an undo passes none, after
+  // which the changes can no longer be replayed on memory.
+  async function addFindReplacePending(sessionId, messages, rule) {
     const sid = String(sessionId || "").trim();
     if (!sid || !(messages > 0)) return;
     const current = await loadFindReplacePending(sid);
-    const next = { messages: (current ? current.messages : 0) + messages, since: current ? current.since : Date.now() };
+    const next = {
+      messages: (current ? current.messages : 0) + messages, since: current ? current.since : Date.now(),
+      rules: (current && Array.isArray(current.rules) ? current.rules : []).concat(rule ? [rule] : []),
+      rulesComplete: (!current || current.rulesComplete === true) && !!rule,
+    };
     _findReplacePending.set(sid, next);
     await persistentSet(findReplacePendingKey(sid), JSON.stringify(next)).catch(function() {});
   }
@@ -57629,9 +57873,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       (_sessionNormalizeState.loading ? " disabled" : "") + '>' + escapeAttr(t("findReplace.reflect")) + '</button></div>';
   }
 
-  // Runs session normalize for the pending changes. The pending state stays
-  // until normalize takes the edited turns.
-  async function reflectFindReplacePending(sessionId, onStatus) {
+  // Asks how to apply the pending changes: store the chat text only, apply
+  // the same replaces to stored memory, or run session normalize. Right after
+  // a replace it also offers to wait. The pending state stays until one of
+  // them takes the edited turns.
+  async function reflectFindReplacePending(sessionId, onStatus, options) {
     const sid = String(sessionId || "").trim();
     const pending = await loadFindReplacePending(sid);
     if (!pending) return;
@@ -57640,11 +57886,17 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       report(t("findReplace.normalizeBusy"), true);
       return;
     }
-    const choice = await showChoiceModal(t("findReplace.reflect"), tf("findReplace.reflectConfirm", { count: pending.messages }), [
-      { value: "text", label: t("findReplace.reflectTextOnly") },
-      { value: "memory", label: t("findReplace.reflectMemory"), primary: true },
-    ]);
+    const opts = options && typeof options === "object" ? options : {};
+    const canReplayRules = pending.rulesComplete === true && Array.isArray(pending.rules) && pending.rules.length > 0;
+    const choices = [{ value: "text", label: t("findReplace.reflectTextOnly") }];
+    if (canReplayRules) choices.push({ value: "memory_text", label: t("findReplace.reflectMemoryText"), primary: true });
+    choices.push({ value: "memory", label: t("findReplace.reflectMemory"), primary: !canReplayRules });
+    if (opts.afterApply) choices.unshift({ value: "later", label: t("findReplace.reflectLater") });
+    const message = tf("findReplace.reflectConfirm", { count: pending.messages }) +
+      (canReplayRules ? "\n" + t("findReplace.reflectMemoryTextLine") : "");
+    const choice = await showChoiceModal(t("findReplace.reflect"), message, choices);
     if (choice === "text") return reflectFindReplaceTextOnly(sid, report);
+    if (choice === "memory_text") return reflectFindReplaceMemoryText(sid, pending.rules, report);
     if (choice !== "memory") return;
     const started = await normalizeSession(sid, 0, {
       skipConfirm: true,
@@ -57925,6 +58177,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       st.preview = Object.assign({}, where, {
         chatId: String(chat.id || ""),
         replacement: st.replacement,
+        rule: { query: st.query, replacement: st.replacement, regex: !!st.regex, caseSensitive: !!st.caseSensitive },
         entries: buildFindReplacePreview(chat.message, matcher.regex, st.replacement, st.regex, st.target),
       });
     } catch (err) {
@@ -57983,14 +58236,21 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       st.undo = { sessionId: preview.sessionId, charIdx: preview.charIdx, chatIdx: preview.chatIdx, chatId: preview.chatId, entries: result.changed };
       st.preview = null;
       st.sessionId = preview.sessionId;
-      await addFindReplacePending(preview.sessionId, result.changed.length);
+      await addFindReplacePending(preview.sessionId, result.changed.length, preview.rule);
       setFindReplaceStatus(tf("findReplace.applied", { count: result.changed.length }) +
         (result.skipped > 0 ? " " + tf("findReplace.skipped", { count: result.skipped }) : "") +
         "\n" + t("findReplace.pendingAdded"), false);
+      st.reflectAfterApply = preview.sessionId;
     } catch (err) {
       setFindReplaceStatus(tf("findReplace.failed", { error: String(err && err.message || err) }), true);
     } finally {
       st.applying = false;
+      paintFindReplacePanel();
+    }
+    const reflectSid = st.reflectAfterApply;
+    st.reflectAfterApply = "";
+    if (reflectSid) {
+      await reflectFindReplacePending(reflectSid, setFindReplaceStatus, { afterApply: true });
       paintFindReplacePanel();
     }
   }

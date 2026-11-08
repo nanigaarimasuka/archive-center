@@ -30,6 +30,8 @@ func (s *Server) registerAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/rescan", s.handleAdminRescan)
 	mux.HandleFunc("POST /admin/session-normalize", s.handleAdminSessionNormalize)
 	mux.HandleFunc("POST /admin/session-turn-text", s.handleAdminSessionTurnText)
+	mux.HandleFunc("POST /admin/memory-text/fields", s.handleMemoryTextFields)
+	mux.HandleFunc("POST /admin/memory-text/apply", s.handleMemoryTextApply)
 	mux.HandleFunc("POST /admin/hierarchy/regenerate", s.handleHierarchyRegenerate)
 	mux.HandleFunc("GET /admin/jobs", s.handleAdminJobs)
 	mux.HandleFunc("GET /admin/jobs/{job_id}", s.handleAdminJob)

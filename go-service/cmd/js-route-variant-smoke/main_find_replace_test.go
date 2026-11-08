@@ -26,7 +26,7 @@ func TestFindReplaceMatchesStringReplaceAndAppliesOnlyPreviewedMessages(t *testi
 		`acceptEdits: true,`,
 		`if (editsCovered) await clearFindReplacePending(sid);`,
 		`editsCovered = applyTurnEdits.length > 0 || !(Array.isArray(plan.rawMismatchTurns) && plan.rawMismatchTurns.length > 0);`,
-		`await addFindReplacePending(preview.sessionId, result.changed.length);`,
+		`await addFindReplacePending(preview.sessionId, result.changed.length, preview.rule);`,
 	} {
 		if !strings.Contains(src, required) {
 			t.Fatalf("Archive Center.js missing %q", required)
