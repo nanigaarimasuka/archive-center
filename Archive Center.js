@@ -155,6 +155,7 @@
     pluginMainClaudePromptCacheMode: "off",
     pluginMainExtraHeadersJson: "",
     pluginMainExtraBodyJson: "",
+    pluginMainOpenRouterProviderRoute: "",
     // ── 편집 검토 LLM (편집자 결과 second-pass 검토 전용) ──
     subLlmProvider: "openai",
     subLlmApiKey: "",
@@ -172,6 +173,7 @@
     subLlmClaudePromptCacheMode: "off",
     subLlmExtraHeadersJson: "",
     subLlmExtraBodyJson: "",
+    subLlmOpenRouterProviderRoute: "",
     // ── Embedding LLM (메모리 검색용 임베딩) ──
     embeddingProvider: "openai",
     embeddingApiKey: "",
@@ -194,6 +196,7 @@
     backupApiKey: "",
     backupEndpoint: "",
     backupModel: "",
+    backupOpenRouterProviderRoute: "",
     backupTimeoutMs: 120000,
     backupTimeoutFromRole: true,
     backupTemperature: 0.7,
@@ -12661,7 +12664,11 @@
       );
     }
     const extraHeaders = sanitizeProviderOverrideJsonSetting(isSub ? settings.subLlmExtraHeadersJson : settings.pluginMainExtraHeadersJson);
-    const extraBody = sanitizeProviderOverrideJsonSetting(isSub ? settings.subLlmExtraBodyJson : settings.pluginMainExtraBodyJson);
+    const extraBody = forkExtraBodyWithProviderRoute(
+      sanitizeProviderOverrideJsonSetting(isSub ? settings.subLlmExtraBodyJson : settings.pluginMainExtraBodyJson),
+      isSub ? settings.subLlmOpenRouterProviderRoute : settings.pluginMainOpenRouterProviderRoute,
+      provider,
+    );
     if (provider === "vertex") {
       const flexMode = normalizeVertexFlexModeSetting(isSub ? settings.subLlmVertexFlexMode : settings.pluginMainVertexFlexMode);
       if (flexMode && flexMode !== "off") payload.vertex_flex_mode = flexMode;
@@ -12687,7 +12694,11 @@
         ? normalizeClaudePromptCacheModeSetting(isSub ? cfg.subLlmClaudePromptCacheMode : cfg.pluginMainClaudePromptCacheMode)
         : "",
       extraHeadersJson: sanitizeProviderOverrideJsonSetting(isSub ? cfg.subLlmExtraHeadersJson : cfg.pluginMainExtraHeadersJson),
-      extraBodyJson: sanitizeProviderOverrideJsonSetting(isSub ? cfg.subLlmExtraBodyJson : cfg.pluginMainExtraBodyJson),
+      extraBodyJson: sanitizeProviderOverrideJsonSetting(forkExtraBodyWithProviderRoute(
+        isSub ? cfg.subLlmExtraBodyJson : cfg.pluginMainExtraBodyJson,
+        isSub ? cfg.subLlmOpenRouterProviderRoute : cfg.pluginMainOpenRouterProviderRoute,
+        normalizedProvider,
+      )),
     };
   }
 
@@ -12910,6 +12921,7 @@
     merged.pluginMainClaudePromptCacheMode = normalizeClaudePromptCacheModeSetting(merged.pluginMainClaudePromptCacheMode);
     merged.pluginMainExtraHeadersJson = sanitizeProviderOverrideJsonSetting(merged.pluginMainExtraHeadersJson);
     merged.pluginMainExtraBodyJson = sanitizeProviderOverrideJsonSetting(merged.pluginMainExtraBodyJson);
+    merged.pluginMainOpenRouterProviderRoute = forkSanitizeOpenRouterProviderRoute(merged.pluginMainOpenRouterProviderRoute);
     merged.subLlmProvider = getSubLlmProviderSetting(merged.subLlmProvider);
     merged.subLlmTimeoutMs = getSubLlmTimeoutSettingMs(merged.subLlmTimeoutMs);
     merged.subLlmTemperature = getSubLlmTemperatureSetting(merged.subLlmTemperature);
@@ -12928,6 +12940,7 @@
     merged.subLlmClaudePromptCacheMode = normalizeClaudePromptCacheModeSetting(merged.subLlmClaudePromptCacheMode);
     merged.subLlmExtraHeadersJson = sanitizeProviderOverrideJsonSetting(merged.subLlmExtraHeadersJson);
     merged.subLlmExtraBodyJson = sanitizeProviderOverrideJsonSetting(merged.subLlmExtraBodyJson);
+    merged.subLlmOpenRouterProviderRoute = forkSanitizeOpenRouterProviderRoute(merged.subLlmOpenRouterProviderRoute);
     merged.embeddingProvider = normalizeEmbeddingProvider(merged.embeddingProvider, DEFAULT_SETTINGS.embeddingProvider);
     merged.embeddingTimeout = sanitizeNumber(merged.embeddingTimeout, DEFAULT_SETTINGS.embeddingTimeout, 5, 3000);
     merged.embeddingRetryCount = Math.trunc(sanitizeNumber(merged.embeddingRetryCount, DEFAULT_SETTINGS.embeddingRetryCount, 0, 10));
@@ -12942,6 +12955,7 @@
     merged.sourceSearchPlannerReasoningBudgetTokens = normalizeReasoningBudgetTokens(merged.sourceSearchPlannerReasoningBudgetTokens, DEFAULT_SETTINGS.sourceSearchPlannerReasoningBudgetTokens);
     merged.backupLlmEnabled = merged.backupLlmEnabled === true;
     merged.backupProvider = getSubLlmProviderSetting(merged.backupProvider || DEFAULT_SETTINGS.backupProvider);
+    merged.backupOpenRouterProviderRoute = forkSanitizeOpenRouterProviderRoute(merged.backupOpenRouterProviderRoute);
     merged.backupTimeoutMs = sanitizeNumber(merged.backupTimeoutMs, DEFAULT_SETTINGS.backupTimeoutMs, 5000, 300000);
     merged.backupTimeoutFromRole = merged.backupTimeoutFromRole !== false;
     merged.backupTemperatureFromRole = merged.backupTemperatureFromRole !== false;
@@ -13220,6 +13234,7 @@
       backupApiKey: typeof s.backupApiKey === "string" ? s.backupApiKey : "",
       backupEndpoint: typeof s.backupEndpoint === "string" ? s.backupEndpoint : "",
       backupModel: typeof s.backupModel === "string" ? s.backupModel : "",
+      backupOpenRouterProviderRoute: typeof s.backupOpenRouterProviderRoute === "string" ? s.backupOpenRouterProviderRoute.trim() : "",
       backupTimeout: Math.ceil(sanitizeNumber(s.backupTimeoutMs, DEFAULT_SETTINGS.backupTimeoutMs, 5000, 300000) / 1000),
       backupTemperature: sanitizeNumber(s.backupTemperature, DEFAULT_SETTINGS.backupTemperature, 0, 2),
       backupTemperatureFromRole: s.backupTemperatureFromRole !== false,
@@ -54359,6 +54374,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         </select>
         <small style="color:#888;font-size:11px;">지원되는 provider/model 조합에만 적용됩니다. 미지원 조합은 자동 강등 없이 400 오류를 반환합니다.</small>
       </div>
+      <div class="mo-row" id="mo-pluginMainOpenRouterProviderRouteRow">
+        <label>프로바이더 고정</label>
+        <input id="mo-pluginMainOpenRouterProviderRoute" type="text" spellcheck="false" placeholder="google-vertex" value="${escapeAttr(s.pluginMainOpenRouterProviderRoute || "")}">
+        <small style="color:#888;font-size:11px;">쉼표로 구분한 OpenRouter 업스트림 프로바이더(예: google-vertex, deepinfra)를 순서대로 고정합니다. 다른 프로바이더로 넘어가지 않으며, 비우면 OpenRouter가 고릅니다.</small>
+      </div>
       <div class="mo-row" id="mo-pluginMainClaudePromptCacheModeRow">
         <label>Claude Prompt Cache</label>
         <select id="mo-pluginMainClaudePromptCacheMode">
@@ -54471,6 +54491,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
         </select>
         <small style="color:#888;font-size:11px;">평론가처럼 지연을 감수할 수 있는 호출에 Flex를 선택할 수 있습니다. 지원 여부는 선택 모델에 따라 다릅니다.</small>
       </div>
+      <div class="mo-row" id="mo-subLlmOpenRouterProviderRouteRow">
+        <label>프로바이더 고정</label>
+        <input id="mo-subLlmOpenRouterProviderRoute" type="text" spellcheck="false" placeholder="google-vertex" value="${escapeAttr(s.subLlmOpenRouterProviderRoute || "")}">
+        <small style="color:#888;font-size:11px;">쉼표로 구분한 OpenRouter 업스트림 프로바이더(예: google-vertex, deepinfra)를 순서대로 고정합니다. 다른 프로바이더로 넘어가지 않으며, 비우면 OpenRouter가 고릅니다.</small>
+      </div>
       <div class="mo-row" id="mo-subLlmClaudePromptCacheModeRow">
         <label>Claude Prompt Cache</label>
         <select id="mo-subLlmClaudePromptCacheMode">
@@ -54582,6 +54607,11 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       <div class="mo-row">
         <label>Model</label>
         <input type="text" id="mo-backupModel" value="${escapeAttr(s.backupModel)}" placeholder="예: gpt-4o">
+      </div>
+      <div class="mo-row" id="mo-backupOpenRouterProviderRouteRow">
+        <label>프로바이더 고정</label>
+        <input id="mo-backupOpenRouterProviderRoute" type="text" spellcheck="false" placeholder="google-vertex" value="${escapeAttr(s.backupOpenRouterProviderRoute || "")}">
+        <small style="color:#888;font-size:11px;">쉼표로 구분한 OpenRouter 업스트림 프로바이더(예: google-vertex, deepinfra)를 순서대로 고정합니다. 다른 프로바이더로 넘어가지 않으며, 비우면 OpenRouter가 고릅니다.</small>
       </div>
       <div class="mo-row mo-range-row">
         <label>Timeout (ms)</label>
@@ -55907,6 +55937,9 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
       syncVertexOverrideRows("mo-subLlmProvider", ["mo-subLlmVertexFlexRow"]);
       syncProviderSpecificRow("mo-pluginMainProvider", "mo-pluginMainLlmGatewayServiceTierRow", ["openai", "llmgateway", "vercel", "neuralwatt", "custom"]);
       syncProviderSpecificRow("mo-subLlmProvider", "mo-subLlmLlmGatewayServiceTierRow", ["openai", "llmgateway", "vercel", "neuralwatt", "custom"]);
+      syncProviderSpecificRow("mo-pluginMainProvider", "mo-pluginMainOpenRouterProviderRouteRow", "openrouter");
+      syncProviderSpecificRow("mo-subLlmProvider", "mo-subLlmOpenRouterProviderRouteRow", "openrouter");
+      syncProviderSpecificRow("mo-backupProvider", "mo-backupOpenRouterProviderRouteRow", "openrouter");
       syncProviderSpecificRow("mo-pluginMainProvider", "mo-pluginMainClaudePromptCacheModeRow", "claude");
       syncProviderSpecificRow("mo-subLlmProvider", "mo-subLlmClaudePromptCacheModeRow", "claude");
 
@@ -55971,6 +56004,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             pluginMainClaudePromptCacheMode: readValue("mo-pluginMainClaudePromptCacheMode", settings.pluginMainClaudePromptCacheMode, true),
             pluginMainExtraHeadersJson: readValue("mo-pluginMainExtraHeadersJson", settings.pluginMainExtraHeadersJson, true),
             pluginMainExtraBodyJson: readValue("mo-pluginMainExtraBodyJson", settings.pluginMainExtraBodyJson, true),
+            pluginMainOpenRouterProviderRoute: forkSanitizeOpenRouterProviderRoute(readValue("mo-pluginMainOpenRouterProviderRoute", settings.pluginMainOpenRouterProviderRoute, true)),
             subLlmApiKey: $("mo-subLlmApiKey").value,
             subLlmProvider: $("mo-subLlmProvider").value,
             subLlmEndpoint: $("mo-subLlmEndpoint").value.trim(),
@@ -55987,6 +56021,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             subLlmClaudePromptCacheMode: readValue("mo-subLlmClaudePromptCacheMode", settings.subLlmClaudePromptCacheMode, true),
             subLlmExtraHeadersJson: readValue("mo-subLlmExtraHeadersJson", settings.subLlmExtraHeadersJson, true),
             subLlmExtraBodyJson: readValue("mo-subLlmExtraBodyJson", settings.subLlmExtraBodyJson, true),
+            subLlmOpenRouterProviderRoute: forkSanitizeOpenRouterProviderRoute(readValue("mo-subLlmOpenRouterProviderRoute", settings.subLlmOpenRouterProviderRoute, true)),
             embeddingProvider: $("mo-embeddingProvider").value,
             embeddingApiKey: $("mo-embeddingApiKey").value,
             embeddingEndpoint: $("mo-embeddingEndpoint").value.trim(),
@@ -55996,6 +56031,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
             backupApiKey: readValue("mo-backupApiKey", settings.backupApiKey),
             backupEndpoint: readValue("mo-backupEndpoint", settings.backupEndpoint, true),
             backupModel: readValue("mo-backupModel", settings.backupModel, true),
+            backupOpenRouterProviderRoute: forkSanitizeOpenRouterProviderRoute(readValue("mo-backupOpenRouterProviderRoute", settings.backupOpenRouterProviderRoute, true)),
             backupTimeoutMs: readValue("mo-backupTimeoutMs", settings.backupTimeoutMs),
             backupTimeoutFromRole: $("mo-backupTimeoutFromRole") ? $("mo-backupTimeoutFromRole").checked : settings.backupTimeoutFromRole,
             backupTemperature: readValue("mo-backupTemperature", settings.backupTemperature),
@@ -56090,11 +56126,13 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           setValueIfPresent("mo-pluginMainClaudePromptCacheMode", settings.pluginMainClaudePromptCacheMode || "off");
           setValueIfPresent("mo-pluginMainExtraHeadersJson", settings.pluginMainExtraHeadersJson || "");
           setValueIfPresent("mo-pluginMainExtraBodyJson", settings.pluginMainExtraBodyJson || "");
+          setValueIfPresent("mo-pluginMainOpenRouterProviderRoute", settings.pluginMainOpenRouterProviderRoute || "");
           setValueIfPresent("mo-subLlmVertexFlexMode", settings.subLlmVertexFlexMode || "off");
           setValueIfPresent("mo-subLlmLlmGatewayServiceTier", settings.subLlmLlmGatewayServiceTier || "standard");
           setValueIfPresent("mo-subLlmClaudePromptCacheMode", settings.subLlmClaudePromptCacheMode || "off");
           setValueIfPresent("mo-subLlmExtraHeadersJson", settings.subLlmExtraHeadersJson || "");
           setValueIfPresent("mo-subLlmExtraBodyJson", settings.subLlmExtraBodyJson || "");
+          setValueIfPresent("mo-subLlmOpenRouterProviderRoute", settings.subLlmOpenRouterProviderRoute || "");
           for (let i = 0; i < reasoningSyncRunners.length; i++) reasoningSyncRunners[i]();
           $("mo-coreObjectiveMemoryMaxItems").value = settings.coreObjectiveMemoryMaxItems;
           $("mo-recentConversationReferenceCount").value = settings.recentConversationReferenceCount;
@@ -56254,7 +56292,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           const testLlmGatewayServiceTier = normalizeLlmGatewayServiceTierSetting((($("mo-pluginMainLlmGatewayServiceTier") || {}).value || "standard").trim());
           const testClaudePromptCacheMode = normalizeClaudePromptCacheModeSetting((($("mo-pluginMainClaudePromptCacheMode") || {}).value || "off").trim());
           const testExtraHeadersJson = sanitizeProviderOverrideJsonSetting((($("mo-pluginMainExtraHeadersJson") || {}).value || ""));
-          const testExtraBodyJson = sanitizeProviderOverrideJsonSetting((($("mo-pluginMainExtraBodyJson") || {}).value || ""));
+          const testExtraBodyJson = forkExtraBodyWithProviderRoute(sanitizeProviderOverrideJsonSetting((($("mo-pluginMainExtraBodyJson") || {}).value || "")), (($("mo-pluginMainOpenRouterProviderRoute") || {}).value || ""), testProvider);
           const testBody = {
             model: testModel,
             messages: [{ role: "user", content: "Reply with exactly: ARCHIVE_CENTER_PUBLISHER_OK" }],
@@ -56342,7 +56380,7 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
           const testLlmGatewayServiceTier = normalizeLlmGatewayServiceTierSetting((($("mo-subLlmLlmGatewayServiceTier") || {}).value || "standard").trim());
           const testClaudePromptCacheMode = normalizeClaudePromptCacheModeSetting((($("mo-subLlmClaudePromptCacheMode") || {}).value || "off").trim());
           const testExtraHeadersJson = sanitizeProviderOverrideJsonSetting((($("mo-subLlmExtraHeadersJson") || {}).value || ""));
-          const testExtraBodyJson = sanitizeProviderOverrideJsonSetting((($("mo-subLlmExtraBodyJson") || {}).value || ""));
+          const testExtraBodyJson = forkExtraBodyWithProviderRoute(sanitizeProviderOverrideJsonSetting((($("mo-subLlmExtraBodyJson") || {}).value || "")), (($("mo-subLlmOpenRouterProviderRoute") || {}).value || ""), testProvider);
           const testBody = {
             model: testModel,
             messages: [{ role: "user", content: "Reply with exactly: OK" }],
@@ -56737,6 +56775,33 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.45;cur
   // Functions this fork adds. They are declarations, so they are hoisted
   // and their place in the file does not matter.
   // ──────────────────────────────────────────────────────────────
+
+  // OpenRouter upstream provider pinning, set per model block. "a, b" becomes
+  // {"provider":{"order":["a","b"],"allow_fallbacks":false}} merged into the
+  // extra body; the backend lets `provider` through for OpenRouter only.
+  function forkOpenRouterProviderSlugs(value) {
+    return String(value || "").split(",").map(function(slug) { return slug.trim(); }).filter(Boolean);
+  }
+  function forkSanitizeOpenRouterProviderRoute(value) {
+    return forkOpenRouterProviderSlugs(value).join(", ").slice(0, 500);
+  }
+  function forkExtraBodyWithProviderRoute(extraBodyJson, route, provider) {
+    const slugs = forkOpenRouterProviderSlugs(route);
+    if (normalizeLlmProvider(provider, "openai") !== "openrouter" || slugs.length === 0) return extraBodyJson;
+    const text = typeof extraBodyJson === "string" ? extraBodyJson.trim() : "";
+    let body = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch (_) {
+        return extraBodyJson;
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)) return extraBodyJson;
+    }
+    const current = body.provider && typeof body.provider === "object" && !Array.isArray(body.provider) ? body.provider : {};
+    body.provider = Object.assign({}, current, { order: slugs, allow_fallbacks: false });
+    return JSON.stringify(body);
+  }
 
   // Applies the replaces made in the chat to stored memory too: the plugin
   // runs the same rules over the text the backend lists, shows what changes,

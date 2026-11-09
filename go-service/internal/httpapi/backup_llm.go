@@ -35,6 +35,7 @@ type backupLLMTarget struct {
 	APIKey          string
 	Endpoint        string
 	Model           string
+	ProviderRoute   string
 	TimeoutMs       int64
 	Temperature     *float64
 	MaxTokens       *int64
@@ -74,6 +75,7 @@ func (s *Server) backupLLMFor(roles ...string) *backupLLMTarget {
 		APIKey:          strings.TrimSpace(rt.BackupAPIKey),
 		Endpoint:        strings.TrimSpace(rt.BackupEndpoint),
 		Model:           model,
+		ProviderRoute:   strings.TrimSpace(rt.BackupOpenRouterProviderRoute),
 		TimeoutMs:       runtimeTimeoutMs(rt.BackupTimeoutSec),
 		Temperature:     rt.BackupTemperature,
 		MaxTokens:       rt.BackupMaxTokens,
@@ -129,6 +131,7 @@ func (b *backupLLMTarget) request(primary dto.ProxyPluginMainRequest) dto.ProxyP
 		budget := *b.ReasoningBudget
 		out.ReasoningBudgetTokens = &budget
 	}
+	out.ExtraBodyJSON = backupForkOpenRouterExtraBody(provider, b.ProviderRoute)
 	return out
 }
 

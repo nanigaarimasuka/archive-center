@@ -1595,7 +1595,11 @@ func proxyApplyRequestOverrides(headers map[string]string, body map[string]any, 
 		if err != nil {
 			return trace, err
 		}
+		routed := proxyForkTakeOpenRouterProvider(body, extraBody, provider, trace)
 		applied, blocked := proxyMergeExtraBody(body, extraBody, "")
+		if routed {
+			applied = append(applied, "provider")
+		}
 		trace["extra_body_applied"] = len(applied) > 0
 		trace["extra_body_keys"] = applied
 		if len(blocked) > 0 {

@@ -77,6 +77,7 @@ type RuntimeConfig struct {
 	BackupAPIKey                       string
 	BackupEndpoint                     string
 	BackupModel                        string
+	BackupOpenRouterProviderRoute      string
 	BackupTimeoutSec                   int64
 	BackupTemperature                  *float64
 	BackupTemperatureFromRole          bool
@@ -317,6 +318,7 @@ func (s *Server) updateRuntimeConfig(body map[string]any) []string {
 	setString("backupApiKey", &s.RuntimeConfig.BackupAPIKey)
 	setString("backupEndpoint", &s.RuntimeConfig.BackupEndpoint)
 	setString("backupModel", &s.RuntimeConfig.BackupModel)
+	setString("backupOpenRouterProviderRoute", &s.RuntimeConfig.BackupOpenRouterProviderRoute)
 	setInt("backupTimeout", &s.RuntimeConfig.BackupTimeoutSec)
 	setFloatPtr("backupTemperature", &s.RuntimeConfig.BackupTemperature)
 	setIntPtr("backupMaxCompletionTokens", &s.RuntimeConfig.BackupMaxTokens)
